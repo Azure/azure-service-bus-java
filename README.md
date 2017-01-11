@@ -30,18 +30,18 @@ See our [Contribution Guidelines](./.github/CONTRIBUTING.md).
   
 - [ ] Sprint 2: **Batch operations complete**
   * RenewLock (Request/Response)
-  * Batch operation  - Explicit batching only
+  * ~~Batch operation  - Explicit batching only~~
   * Runtime operation only
   * Linux testing setup/investigation
 
 - [ ] Sprint 3: **Topic/subscription support complete**
-  * Add topic/subscription support
+  * ~~Add topic/subscription support~~
   * Session support
     * Accept session
     * Session Receive/ReceiveBatch
 	
 - [ ] Sprint 4: **Retry policy complete**
-  * Retry policy
+  * ~~Retry policy~~
   * Receive by sequence number
 
 - [ ] Sprint 5:
