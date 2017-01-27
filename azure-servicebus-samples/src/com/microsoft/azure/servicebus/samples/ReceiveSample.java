@@ -11,7 +11,7 @@ import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 public class ReceiveSample {
 
-	private static final String ENVIRONMENT_VARIABLE_NAME = "azure-service-bus-dotnet/connectionstring";
+	private static final String ENVIRONMENT_VARIABLE_NAME = "azure-service-bus-java/connectionstring";
 	private static IMessageReceiver receiver;
 
 	public static void main(String[] args) throws Exception {

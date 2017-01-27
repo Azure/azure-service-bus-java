@@ -8,7 +8,7 @@ import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 public class SendSample {
 	
-	private static final String ENVIRONMENT_VARIABLE_NAME = "azure-service-bus-dotnet/connectionstring";
+	private static final String ENVIRONMENT_VARIABLE_NAME = "azure-service-bus-java/connectionstring";
 	private static final int NUMBER_OF_MESSAGES = 1;
 	private static IMessageSender sender;
 	
