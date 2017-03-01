@@ -141,7 +141,9 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public void abandon(UUID lockToken) throws InterruptedException, ServiceBusException {
+
 		Utils.completeFuture(this.abandonAsync(lockToken));
+
 	}
 
 	@Override
@@ -543,6 +545,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 							BrokeredMessage message = (BrokeredMessage)messageIterator.next();
 							Instant lockedUntilUtc = lockTimeIterator.next();
 							message.setLockedUntilUtc(lockedUntilUtc);
+
 							if(this.requestResponseLockTokensToLockTimesMap.containsKey(message.getLockToken()))
 							{
 								this.requestResponseLockTokensToLockTimesMap.put(message.getLockToken(), lockedUntilUtc);
