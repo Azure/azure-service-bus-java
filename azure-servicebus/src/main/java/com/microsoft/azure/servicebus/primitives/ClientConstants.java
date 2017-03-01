@@ -43,6 +43,8 @@ public final class ClientConstants
     public static final Symbol SESSIONS_CANNOT_BE_LOCKED_ERROR = Symbol.getSymbol(AmqpConstants.VENDOR + ":session-cannot-be-locked");
     public static final Symbol MESSAGE_NOT_FOUND_ERROR = Symbol.getSymbol(AmqpConstants.VENDOR + ":message-not-found");
     public static final Symbol SESSION_NOT_FOUND_ERROR = Symbol.getSymbol(AmqpConstants.VENDOR + ":session-not-found");
+    public static final Symbol SESSION_FILTER = Symbol.getSymbol(AmqpConstants.VENDOR + ":session-filter");
+    public static final Symbol LOCKED_UNTIL_UTC = Symbol.getSymbol(AmqpConstants.VENDOR + ":locked-until-utc");
 	
 	public static final String DEADLETTER_REASON_HEADER = "DeadLetterReason";
     public static final String DEADLETTER_ERROR_DESCRIPTION_HEADER = "DeadLetterErrorDescription";
