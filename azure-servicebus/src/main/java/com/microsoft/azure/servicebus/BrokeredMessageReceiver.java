@@ -28,7 +28,6 @@ import com.microsoft.azure.servicebus.primitives.Timer;
 import com.microsoft.azure.servicebus.primitives.TimerType;
 import com.microsoft.azure.servicebus.primitives.Util;
 
-
 // TODO As part of receive, don't return messages whose lock is already expired. Can happen because of delay between prefetch and actual receive from client.
 class BrokeredMessageReceiver extends InitializableEntity implements IMessageReceiver
 {
@@ -87,24 +86,48 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 			CompletableFuture<Void> factoryFuture;
 			if(this.messagingFactory == null)
 			{
-				factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder).thenAccept((f) -> {BrokeredMessageReceiver.this.messagingFactory = f;});
+				factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder).thenAccept((f) -> {this.messagingFactory = f;});
 			}
 			else
 			{
 				factoryFuture = CompletableFuture.completedFuture(null);
-			}
+			}			
 			
 			return factoryFuture.thenCompose((v) ->
 			{
-				CompletableFuture<MessageReceiver> receiverFuture = MessageReceiver.create(BrokeredMessageReceiver.this.messagingFactory, StringUtil.getRandomString(), BrokeredMessageReceiver.this.entityPath, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+				CompletableFuture<MessageReceiver> receiverFuture;
+				if(BrokeredMessageReceiver.this.isSessionReceiver())
+				{
+					receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+				}
+				else
+				{
+					receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+				}
+				
 				return receiverFuture.thenAccept((r) -> 
 				{
-					BrokeredMessageReceiver.this.internalReceiver = r;
-					BrokeredMessageReceiver.this.isInitialized = true;
+					this.internalReceiver = r;
+					this.isInitialized = true;
 				});
 			});
 		}
 	}
+	
+	protected boolean isSessionReceiver()
+	{
+		return false;
+	}	
+	
+	protected String getRequestedSessionId()
+	{
+		return null;
+	}
+	
+	protected final MessageReceiver getInternalReceiver()
+	{
+		return this.internalReceiver;
+	}	
 	
 	@Override
 	public String getEntityPath() {
@@ -118,7 +141,9 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public void abandon(UUID lockToken) throws InterruptedException, ServiceBusException {
-		Utils.completeFuture(this.abandonAsync(lockToken));		
+
+		Utils.completeFuture(this.abandonAsync(lockToken));
+
 	}
 
 	@Override
@@ -509,7 +534,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 			lockTokens[messageIndex++] = lockToken;
 		}
 		
-		return this.internalReceiver.renewMessageLocksAsync(lockTokens, null, this.messagingFactory.getOperationTimeout()).thenApply(
+		return this.internalReceiver.renewMessageLocksAsync(lockTokens, this.messagingFactory.getOperationTimeout()).thenApply(
 				(newLockedUntilTimes) ->
 					{
 						// Assuming both collections are of same size and in same order (order doesn't really matter as all instants in the response are same).
@@ -520,9 +545,10 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 							BrokeredMessage message = (BrokeredMessage)messageIterator.next();
 							Instant lockedUntilUtc = lockTimeIterator.next();
 							message.setLockedUntilUtc(lockedUntilUtc);
-							if(BrokeredMessageReceiver.this.requestResponseLockTokensToLockTimesMap.containsKey(message.getLockToken()))
+
+							if(this.requestResponseLockTokensToLockTimesMap.containsKey(message.getLockToken()))
 							{
-								BrokeredMessageReceiver.this.requestResponseLockTokensToLockTimesMap.put(message.getLockToken(), lockedUntilUtc);
+								this.requestResponseLockTokensToLockTimesMap.put(message.getLockToken(), lockedUntilUtc);
 							}
 						}
 						return newLockedUntilTimes;
