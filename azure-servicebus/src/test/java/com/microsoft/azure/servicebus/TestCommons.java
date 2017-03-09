@@ -1,6 +1,7 @@
 package com.microsoft.azure.servicebus;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -17,6 +18,8 @@ import com.microsoft.azure.servicebus.primitives.MessageNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 public class TestCommons {
+	
+	private static Duration shortWaitTime = Duration.ofSeconds(5);
 	
 	public static void testBasicQueueSend(IMessageSender sender) throws InterruptedException, ServiceBusException, IOException
 	{		
@@ -42,12 +45,12 @@ public class TestCommons {
 		{
 			message.setSessionId(sessionId);
 		}
-		sender.send(message);		
-				
+		sender.send(message);
+ 				
 		IBrokeredMessage receivedMessage = receiver.receive();
 		Assert.assertNotNull("Message not received", receivedMessage);
 		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
-		receivedMessage = receiver.receive();
+		receivedMessage = receiver.receive(shortWaitTime);
 		Assert.assertNull("Message received again", receivedMessage);
 	}
 	
@@ -75,7 +78,7 @@ public class TestCommons {
 		}
 		
 		Assert.assertEquals("All messages not received", numMessages, totalReceivedMessages);
-		receivedMessages = receiver.receiveBatch(numMessages);
+		receivedMessages = receiver.receiveBatch(numMessages, shortWaitTime);
 		Assert.assertNull("Messages received again", receivedMessages);
 	}
 		
@@ -94,7 +97,7 @@ public class TestCommons {
 		Assert.assertNotNull("Message not received", receivedMessage);
 		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 		receiver.complete(receivedMessage.getLockToken());
-		receivedMessage = receiver.receive();
+		receivedMessage = receiver.receive(shortWaitTime);
 		Assert.assertNull("Message was not properly completed", receivedMessage);
 	}
 	
@@ -136,9 +139,9 @@ public class TestCommons {
 		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 		String deadLetterReason = "java client deadletter test";
 		receiver.deadLetter(receivedMessage.getLockToken(), deadLetterReason, null);
-		receivedMessage = receiver.receive();
+		receivedMessage = receiver.receive(shortWaitTime);
 		Assert.assertNull("Message was not properly deadlettered", receivedMessage);
-	}
+	}	
 		
 	public static void testBasicQueueReceiveAndRenewLock(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
 	{		
@@ -238,7 +241,7 @@ public class TestCommons {
 		}
 		Assert.assertEquals("All messages not received", numMessages, totalMessagesReceived);		
 		
-		receivedMessages = receiver.receiveBatch(numMessages);
+		receivedMessages = receiver.receiveBatch(numMessages, shortWaitTime);
 		Assert.assertNull("Messages received again", receivedMessages);
 	}
 		
@@ -377,7 +380,7 @@ public class TestCommons {
 		IBrokeredMessage receivedMessage = receiver.receive();
 		long sequenceNumber = receivedMessage.getSequenceNumber();
 		String messageId = receivedMessage.getMessageId();
-		receiver.defer(receivedMessage.getLockToken());		
+		receiver.defer(receivedMessage.getLockToken());
 		
 		// Now receive by sequence number
 		receivedMessage = receiver.receive(sequenceNumber);
@@ -409,7 +412,7 @@ public class TestCommons {
 		IBrokeredMessage receivedMessage = receiver.receive();
 		long sequenceNumber = receivedMessage.getSequenceNumber();
 		String messageId = receivedMessage.getMessageId();
-		receiver.defer(receivedMessage.getLockToken());		
+		receiver.defer(receivedMessage.getLockToken());
 		
 		// Now receive by sequence number
 		receivedMessage = receiver.receive(sequenceNumber);
@@ -425,10 +428,16 @@ public class TestCommons {
 	}
 		
 	public static void testReceiveBySequenceNumberAndDefer(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
-	{			
+	{
+		// Use longer strings with each defer to avoid an assert check in debug builds of service
+		String phaseKey = "phase";
+		String initialPhase = "undeferred";
+		String firstDeferredPhase = "deferred first time";
+		String secondDeferredPhase = "deferred first time and second time";
+		
 		BrokeredMessage sentMessage = new BrokeredMessage("AMQP message");
 		HashMap customProperties = new HashMap();
-		customProperties.put("phase", "before defer");
+		customProperties.put(phaseKey, initialPhase);
 		sentMessage.setProperties(customProperties);
 		if(sessionId != null)
 		{
@@ -439,20 +448,22 @@ public class TestCommons {
 		IBrokeredMessage receivedMessage = receiver.receive();
 		long sequenceNumber = receivedMessage.getSequenceNumber();
 		String messageId = receivedMessage.getMessageId();
-		receiver.defer(receivedMessage.getLockToken());	
+		customProperties.put(phaseKey, firstDeferredPhase);
+		receiver.defer(receivedMessage.getLockToken(), customProperties);
 		
 		// Now receive by sequence number
 		receivedMessage = receiver.receive(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", sequenceNumber, receivedMessage.getSequenceNumber());
-		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", messageId, receivedMessage.getMessageId());		
-		customProperties.put("phase", "after defer");
+		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", messageId, receivedMessage.getMessageId());
+		Assert.assertEquals("Defer didn't update properties of the message received by sequence number", firstDeferredPhase, receivedMessage.getProperties().get(phaseKey));
+		customProperties.put(phaseKey, secondDeferredPhase);
 		receiver.defer(receivedMessage.getLockToken(), customProperties);
 		
 		// Try to receive by sequence number again
 		receivedMessage = receiver.receive(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message after deferrring", sequenceNumber, receivedMessage.getSequenceNumber());
-		Assert.assertEquals("Defer didn't update properties of the message received by sequence number", "after defer", receivedMessage.getProperties().get("phase"));
-		receiver.complete(receivedMessage.getLockToken());		
+		Assert.assertEquals("Defer didn't update properties of the message received by sequence number", secondDeferredPhase, receivedMessage.getProperties().get(phaseKey));
+		receiver.complete(receivedMessage.getLockToken());
 	}
 		
 	public static void testReceiveBySequenceNumberAndDeadletter(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException

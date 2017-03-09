@@ -50,31 +50,28 @@ public class BrokeredMessageSession extends BrokeredMessageReceiver implements I
 
 	@Override
 	public CompletableFuture<Void> renewLockAsync() {
-		// TODO Auto-generated method stub
-		return null;
+		return this.getInternalReceiver().renewSessionLocksAsync();
 	}
 
 	@Override
-	public void setState(InputStream stream) throws InterruptedException, ServiceBusException
+	public void setState(byte[] sessionState) throws InterruptedException, ServiceBusException
 	{
-		Utils.completeFuture(this.setStateAsync(stream));
+		Utils.completeFuture(this.setStateAsync(sessionState));
 	}
 
 	@Override
-	public CompletableFuture<Void> setStateAsync(InputStream stream) {
-		// TODO Auto-generated method stub
-		return null;
+	public CompletableFuture<Void> setStateAsync(byte[] sessionState) {
+		return this.getInternalReceiver().setSessionStateAsync(sessionState);
 	}
 
 	@Override
-	public InputStream getState() throws InterruptedException, ServiceBusException {
+	public byte[] getState() throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.getStateAsync());
 	}
 
 	@Override
-	public CompletableFuture<InputStream> getStateAsync() {
-		// TODO Auto-generated method stub
-		return null;
+	public CompletableFuture<byte[]> getStateAsync() {
+		return this.getInternalReceiver().getSessionStateAsync();
 	}
 
 	@Override

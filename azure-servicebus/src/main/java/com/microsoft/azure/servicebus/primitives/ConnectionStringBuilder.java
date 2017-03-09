@@ -35,7 +35,8 @@ import java.util.regex.*;
  */
 public class ConnectionStringBuilder
 {
-	final static String endpointFormat = "amqps://%s.servicebus.windows.net";
+	final static String endpointFormat = "amqps://%s.servicebus.onebox.windows-int.net";
+//	final static String endpointFormat = "amqps://%s.servicebus.windows.net";
 	final static String endpointRawFormat = "amqps://%s";
 
 	final static String HostnameConfigName = "Hostname";

@@ -15,11 +15,11 @@ public interface IMessageSession extends IMessageReceiver {
 	
 	CompletableFuture<Void> renewLockAsync();
 	
-	void setState(InputStream stream) throws InterruptedException, ServiceBusException;
+	void setState(byte[] state) throws InterruptedException, ServiceBusException;
 	
-	CompletableFuture<Void> setStateAsync(InputStream stream);
+	CompletableFuture<Void> setStateAsync(byte[] state);
 	
-	InputStream getState() throws InterruptedException, ServiceBusException;
+	byte[] getState() throws InterruptedException, ServiceBusException;
 	
-	CompletableFuture<InputStream> getStateAsync();	
+	CompletableFuture<byte[]> getStateAsync();	
 }

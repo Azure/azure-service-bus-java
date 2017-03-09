@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
+import org.apache.qpid.proton.message.Message;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
@@ -29,7 +30,7 @@ import com.microsoft.azure.servicebus.primitives.TimerType;
 import com.microsoft.azure.servicebus.primitives.Util;
 
 // TODO As part of receive, don't return messages whose lock is already expired. Can happen because of delay between prefetch and actual receive from client.
-class BrokeredMessageReceiver extends InitializableEntity implements IMessageReceiver
+class BrokeredMessageReceiver extends InitializableEntity implements IMessageReceiver, IMessageBrowser
 {
 	private static final int DEFAULT_PREFETCH_COUNT = 100;
 	
@@ -41,14 +42,14 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	private MessageReceiver internalReceiver = null;
 	private boolean isInitialized = false;
 	private int prefetchCount = DEFAULT_PREFETCH_COUNT;
+	private long lastPeekedSequenceNumber = 0;
 	private final ConcurrentHashMap<UUID, Instant> requestResponseLockTokensToLockTimesMap;
 	
 	private BrokeredMessageReceiver(ReceiveMode receiveMode)
 	{
 		super(StringUtil.getRandomString(), null);
 		this.receiveMode = receiveMode;
-		this.requestResponseLockTokensToLockTimesMap = new ConcurrentHashMap<>();
-		this.schedulePruningRequestResponseLockTokens();
+		this.requestResponseLockTokensToLockTimesMap = new ConcurrentHashMap<>();		
 	}
 	
 	BrokeredMessageReceiver(ConnectionStringBuilder amqpConnectionStringBuilder, ReceiveMode receiveMode)
@@ -98,7 +99,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 				CompletableFuture<MessageReceiver> receiverFuture;
 				if(BrokeredMessageReceiver.this.isSessionReceiver())
 				{
-					receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+					receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), false, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
 				}
 				else
 				{
@@ -109,6 +110,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 				{
 					this.internalReceiver = r;
 					this.isInitialized = true;
+					this.schedulePruningRequestResponseLockTokens();
 				});
 			});
 		}
@@ -561,6 +563,77 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 //	@Override
 	public Collection<Instant> renewMessageLockBatch(Collection<? extends IBrokeredMessage> messages) throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.renewMessageLockBatchAsync(messages));
+	}
+	
+	@Override
+	public IBrokeredMessage peek() throws InterruptedException, ServiceBusException {
+		return Utils.completeFuture(this.peekAsync());
+	}
+
+	@Override
+	public IBrokeredMessage peek(long fromSequenceNumber) throws InterruptedException, ServiceBusException {
+		return Utils.completeFuture(this.peekAsync(fromSequenceNumber));
+	}
+
+	@Override
+	public Collection<IBrokeredMessage> peekBatch(int messageCount) throws InterruptedException, ServiceBusException {
+		return Utils.completeFuture(this.peekBatchAsync(messageCount));
+	}
+
+	@Override
+	public Collection<IBrokeredMessage> peekBatch(long fromSequenceNumber, int messageCount) throws InterruptedException, ServiceBusException {
+		return Utils.completeFuture(this.peekBatchAsync(fromSequenceNumber, messageCount));
+	}
+
+	@Override
+	public CompletableFuture<IBrokeredMessage> peekAsync() {
+		return this.peekAsync(this.lastPeekedSequenceNumber + 1);
+	}
+
+	@Override
+	public CompletableFuture<IBrokeredMessage> peekAsync(long fromSequenceNumber) {
+		return this.peekBatchAsync(fromSequenceNumber, 1).thenApply((c) -> 
+		{
+			IBrokeredMessage message = null;
+			Iterator<IBrokeredMessage> iterator = c.iterator();
+			if(iterator.hasNext())
+			{
+				message = iterator.next();
+				iterator.remove();
+			}
+			return message;
+		});
+	}
+
+	@Override
+	public CompletableFuture<Collection<IBrokeredMessage>> peekBatchAsync(int messageCount) {
+		return this.peekBatchAsync(this.lastPeekedSequenceNumber + 1, messageCount);
+	}
+
+	@Override
+	public CompletableFuture<Collection<IBrokeredMessage>> peekBatchAsync(long fromSequenceNumber, int messageCount) {
+		CompletableFuture<Collection<Message>> peekFuture = this.internalReceiver.peekMessages(fromSequenceNumber, messageCount, this.messagingFactory.getOperationTimeout());
+		return peekFuture.thenApply((peekedMessages) -> 
+		{
+			ArrayList<IBrokeredMessage> convertedMessages = new ArrayList<IBrokeredMessage>();
+			if(peekedMessages != null)
+			{
+				long sequenceNumberOfLastMessage = 0;
+				for(Message message : peekedMessages)
+				{
+					BrokeredMessage convertedMessage = MessageConverter.convertAmqpMessageToBrokeredMessage(message);
+					sequenceNumberOfLastMessage = convertedMessage.getSequenceNumber();
+					convertedMessages.add(convertedMessage);
+				}
+				
+				if(sequenceNumberOfLastMessage > 0)
+				{
+					this.lastPeekedSequenceNumber = sequenceNumberOfLastMessage;
+				}
+			}		
+			
+			return convertedMessages;
+		});
 	}
 	
 	private void schedulePruningRequestResponseLockTokens()

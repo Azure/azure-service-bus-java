@@ -17,8 +17,7 @@ public class QueueSendReceiveTests {
 	private ConnectionStringBuilder builder;
 	private MessagingFactory factory;
 	private IMessageSender sender;
-	private IMessageReceiver receiver;
-	private IMessageBrowser browser;
+	private IMessageReceiver receiver;	
 	private final String sessionId = null;
 	
 	@Before // Fix this. something goes wrong when we do this setup.
@@ -29,7 +28,6 @@ public class QueueSendReceiveTests {
 		this.sender = ClientFactory.createMessageSenderFromConnectionStringBuilder(builder);		
 		
 		this.drainAllMessages(builder);
-		//Thread.sleep(60000);
 	}
 	
 	@After
@@ -38,8 +36,6 @@ public class QueueSendReceiveTests {
 		this.sender.close();
 		if(this.receiver != null)
 			this.receiver.close();
-		if(this.browser != null)
-			this.browser.close();
 		this.factory.close();
 	}
 	
@@ -128,15 +124,15 @@ public class QueueSendReceiveTests {
 	@Test
 	public void testPeekMessage() throws InterruptedException, ServiceBusException, IOException
 	{		
-		this.browser = ClientFactory.createMessageBrowserFromEntityPath(factory, this.builder.getEntityPath());
-		TestCommons.testPeekMessage(this.sender, this.sessionId, this.browser);
+		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, builder.getEntityPath(), ReceiveMode.PeekLock);
+		TestCommons.testPeekMessage(this.sender, this.sessionId, this.receiver);
 	}
 	
 	@Test
 	public void testPeekMessageBatch() throws InterruptedException, ServiceBusException, IOException
 	{
-		this.browser = ClientFactory.createMessageBrowserFromEntityPath(factory, this.builder.getEntityPath());
-		TestCommons.testPeekMessageBatch(this.sender, this.sessionId, this.browser);
+		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, builder.getEntityPath(), ReceiveMode.PeekLock);
+		TestCommons.testPeekMessageBatch(this.sender, this.sessionId, this.receiver);
 	}
 	
 	@Test
@@ -176,16 +172,14 @@ public class QueueSendReceiveTests {
 		while(messages !=null && messages.size() > 0)
 		{
 			messages = receiver.receiveBatch(batchSize, waitTime);
-		}
+		}		
 		
-		IMessageBrowser browser = ClientFactory.createMessageBrowserFromEntityPath(this.factory, this.builder.getEntityPath());
 		IBrokeredMessage message;
-		while((message = browser.peek()) != null)
+		while((message = receiver.peek()) != null)
 		{
 			receiver.receive(message.getSequenceNumber());
-		}
+		}		
 		
-		browser.close();
 		receiver.close();
 	}	
 }
