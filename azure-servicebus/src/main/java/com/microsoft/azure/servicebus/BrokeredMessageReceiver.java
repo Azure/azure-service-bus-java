@@ -36,6 +36,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	
 	private final ReceiveMode receiveMode;
 	private boolean ownsMessagingFactory;
+	private boolean ownsInternalReceiver;
 	private ConnectionStringBuilder amqpConnectionStringBuilder = null;
 	private String entityPath = null;
 	private MessagingFactory messagingFactory = null;
@@ -49,7 +50,17 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	{
 		super(StringUtil.getRandomString(), null);
 		this.receiveMode = receiveMode;
-		this.requestResponseLockTokensToLockTimesMap = new ConcurrentHashMap<>();		
+		this.ownsInternalReceiver = true;
+		this.requestResponseLockTokensToLockTimesMap = new ConcurrentHashMap<>();	
+	}
+	
+	private BrokeredMessageReceiver(MessagingFactory messagingFactory, String entityPath, boolean ownsMessagingFactory, ReceiveMode receiveMode)
+	{		
+		this(receiveMode);
+		
+		this.messagingFactory = messagingFactory;
+		this.entityPath = entityPath;
+		this.ownsMessagingFactory = ownsMessagingFactory;
 	}
 	
 	BrokeredMessageReceiver(ConnectionStringBuilder amqpConnectionStringBuilder, ReceiveMode receiveMode)
@@ -64,16 +75,15 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	BrokeredMessageReceiver(MessagingFactory messagingFactory, String entityPath, ReceiveMode receiveMode)
 	{		
 		this(messagingFactory, entityPath, false, receiveMode);
-	}
-			
-	private BrokeredMessageReceiver(MessagingFactory messagingFactory, String entityPath, boolean ownsMessagingFactory, ReceiveMode receiveMode)
+	}	
+	
+	// Only to be used by browsable sessions
+	BrokeredMessageReceiver(MessagingFactory messagingFactory, MessageReceiver internalReceiver, String entityPath, ReceiveMode receiveMode)
 	{		
-		this(receiveMode);
-		
-		this.messagingFactory = messagingFactory;
-		this.entityPath = entityPath;
-		this.ownsMessagingFactory = ownsMessagingFactory;
-	}
+		this(messagingFactory, entityPath, false, receiveMode);
+		this.internalReceiver = internalReceiver;
+		this.ownsInternalReceiver = false;
+	}	
 	
 	@Override
 	synchronized CompletableFuture<Void> initializeAsync() throws IOException
@@ -96,19 +106,31 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 			
 			return factoryFuture.thenCompose((v) ->
 			{
-				CompletableFuture<MessageReceiver> receiverFuture;
-				if(BrokeredMessageReceiver.this.isSessionReceiver())
+				CompletableFuture<Void> acceptReceiverFuture;
+				if(this.internalReceiver == null)
 				{
-					receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), false, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+					CompletableFuture<MessageReceiver> receiverFuture;
+					if(BrokeredMessageReceiver.this.isSessionReceiver())
+					{
+						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), false, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+					}
+					else
+					{
+						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+					}
+					
+					acceptReceiverFuture = receiverFuture.thenAccept((r) -> 
+					{
+						this.internalReceiver = r;					
+					});
 				}
 				else
 				{
-					receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
-				}
+					acceptReceiverFuture = CompletableFuture.completedFuture(null);
+				}				
 				
-				return receiverFuture.thenAccept((r) -> 
-				{
-					this.internalReceiver = r;
+				return acceptReceiverFuture.thenRun(() -> 
+				{					
 					this.isInitialized = true;
 					this.schedulePruningRequestResponseLockTokens();
 				});
@@ -406,7 +428,17 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	protected CompletableFuture<Void> onClose() {
 		if(this.isInitialized)
 		{
-			return this.internalReceiver.closeAsync().thenComposeAsync((v) -> 
+			CompletableFuture<Void> closeReceiverFuture;
+			if(this.ownsInternalReceiver)
+			{
+				closeReceiverFuture = this.internalReceiver.closeAsync();
+			}
+			else
+			{
+				closeReceiverFuture = CompletableFuture.completedFuture(null);
+			}
+			
+			return closeReceiverFuture.thenComposeAsync((v) -> 
 			{
 				if(BrokeredMessageReceiver.this.ownsMessagingFactory)
 				{
@@ -534,7 +566,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 			lockTokens[messageIndex++] = lockToken;
 		}
 		
-		return this.internalReceiver.renewMessageLocksAsync(lockTokens, this.messagingFactory.getOperationTimeout()).thenApply(
+		return this.internalReceiver.renewMessageLocksAsync(lockTokens).thenApply(
 				(newLockedUntilTimes) ->
 					{
 						// Assuming both collections are of same size and in same order (order doesn't really matter as all instants in the response are same).
@@ -612,7 +644,8 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public CompletableFuture<Collection<IBrokeredMessage>> peekBatchAsync(long fromSequenceNumber, int messageCount) {
-		CompletableFuture<Collection<Message>> peekFuture = this.internalReceiver.peekMessages(fromSequenceNumber, messageCount, this.messagingFactory.getOperationTimeout());
+		String sessionId = this.isSessionReceiver()? this.internalReceiver.getSessionId() : null;
+		CompletableFuture<Collection<Message>> peekFuture = this.internalReceiver.peekMessagesAsync(fromSequenceNumber, messageCount, sessionId);
 		return peekFuture.thenApply((peekedMessages) -> 
 		{
 			ArrayList<IBrokeredMessage> convertedMessages = new ArrayList<IBrokeredMessage>();

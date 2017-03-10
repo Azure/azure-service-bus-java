@@ -83,6 +83,7 @@ public final class ClientConstants
     public static final String REQUEST_RESPONSE_UPDATE_DISPOSTION_OPERATION = AmqpConstants.VENDOR + ":update-disposition";
     public static final String REQUEST_RESPONSE_GET_SESSION_STATE_OPERATION = AmqpConstants.VENDOR + ":get-session-state";
     public static final String REQUEST_RESPONSE_SET_SESSION_STATE_OPERATION = AmqpConstants.VENDOR + ":set-session-state";
+    public static final String REQUEST_RESPONSE_GET_MESSAGE_SESSIONS_OPERATION = AmqpConstants.VENDOR + ":get-message-sessions";
 	public static final String REQUEST_RESPONSE_LOCKTOKENS = "lock-tokens";
 	public static final String REQUEST_RESPONSE_LOCKTOKEN = "lock-token";
 	public static final String REQUEST_RESPONSE_EXPIRATION = "expiration";
@@ -105,6 +106,11 @@ public final class ClientConstants
     public static final String REQUEST_RESPONSE_DEADLETTER_REASON = "deadletter-reason";
     public static final String REQUEST_RESPONSE_DEADLETTER_DESCRIPTION = "deadletter-description";
     public static final String REQUEST_RESPONSE_PROPERTIES_TO_MODIFY = "properties-to-modify";
+    public static final String REQUEST_RESPONSE_LAST_UPDATED_TIME = "last-updated-time";
+    public static final String REQUEST_RESPONSE_LAST_SESSION_ID = "last-session-id";
+    public static final String REQUEST_RESPONSE_SKIP = "skip";
+    public static final String REQUEST_RESPONSE_TOP = "top";
+    public static final String REQUEST_RESPONSE_SESSIONIDS = "sessions-ids";
     
     public static final String DISPOSITION_STATUS_COMPLETED = "completed";
     public static final String DISPOSITION_STATUS_DEFERED = "defered";
