@@ -1208,53 +1208,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 	// A receiver can be used to peek messages from any session-id, useful for browsable sessions
 	public CompletableFuture<Collection<Message>> peekMessagesAsync(long fromSequenceNumber, int messageCount, String sessionId)
 	{
-		HashMap requestBodyMap = new HashMap();
-		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_FROM_SEQUENCE_NUMER, fromSequenceNumber);
-		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_MESSAGE_COUNT, messageCount);		
-		if(sessionId != null)
-		{
-			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, sessionId);
-		}
-		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_PEEK_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
-		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
-			CompletableFuture<Collection<Message>> returningFuture = new CompletableFuture<Collection<Message>>();
-			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
-			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
-			{
-				List<Message> peekedMessages = new ArrayList<Message>();
-				Object responseBodyMap = ((AmqpValue)responseMessage.getBody()).getValue();
-				if(responseBodyMap != null && responseBodyMap instanceof Map)
-				{					
-					Object messages = ((Map)responseBodyMap).get(ClientConstants.REQUEST_RESPONSE_MESSAGES);
-					if(messages != null && messages instanceof Iterable)
-					{
-						for(Object message : (Iterable)messages)
-						{
-							if(message instanceof Map)
-							{
-								Message peekedMessage = Message.Factory.create();
-								Binary messagePayLoad = (Binary)((Map)message).get(ClientConstants.REQUEST_RESPONSE_MESSAGE);
-								peekedMessage.decode(messagePayLoad.getArray(), messagePayLoad.getArrayOffset(), messagePayLoad.getLength());
-								peekedMessages.add(peekedMessage);
-							}
-						}
-					}
-				}				
-				returningFuture.complete(peekedMessages);
-			}
-			else if(statusCode == ClientConstants.REQUEST_RESPONSE_NOCONTENT_STATUS_CODE ||
-					(statusCode == ClientConstants.REQUEST_RESPONSE_NOTFOUND_STATUS_CODE && ClientConstants.MESSAGE_NOT_FOUND_ERROR.equals(RequestResponseUtils.getResponseErrorCondition(responseMessage))))
-			{
-				returningFuture.complete(new ArrayList<Message>());
-			}
-			else
-			{
-				// error response
-				returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
-			}
-			return returningFuture;
-		});
+		return MessageBrowserUtil.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, sessionId);
 	}
 	
 	public CompletableFuture<Pair<String[], Integer>> getMessageSessionsAsync(Date lastUpdatedTime, int skip, int top, String lastSessionId)

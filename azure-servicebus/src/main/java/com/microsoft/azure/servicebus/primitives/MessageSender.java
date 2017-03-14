@@ -940,4 +940,10 @@ public class MessageSender extends ClientEntity implements IAmqpSender, IErrorCo
 			return returningFuture;
 		});
 	}
+	
+	// In case we need to support peek on a topic
+	public CompletableFuture<Collection<Message>> peekMessagesAsync(long fromSequenceNumber, int messageCount)
+	{
+		return MessageBrowserUtil.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, null);
+	}
 }

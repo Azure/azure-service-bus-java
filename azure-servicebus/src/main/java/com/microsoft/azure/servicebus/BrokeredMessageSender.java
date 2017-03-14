@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.qpid.proton.message.Message;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
+import com.microsoft.azure.servicebus.primitives.MessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessageSender;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
@@ -80,7 +81,12 @@ final class BrokeredMessageSender extends InitializableEntity implements IMessag
 				});
 			});
 		}
-	}		
+	}
+	
+	final MessageSender getInternalSender()
+	{
+		return this.internalSender;
+	}
 	
 	@Override
 	public void send(IBrokeredMessage message) throws InterruptedException, ServiceBusException {

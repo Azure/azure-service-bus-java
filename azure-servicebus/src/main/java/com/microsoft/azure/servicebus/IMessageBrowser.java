@@ -5,7 +5,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
-public interface IMessageBrowser extends IMessageEntity {
+public interface IMessageBrowser {
 	
 	IBrokeredMessage peek() throws InterruptedException, ServiceBusException;
 
