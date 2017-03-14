@@ -3,9 +3,12 @@ package com.microsoft.azure.servicebus;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.time.Duration;
+import java.util.Collection;
 import java.util.Properties;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
+import com.microsoft.azure.servicebus.primitives.TestConnectionStringBuilder;
 
 public class TestUtils {
 	private static final String TEST_DIR_NAME = "resources";
@@ -61,37 +64,37 @@ public class TestUtils {
 	
 	public static ConnectionStringBuilder getQueueConnectionStringBuilder()
 	{
-		return new ConnectionStringBuilder(getProperty(QUEUE_NAMESPACENAME_PROPERTY), getProperty(QUEUE_ENTITYPATH_PROPERTY), 
+		return new TestConnectionStringBuilder(getProperty(QUEUE_NAMESPACENAME_PROPERTY), getProperty(QUEUE_ENTITYPATH_PROPERTY), 
 				getProperty(QUEUE_SHAREDACCESSKEYNAME_PROPERTY), getProperty(QUEUE_SHAREDACCESSKEY_PROPERTY));
 	}
 	
 	public static ConnectionStringBuilder getSessionfulQueueConnectionStringBuilder()
 	{
-		return new ConnectionStringBuilder(getProperty(SESSIONFUL_QUEUE_NAMESPACENAME_PROPERTY), getProperty(SESSIONFUL_QUEUE_ENTITYPATH_PROPERTY), 
+		return new TestConnectionStringBuilder(getProperty(SESSIONFUL_QUEUE_NAMESPACENAME_PROPERTY), getProperty(SESSIONFUL_QUEUE_ENTITYPATH_PROPERTY), 
 				getProperty(SESSIONFUL_QUEUE_SHAREDACCESSKEYNAME_PROPERTY), getProperty(SESSIONFUL_QUEUE_SHAREDACCESSKEY_PROPERTY));
 	}
 	
 	public static ConnectionStringBuilder getTopicConnectionStringBuilder()
 	{
-		return new ConnectionStringBuilder(getProperty(TOPIC_NAMESPACENAME_PROPERTY), getProperty(TOPIC_ENTITYPATH_PROPERTY), 
+		return new TestConnectionStringBuilder(getProperty(TOPIC_NAMESPACENAME_PROPERTY), getProperty(TOPIC_ENTITYPATH_PROPERTY), 
 				getProperty(TOPIC_SHAREDACCESSKEYNAME_PROPERTY), getProperty(TOPIC_SHAREDACCESSKEY_PROPERTY));
 	}
 	
 	public static ConnectionStringBuilder getSessionfulTopicConnectionStringBuilder()
 	{
-		return new ConnectionStringBuilder(getProperty(SESSIONFUL_TOPIC_NAMESPACENAME_PROPERTY), getProperty(SESSIONFUL_TOPIC_ENTITYPATH_PROPERTY), 
+		return new TestConnectionStringBuilder(getProperty(SESSIONFUL_TOPIC_NAMESPACENAME_PROPERTY), getProperty(SESSIONFUL_TOPIC_ENTITYPATH_PROPERTY), 
 				getProperty(SESSIONFUL_TOPIC_SHAREDACCESSKEYNAME_PROPERTY), getProperty(SESSIONFUL_TOPIC_SHAREDACCESSKEY_PROPERTY));
 	}
 	
 	public static ConnectionStringBuilder getSubscriptionConnectionStringBuilder()
 	{
-		return new ConnectionStringBuilder(getProperty(TOPIC_NAMESPACENAME_PROPERTY), getProperty(SUBSCRIPTION_ENTITYPATH_PROPERTY), 
+		return new TestConnectionStringBuilder(getProperty(TOPIC_NAMESPACENAME_PROPERTY), getProperty(TOPIC_ENTITYPATH_PROPERTY) + "/subscriptions/" + getProperty(SUBSCRIPTION_ENTITYPATH_PROPERTY), 
 				getProperty(TOPIC_SHAREDACCESSKEYNAME_PROPERTY), getProperty(TOPIC_SHAREDACCESSKEY_PROPERTY));
 	}
 	
 	public static ConnectionStringBuilder getSessionfulSubscriptionConnectionStringBuilder()
 	{
-		return new ConnectionStringBuilder(getProperty(SESSIONFUL_TOPIC_NAMESPACENAME_PROPERTY), getProperty(SESSIONFUL_SUBSCRIPTION_ENTITYPATH_PROPERTY), 
+		return new TestConnectionStringBuilder(getProperty(SESSIONFUL_TOPIC_NAMESPACENAME_PROPERTY), getProperty(SESSIONFUL_TOPIC_ENTITYPATH_PROPERTY) + "/subscriptions/" + getProperty(SESSIONFUL_SUBSCRIPTION_ENTITYPATH_PROPERTY), 
 				getProperty(SESSIONFUL_TOPIC_SHAREDACCESSKEYNAME_PROPERTY), getProperty(SESSIONFUL_TOPIC_SHAREDACCESSKEY_PROPERTY));
-	}
+	}	
 }
