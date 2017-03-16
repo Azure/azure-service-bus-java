@@ -55,6 +55,7 @@ import com.microsoft.azure.servicebus.amqp.DispatchHandler;
 import com.microsoft.azure.servicebus.amqp.IAmqpReceiver;
 import com.microsoft.azure.servicebus.amqp.ReceiveLinkHandler;
 import com.microsoft.azure.servicebus.amqp.SessionHandler;
+import com.microsoft.azure.servicebus.rules.RuleDescription;
 
 /**
  * Common Receiver that abstracts all amqp related details
@@ -1238,6 +1239,53 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 					(statusCode == ClientConstants.REQUEST_RESPONSE_NOTFOUND_STATUS_CODE && ClientConstants.SESSION_NOT_FOUND_ERROR.equals(RequestResponseUtils.getResponseErrorCondition(responseMessage))))
 			{
 				returningFuture.complete(new Pair<>(new String[0], 0));
+			}
+			else
+			{
+				// error response
+				returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
+			}
+			return returningFuture;
+		});
+	}
+	
+	public CompletableFuture<Void> removeRuleAsync(String ruleName)
+	{
+		HashMap requestBodyMap = new HashMap();
+		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_RULENAME, ruleName);
+		
+		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_REMOVE_RULE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
+		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
+		return responseFuture.thenCompose((responseMessage) -> {
+			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
+			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
+			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
+			{
+				returningFuture.complete(null);
+			}
+			else
+			{
+				// error response
+				returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
+			}
+			return returningFuture;
+		});
+	}
+	
+	public CompletableFuture<Void> addRuleAsync(RuleDescription ruleDescription)
+	{
+		HashMap requestBodyMap = new HashMap();
+		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_RULENAME, ruleDescription.getName());
+		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_RULEDESCRIPTION, RequestResponseUtils.encodeRuleDescriptionToMap(ruleDescription));
+		
+		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_ADD_RULE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
+		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
+		return responseFuture.thenCompose((responseMessage) -> {
+			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
+			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
+			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
+			{
+				returningFuture.complete(null);
 			}
 			else
 			{

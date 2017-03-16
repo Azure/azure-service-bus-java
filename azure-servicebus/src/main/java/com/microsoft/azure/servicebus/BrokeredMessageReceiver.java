@@ -43,7 +43,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	private MessageReceiver internalReceiver = null;
 	private boolean isInitialized = false;
 	private BrokeredMessageBrowser browser = null;
-	private int prefetchCount = DEFAULT_PREFETCH_COUNT;
+	private int messagePrefetchCount = DEFAULT_PREFETCH_COUNT;
 	
 	private final ConcurrentHashMap<UUID, Instant> requestResponseLockTokensToLockTimesMap;
 	
@@ -113,11 +113,11 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 					CompletableFuture<MessageReceiver> receiverFuture;
 					if(BrokeredMessageReceiver.this.isSessionReceiver())
 					{
-						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), false, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), false, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
 					}
 					else
 					{
-						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.prefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
 					}
 					
 					acceptReceiverFuture = receiverFuture.thenAccept((r) -> 
@@ -459,15 +459,15 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	}
 
 	@Override
-	public int getPrefetchCount()
+	public int getMessagePrefetchCount()
 	{
-		return this.prefetchCount;
+		return this.messagePrefetchCount;
 	}
 
 	@Override
-	public void setPrefetchCount(int prefetchCount) throws ServiceBusException
+	public void setMessagePrefetchCount(int prefetchCount) throws ServiceBusException
 	{
-		this.prefetchCount = prefetchCount;
+		this.messagePrefetchCount = prefetchCount;
 		if(this.isInitialized)
 		{
 			this.internalReceiver.setPrefetchCount(prefetchCount);

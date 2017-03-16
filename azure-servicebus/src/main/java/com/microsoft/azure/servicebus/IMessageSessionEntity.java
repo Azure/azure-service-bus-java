@@ -5,9 +5,9 @@ import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 
 public interface IMessageSessionEntity {
-	int getPrefetchCount();
+	int getSessionPrefetchCount();
 	
-	void setPrefetchCount(int prefetchCount);
+	void setSessionPrefetchCount(int prefetchCount);
 
     IMessageSession acceptMessageSession();
 

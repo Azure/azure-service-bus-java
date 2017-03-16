@@ -103,7 +103,11 @@ final class ExceptionUtil
 		else if (errorCondition.getCondition() == ClientConstants.MESSAGE_NOT_FOUND_ERROR)
 		{
 			return new MessageNotFoundException(errorCondition.getDescription());
-		}		
+		}
+		else if (errorCondition.getCondition() == ClientConstants.ENTITY_ALREADY_EXISTS_ERROR)
+		{
+			return new MessagingEntityAlreadyExistsException(errorCondition.getDescription());
+		}
 
 		return new ServiceBusException(ClientConstants.DEFAULT_IS_TRANSIENT, errorCondition.getDescription());
 	}
