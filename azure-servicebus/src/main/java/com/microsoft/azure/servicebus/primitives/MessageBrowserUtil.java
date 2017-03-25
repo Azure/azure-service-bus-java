@@ -24,7 +24,7 @@ final class MessageBrowserUtil {
 		}
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_PEEK_OPERATION, requestBodyMap, Util.adjustServerTimeout(operationTimeout));
 		CompletableFuture<Message> responseFuture = requestResponseLink.requestAysnc(requestMessage, operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Collection<Message>> returningFuture = new CompletableFuture<Collection<Message>>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)

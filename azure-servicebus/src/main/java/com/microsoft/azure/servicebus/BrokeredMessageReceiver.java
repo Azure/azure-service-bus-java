@@ -1,6 +1,5 @@
 package com.microsoft.azure.servicebus;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
-import org.apache.qpid.proton.message.Message;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
@@ -87,7 +85,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	}	
 	
 	@Override
-	synchronized CompletableFuture<Void> initializeAsync() throws IOException
+	synchronized CompletableFuture<Void> initializeAsync()
 	{
 		if(this.isInitialized)
 		{
@@ -98,14 +96,14 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 			CompletableFuture<Void> factoryFuture;
 			if(this.messagingFactory == null)
 			{
-				factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder).thenAccept((f) -> {this.messagingFactory = f;});
+				factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder).thenAcceptAsync((f) -> {this.messagingFactory = f;});
 			}
 			else
 			{
 				factoryFuture = CompletableFuture.completedFuture(null);
 			}			
 			
-			return factoryFuture.thenCompose((v) ->
+			return factoryFuture.thenComposeAsync((v) ->
 			{
 				CompletableFuture<Void> acceptReceiverFuture;
 				if(this.internalReceiver == null)
@@ -120,7 +118,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
 					}
 					
-					acceptReceiverFuture = receiverFuture.thenAccept((r) -> 
+					acceptReceiverFuture = receiverFuture.thenAcceptAsync((r) -> 
 					{
 						this.internalReceiver = r;					
 					});
@@ -130,7 +128,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 					acceptReceiverFuture = CompletableFuture.completedFuture(null);
 				}				
 				
-				return acceptReceiverFuture.thenRun(() -> 
+				return acceptReceiverFuture.thenRunAsync(() -> 
 				{					
 					this.isInitialized = true;
 					this.schedulePruningRequestResponseLockTokens();
@@ -657,5 +655,10 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 				}
 			}
 		}, Duration.ofSeconds(3600), TimerType.RepeatRun);
+	}
+	
+	MessagingFactory getMessagingFactory()
+	{
+		return this.messagingFactory;
 	}
 }

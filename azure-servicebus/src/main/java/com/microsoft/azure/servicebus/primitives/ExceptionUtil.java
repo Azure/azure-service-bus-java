@@ -110,9 +110,9 @@ final class ExceptionUtil
 		}
 
 		return new ServiceBusException(ClientConstants.DEFAULT_IS_TRANSIENT, errorCondition.getDescription());
-	}
+	}	
 
-	static <T> void completeExceptionally(CompletableFuture<T> future, Exception exception, IErrorContextProvider contextProvider)
+	static <T> void completeExceptionally(CompletableFuture<T> future, Exception exception, IErrorContextProvider contextProvider, boolean completeAsynchronously)
 	{
 		if (exception != null && exception instanceof ServiceBusException)
 		{
@@ -120,7 +120,14 @@ final class ExceptionUtil
 			((ServiceBusException) exception).setContext(errorContext);
 		}
 
-		future.completeExceptionally(exception);
+		if(completeAsynchronously)
+		{
+			AsyncUtil.completeFutureExceptionally(future, exception);
+		}
+		else
+		{
+			future.completeExceptionally(exception);
+		}		
 	}
 
 	// not a specific message related error

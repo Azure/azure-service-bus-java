@@ -46,7 +46,7 @@ import com.microsoft.azure.servicebus.amqp.ReceiveLinkHandler;
 import com.microsoft.azure.servicebus.amqp.SendLinkHandler;
 import com.microsoft.azure.servicebus.amqp.SessionHandler;
 
-public class RequestResponseLink extends ClientEntity{
+class RequestResponseLink extends ClientEntity{
 	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
 	
 	private MessagingFactory underlyingFactory;
@@ -91,8 +91,8 @@ public class RequestResponseLink extends ClientEntity{
 				@Override
 				public void onEvent()
 				{
-					requestReponseLink.createInternalLinks();
-					requestReponseLink.amqpSender.openFuture.runAfterBoth(requestReponseLink.amqpReceiver.openFuture, () -> requestReponseLink.createFuture.complete(requestReponseLink));
+					requestReponseLink.createInternalLinks();					
+					requestReponseLink.amqpSender.openFuture.runAfterBothAsync(requestReponseLink.amqpReceiver.openFuture, () -> requestReponseLink.createFuture.complete(requestReponseLink));
 				}
 			});
 		}
@@ -198,7 +198,7 @@ public class RequestResponseLink extends ClientEntity{
 		}
 		
 		this.createInternalLinks();
-		this.amqpSender.openFuture.thenCompose((v) -> this.amqpReceiver.openFuture).get();
+		this.amqpSender.openFuture.thenComposeAsync((v) -> this.amqpReceiver.openFuture).get();
 	}
 	
 	private void handleConnectionError(Exception exception)
@@ -218,7 +218,7 @@ public class RequestResponseLink extends ClientEntity{
 	private void completeAllPendingRequestsWithException(Exception exception)
 	{
 		for(RequestResponseWorkItem workItem : this.pendingRequests.values())
-		{
+		{			
 			workItem.getWork().completeExceptionally(exception);
 			workItem.cancelTimeoutTask(true);
 		}

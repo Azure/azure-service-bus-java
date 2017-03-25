@@ -215,7 +215,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		CompletableFuture<Void> crateAndAssignRequestResponseLink = 
 				RequestResponseLink.createAsync(this.underlyingFactory, this.getClientId() + "-RequestResponse", requestResponseLinkPath).thenAccept((rrlink) -> {MessageReceiver.this.requestResponseLink = rrlink;});
 
-		return crateAndAssignRequestResponseLink.thenCompose((v) -> this.linkOpen.getWork());
+		return crateAndAssignRequestResponseLink.thenComposeAsync((v) -> this.linkOpen.getWork());
 	}
 	
 	private void createReceiveLink()
@@ -374,8 +374,8 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 
 					final List<MessageWithDeliveryTag> messages = receiveCore(maxMessageCount);
 					if (messages != null)
-					{
-						onReceive.complete(messages);						
+					{						
+						AsyncUtil.completeFuture(onReceive, messages);
 					}
 					else
 					{
@@ -434,6 +434,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		return onReceive;
 	}
 
+	@Override
 	public void onOpenComplete(Exception exception)
 	{		
 		if (exception == null)
@@ -465,8 +466,8 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		if (exception == null)
 		{			
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
-			{
-				this.linkOpen.getWork().complete(this);
+			{				
+				AsyncUtil.completeFuture(this.linkOpen.getWork(), this);
 			}
 
 			this.lastKnownLinkError = null;
@@ -487,7 +488,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
 			{
 				this.setClosed();
-				ExceptionUtil.completeExceptionally(this.linkOpen.getWork(), exception, this);
+				ExceptionUtil.completeExceptionally(this.linkOpen.getWork(), exception, this, true);
 			}
 
 			this.lastKnownLinkError = exception;
@@ -535,8 +536,8 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 					
 					List<MessageWithDeliveryTag> messages = this.receiveCore(currentReceive.getMaxMessageCount());
 
-					CompletableFuture<Collection<MessageWithDeliveryTag>> future = currentReceive.getWork();
-					future.complete(messages);
+					CompletableFuture<Collection<MessageWithDeliveryTag>> future = currentReceive.getWork();					
+					AsyncUtil.completeFuture(future, messages);
 				}
 			}
 		}
@@ -635,7 +636,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 
 		if (this.getIsClosingOrClosed())
 		{
-			this.linkClose.complete(null);			
+			AsyncUtil.completeFuture(this.linkClose, null);
 			this.clearAllPendingWorkItems(exception);
 		}
 		else
@@ -736,7 +737,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 										operationTimedout);
 							}
 
-							ExceptionUtil.completeExceptionally(linkOpen.getWork(), operationTimedout, MessageReceiver.this);
+							ExceptionUtil.completeExceptionally(linkOpen.getWork(), operationTimedout, MessageReceiver.this, false);
 						}
 					}
 				}
@@ -762,7 +763,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 										operationTimedout);
 							}
 
-							ExceptionUtil.completeExceptionally(linkClose, operationTimedout, MessageReceiver.this);
+							ExceptionUtil.completeExceptionally(linkClose, operationTimedout, MessageReceiver.this, false);
 						}
 					}
 				}
@@ -814,8 +815,8 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 				this.scheduleLinkCloseTimeout(TimeoutTracker.create(this.operationTimeout));
 			}
 			else
-			{
-				this.linkClose.complete(null);
+			{				
+				AsyncUtil.completeFuture(this.linkClose, null);
 			}
 		}
 
@@ -910,8 +911,8 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 					String deliveryTagAsString = StringUtil.convertBytesToString(deliveryTag);
 					Delivery delivery = MessageReceiver.this.tagsToDeliveriesMap.get(deliveryTagAsString);
 					if(delivery == null)
-					{
-						completeMessageFuture.completeExceptionally(generateDeliveryNotFoundException());
+					{						
+						AsyncUtil.completeFutureExceptionally(completeMessageFuture, generateDeliveryNotFoundException());
 					}
 					else
 					{
@@ -942,12 +943,12 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 	{
 		delivery.settle();
 		if(exception == null)
-		{
-			workItem.getWork().complete(null);
+		{			
+			AsyncUtil.completeFuture(workItem.getWork(), null);
 		}
 		else
 		{
-			ExceptionUtil.completeExceptionally(workItem.getWork(), exception, this);
+			ExceptionUtil.completeExceptionally(workItem.getWork(), exception, this, true);
 		}	
 		
 		this.tagsToDeliveriesMap.remove(deliveryTagAsString);
@@ -967,12 +968,12 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 			
 			CompletableFuture<Collection<MessageWithDeliveryTag>> future = workItem.getWork();
 			if (isTransientException)
-			{
-				future.complete(null);
+			{				
+				AsyncUtil.completeFuture(future, null);
 			}
 			else
 			{
-				ExceptionUtil.completeExceptionally(future, exception, this);
+				ExceptionUtil.completeExceptionally(future, exception, this, true);
 			}
 			
 			workItem.cancelTimeoutTask(false);
@@ -981,7 +982,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		for(Map.Entry<String, UpdateStateWorkItem> pendingUpdate : this.pendingUpdateStateRequests.entrySet())
 		{
 			pendingUpdateStateRequests.remove(pendingUpdate.getKey());			
-			ExceptionUtil.completeExceptionally(pendingUpdate.getValue().getWork(), exception, this);
+			ExceptionUtil.completeExceptionally(pendingUpdate.getValue().getWork(), exception, this, true);
 		}		
 		
 		this.tagsToDeliveriesMap.clear();		
@@ -1008,7 +1009,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_RENEWLOCK_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Collection<Instant>> returningFuture = new CompletableFuture<Collection<Instant>>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1037,7 +1038,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_RECEIVE_BY_SEQUENCE_NUMBER, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Collection<MessageWithLockToken>> returningFuture = new CompletableFuture<Collection<MessageWithLockToken>>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1106,7 +1107,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_UPDATE_DISPOSTION_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1129,7 +1130,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_RENEW_SESSIONLOCK_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1154,7 +1155,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_GET_SESSION_STATE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<byte[]> returningFuture = new CompletableFuture<byte[]>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1190,7 +1191,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_SET_SESSION_STATE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1225,7 +1226,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_GET_MESSAGE_SESSIONS_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Pair<String[], Integer>> returningFuture = new CompletableFuture<Pair<String[], Integer>>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1256,7 +1257,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_REMOVE_RULE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
@@ -1280,7 +1281,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 		
 		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_ADD_RULE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
-		return responseFuture.thenCompose((responseMessage) -> {
+		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)

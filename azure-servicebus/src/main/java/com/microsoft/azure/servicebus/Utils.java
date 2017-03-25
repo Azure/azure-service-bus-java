@@ -1,8 +1,5 @@
 package com.microsoft.azure.servicebus;
 
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 

@@ -15,16 +15,15 @@ final class BrokeredMessageBrowser implements IMessageBrowser
 	private boolean isReceiveSideBrowser = false;
 	private BrokeredMessageReceiver messageReceiver = null;
 	private BrokeredMessageSender messageSender = null;
-	
-	
+		
 	public BrokeredMessageBrowser(BrokeredMessageReceiver messageReceiver)
-	{
+	{		
 		this.messageReceiver = messageReceiver;
 		this.isReceiveSideBrowser = true;
 	}
 	
 	public BrokeredMessageBrowser(BrokeredMessageSender messageSender)
-	{
+	{		
 		this.messageSender = messageSender;
 		this.isReceiveSideBrowser = false;
 	}
@@ -108,5 +107,5 @@ final class BrokeredMessageBrowser implements IMessageBrowser
 			
 			return convertedMessages;
 		});
-	}	
+	}
 }

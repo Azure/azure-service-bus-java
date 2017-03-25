@@ -1,6 +1,5 @@
 package com.microsoft.azure.servicebus;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,6 +13,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.junit.Assert;
 
+import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.MessageNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
@@ -21,12 +21,12 @@ public class TestCommons {
 	
 	private static Duration shortWaitTime = Duration.ofSeconds(5);
 	
-	public static void testBasicSend(IMessageSender sender) throws InterruptedException, ServiceBusException, IOException
+	public static void testBasicSend(IMessageSender sender) throws InterruptedException, ServiceBusException
 	{		
 		sender.send(new BrokeredMessage("AMQP message"));
 	}
 		
-	public static void testBasicSendBatch(IMessageSender sender) throws InterruptedException, ServiceBusException, IOException
+	public static void testBasicSendBatch(IMessageSender sender) throws InterruptedException, ServiceBusException
 	{		
 		List<BrokeredMessage> messages = new ArrayList<BrokeredMessage>();
 		for(int i=0; i<10; i++)
@@ -36,7 +36,7 @@ public class TestCommons {
 		sender.sendBatch(messages);
 	}
 	
-	public static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{	
 		String messageId = UUID.randomUUID().toString();
 		BrokeredMessage message = new BrokeredMessage("AMQP message");
@@ -54,7 +54,7 @@ public class TestCommons {
 		Assert.assertNull("Message received again", receivedMessage);
 	}
 	
-	public static void testBasicReceiveBatchAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveBatchAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{
 		int numMessages = 10;		
 		List<BrokeredMessage> messages = new ArrayList<BrokeredMessage>();
@@ -82,7 +82,7 @@ public class TestCommons {
 		Assert.assertNull("Messages received again", receivedMessages);
 	}
 		
-	public static void testBasicReceiveAndComplete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveAndComplete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{		
 		String messageId = UUID.randomUUID().toString();
 		BrokeredMessage message = new BrokeredMessage("AMQP message");
@@ -101,7 +101,7 @@ public class TestCommons {
 		Assert.assertNull("Message was not properly completed", receivedMessage);
 	}
 	
-	public static void testBasicReceiveAndAbandon(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveAndAbandon(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{		
 		String messageId = UUID.randomUUID().toString();
 		BrokeredMessage message = new BrokeredMessage("AMQP message");
@@ -123,7 +123,7 @@ public class TestCommons {
 		receiver.complete(receivedMessage.getLockToken());
 	}	
 	
-	public static void testBasicReceiveAndDeadLetter(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveAndDeadLetter(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{		
 		String messageId = UUID.randomUUID().toString();
 		BrokeredMessage message = new BrokeredMessage("AMQP message");
@@ -143,7 +143,7 @@ public class TestCommons {
 		Assert.assertNull("Message was not properly deadlettered", receivedMessage);
 	}	
 		
-	public static void testBasicReceiveAndRenewLock(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveAndRenewLock(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{		
 		String messageId = UUID.randomUUID().toString();
 		BrokeredMessage message = new BrokeredMessage("AMQP message");
@@ -165,7 +165,7 @@ public class TestCommons {
 		receiver.complete(receivedMessage.getLockToken());
 	}
 		
-	public static void testBasicReceiveAndRenewLockBatch(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveAndRenewLockBatch(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{		
 		int numMessages = 10;
 		List<BrokeredMessage> messages = new ArrayList<BrokeredMessage>();
@@ -212,7 +212,7 @@ public class TestCommons {
 		}		
 	}
 		
-	public static void testBasicReceiveBatchAndComplete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException, ExecutionException
+	public static void testBasicReceiveBatchAndComplete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{
 		int numMessages = 10;		
 		List<BrokeredMessage> messages = new ArrayList<BrokeredMessage>();
@@ -245,7 +245,7 @@ public class TestCommons {
 		Assert.assertNull("Messages received again", receivedMessages);
 	}
 		
-	public static void testSendSceduledMessageAndReceive(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
+	public static void testSendSceduledMessageAndReceive(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException
 	{
 		int secondsToWaitBeforeScheduling = 30;
 		String msgId1 = UUID.randomUUID().toString();
@@ -286,7 +286,7 @@ public class TestCommons {
 		Assert.assertTrue("Scheduled messages not received", firstMessageReceived && secondMessageReceived);
 	}
 		
-	public static void testSendSceduledMessageAndCancel(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
+	public static void testSendSceduledMessageAndCancel(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException
 	{
 		int secondsToWaitBeforeScheduling = 30;
 		String msgId1 = UUID.randomUUID().toString();
@@ -318,7 +318,7 @@ public class TestCommons {
 		Assert.assertFalse("Cancelled scheduled messages also received", allReceivedMessages.removeIf(msg -> msg.getMessageId().equals(msgId2)));
 	}
 		
-	public static void testPeekMessage(IMessageSender sender, String sessionId, IMessageBrowser browser) throws InterruptedException, ServiceBusException, IOException
+	public static void testPeekMessage(IMessageSender sender, String sessionId, IMessageBrowser browser) throws InterruptedException, ServiceBusException
 	{
 		BrokeredMessage message = new BrokeredMessage("AMQP Scheduled message");
 		if(sessionId != null)
@@ -343,7 +343,7 @@ public class TestCommons {
 		Assert.assertEquals("Peek with sequence number failed.", firstMessageSequenceNumber, peekedMessage5.getSequenceNumber());
 	}
 		
-	public static void testPeekMessageBatch(IMessageSender sender, String sessionId, IMessageBrowser browser) throws InterruptedException, ServiceBusException, IOException
+	public static void testPeekMessageBatch(IMessageSender sender, String sessionId, IMessageBrowser browser) throws InterruptedException, ServiceBusException
 	{			
 		BrokeredMessage message = new BrokeredMessage("AMQP Scheduled message");
 		if(sessionId != null)
@@ -375,7 +375,7 @@ public class TestCommons {
 		Assert.assertEquals("PeekBatch with sequence number failed.", firstMessageSequenceNumber, peekedMessagesBatch2.iterator().next().getSequenceNumber());
 	}
 		
-	public static void testReceiveBySequenceNumberAndComplete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
+	public static void testReceiveBySequenceNumberAndComplete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException
 	{			
 		BrokeredMessage message = new BrokeredMessage("AMQP Scheduled message");
 		if(sessionId != null)
@@ -407,7 +407,7 @@ public class TestCommons {
 		}		
 	}
 		
-	public static void testReceiveBySequenceNumberAndAbandon(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
+	public static void testReceiveBySequenceNumberAndAbandon(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException
 	{			
 		BrokeredMessage message = new BrokeredMessage("AMQP Scheduled message");
 		if(sessionId != null)
@@ -434,7 +434,7 @@ public class TestCommons {
 		receiver.complete(receivedMessage.getLockToken());
 	}
 		
-	public static void testReceiveBySequenceNumberAndDefer(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
+	public static void testReceiveBySequenceNumberAndDefer(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException
 	{
 		// Use longer strings with each defer to avoid an assert check in debug builds of service
 		String phaseKey = "phase";
@@ -473,7 +473,7 @@ public class TestCommons {
 		receiver.complete(receivedMessage.getLockToken());
 	}
 		
-	public static void testReceiveBySequenceNumberAndDeadletter(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, IOException
+	public static void testReceiveBySequenceNumberAndDeadletter(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException
 	{			
 		BrokeredMessage message = new BrokeredMessage("AMQP Scheduled message");
 		if(sessionId != null)
@@ -540,5 +540,12 @@ public class TestCommons {
 				break;
 			}			
 		}
+	}
+	
+	public static void drainAllMessages(ConnectionStringBuilder connectionStringBuilder) throws InterruptedException, ServiceBusException
+	{
+		IMessageReceiver receiver = ClientFactory.createMessageReceiverFromConnectionStringBuilder(TestUtils.getSubscriptionConnectionStringBuilder(), ReceiveMode.ReceiveAndDelete);
+		TestCommons.drainAllMessagesFromReceiver(receiver);
+		receiver.close();
 	}
 }

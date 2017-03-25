@@ -25,7 +25,7 @@ final class BrowsableMessageSession extends BrokeredMessageSession
 		this.sessionId = sessionId;
 		try {
 			this.initializeAsync().get();
-		} catch (InterruptedException | ExecutionException | IOException e) {
+		} catch (InterruptedException | ExecutionException e) {
 			// We can ignore it, as init is a no-operation in this case
 		}
 	}

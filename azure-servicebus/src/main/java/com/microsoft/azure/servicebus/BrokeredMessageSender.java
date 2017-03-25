@@ -1,6 +1,5 @@
 package com.microsoft.azure.servicebus;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -9,7 +8,6 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.qpid.proton.message.Message;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
-import com.microsoft.azure.servicebus.primitives.MessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessageSender;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
@@ -53,7 +51,7 @@ final class BrokeredMessageSender extends InitializableEntity implements IMessag
 	}
 	
 	@Override
-	synchronized CompletableFuture<Void> initializeAsync() throws IOException
+	synchronized CompletableFuture<Void> initializeAsync()
 	{
 		if(this.isInitialized)
 		{
@@ -64,17 +62,17 @@ final class BrokeredMessageSender extends InitializableEntity implements IMessag
 			CompletableFuture<Void> factoryFuture;
 			if(this.messagingFactory == null)
 			{
-				factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder).thenAccept((f) -> {this.messagingFactory = f;});
+				factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder).thenAcceptAsync((f) -> {this.messagingFactory = f;});
 			}
 			else
 			{
 				factoryFuture = CompletableFuture.completedFuture(null);
 			}
 			
-			return factoryFuture.thenCompose((v) ->
+			return factoryFuture.thenComposeAsync((v) ->
 			{
 				CompletableFuture<MessageSender> senderFuture = MessageSender.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath);
-				return senderFuture.thenAccept((s) -> 
+				return senderFuture.thenAcceptAsync((s) -> 
 				{
 					this.internalSender = s;
 					this.isInitialized = true;
@@ -164,5 +162,10 @@ final class BrokeredMessageSender extends InitializableEntity implements IMessag
 	public void cancelScheduledMessage(long sequenceNumber) throws InterruptedException, ServiceBusException
 	{
 		Utils.completeFuture(this.cancelScheduledMessageAsync(sequenceNumber));
+	}
+	
+	MessagingFactory getMessagingFactory()
+	{
+		return this.messagingFactory;
 	}
 }

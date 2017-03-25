@@ -7,82 +7,103 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
-import com.microsoft.azure.servicebus.rules.Filter;
-import com.microsoft.azure.servicebus.rules.RuleDescription;
 
-public class SubscriptionClient extends InitializableEntity implements ISubscriptionClient {
-
+public class QueueClient extends InitializableEntity implements IQueueClient
+{
+	private IMessageSender sender;
 	private IMessageReceiver receiver;
 	private MessageAndSessionPump messageAndSessionPump;
 	private SessionBrowser sessionBrowser;
 	
-	private SubscriptionClient()
+	private QueueClient()
 	{
 		super(StringUtil.getRandomString(), null);
 	}
 	
-	public SubscriptionClient(String amqpConnectionString, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+	public QueueClient(String amqpConnectionString, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
 	{
 		this();
-		this.receiver = ClientFactory.createMessageReceiverFromConnectionString(amqpConnectionString, receiveMode);
-		this.createPumpAndBrowser();
+		ConnectionStringBuilder builder = new ConnectionStringBuilder(amqpConnectionString);
+		CompletableFuture<MessagingFactory> factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(builder);		
+		Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.CreateSendersAndReceiversAsync(f, builder.getEntityPath(), receiveMode)));
 	}
 	
-	public SubscriptionClient(MessagingFactory factory, String subscriptionPath, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+	public QueueClient(MessagingFactory factory, String queuePath, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
 	{
 		this();
-		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, subscriptionPath, receiveMode);
-		this.createPumpAndBrowser();
+		Utils.completeFuture(this.CreateSendersAndReceiversAsync(factory, queuePath, receiveMode));
 	}
 	
-	private void createPumpAndBrowser()
+	private CompletableFuture<Void> CreateSendersAndReceiversAsync(MessagingFactory factory, String queuePath, ReceiveMode receiveMode)
 	{
-		this.messageAndSessionPump = new MessageAndSessionPump(this.receiver);
-		this.sessionBrowser = new SessionBrowser(((BrokeredMessageReceiver)this.receiver).getMessagingFactory(), (BrokeredMessageReceiver)this.receiver, ((BrokeredMessageReceiver)this.receiver).getEntityPath());
-	}
+		CompletableFuture<IMessageSender> senderFuture = ClientFactory.createMessageSenderFromEntityPathAsync(factory, queuePath);
+		CompletableFuture<Void> postSenderFuture = senderFuture.thenAcceptAsync((s) -> {
+			this.sender = s;			
+		});
+		CompletableFuture<IMessageReceiver> receiverFuture = ClientFactory.createMessageReceiverFromEntityPathAsync(factory, queuePath, receiveMode);
+		CompletableFuture<Void> postRecieverFuture = receiverFuture.thenAcceptAsync((r) -> {
+			this.receiver = r;
+			this.messageAndSessionPump = new MessageAndSessionPump(this.receiver);
+			this.sessionBrowser = new SessionBrowser(factory, (BrokeredMessageReceiver)this.receiver, queuePath);
+		});
+		
+		return CompletableFuture.allOf(postSenderFuture, postRecieverFuture);
+	}	
 	
 	@Override
 	public ReceiveMode getReceiveMode() {
 		return this.receiver.getReceiveMode();
 	}
 	
+
+	@Override
+	public void send(IBrokeredMessage message) throws InterruptedException, ServiceBusException {
+		this.sender.send(message);		
+	}
+
+	@Override
+	public void sendBatch(Collection<? extends IBrokeredMessage> messages) throws InterruptedException, ServiceBusException {
+		this.sender.sendBatch(messages);		
+	}
+
+	@Override
+	public CompletableFuture<Void> sendAsync(IBrokeredMessage message) {
+		return this.sender.sendAsync(message);
+	}
+
+	@Override
+	public CompletableFuture<Void> sendBatchAsync(Collection<? extends IBrokeredMessage> messages) {
+		return this.sender.sendBatchAsync(messages);
+	}
+
+	@Override
+	public CompletableFuture<Long> scheduleMessageAsync(IBrokeredMessage message, Instant scheduledEnqueueTimeUtc) {
+		return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc);
+	}
+
+	@Override
+	public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber) {
+		return this.sender.cancelScheduledMessageAsync(sequenceNumber);
+	}
+
+	@Override
+	public long scheduleMessage(IBrokeredMessage message, Instant scheduledEnqueueTimeUtc) throws InterruptedException, ServiceBusException {
+		return this.sender.scheduleMessage(message, scheduledEnqueueTimeUtc);
+	}
+
+	@Override
+	public void cancelScheduledMessage(long sequenceNumber) throws InterruptedException, ServiceBusException {
+		this.sender.cancelScheduledMessage(sequenceNumber);	
+	}
+
 	@Override
 	public String getEntityPath() {
-		return this.receiver.getEntityPath();
-	}
-
-	@Override
-	public void addRule(RuleDescription ruleDescription) throws InterruptedException, ServiceBusException {
-		Utils.completeFuture(this.addRuleAsync(ruleDescription));
-	}
-
-	@Override
-	public CompletableFuture<Void> addRuleAsync(RuleDescription ruleDescription) {
-		return ((BrokeredMessageReceiver)this.receiver).getInternalReceiver().addRuleAsync(ruleDescription);
-	}
-
-	@Override
-	public void addRule(String ruleName, Filter filter) throws InterruptedException, ServiceBusException {
-		Utils.completeFuture(this.addRuleAsync(ruleName, filter));
-	}
-
-	@Override
-	public CompletableFuture<Void> addRuleAsync(String ruleName, Filter filter) {
-		return this.addRuleAsync(new RuleDescription(ruleName, filter));
-	}
-	
-	@Override
-	public void removeRule(String ruleName) throws InterruptedException, ServiceBusException {
-		Utils.completeFuture(this.removeRuleAsync(ruleName));
-	}
-
-	@Override
-	public CompletableFuture<Void> removeRuleAsync(String ruleName) {
-		return ((BrokeredMessageReceiver)this.receiver).getInternalReceiver().removeRuleAsync(ruleName);
-	}
+		return this.sender.getEntityPath();
+	}	
 
 	@Override
 	public void registerMessageHandler(IMessageHandler handler) {
@@ -112,9 +133,9 @@ public class SubscriptionClient extends InitializableEntity implements ISubscrip
 
 	@Override
 	protected CompletableFuture<Void> onClose() {
-		return this.messageAndSessionPump.closeAsync().thenCompose((v) -> this.receiver.closeAsync());
+		return this.messageAndSessionPump.closeAsync().thenCompose((v) -> this.sender.closeAsync().thenCompose((u) -> this.receiver.closeAsync()));
 	}
-	
+
 	@Override
 	public Collection<IMessageSession> getMessageSessions() throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.getMessageSessionsAsync());
@@ -134,7 +155,7 @@ public class SubscriptionClient extends InitializableEntity implements ISubscrip
 	public CompletableFuture<Collection<IMessageSession>> getMessageSessionsAsync(Instant lastUpdatedTime) {
 		return this.sessionBrowser.getMessageSessionsAsync(Date.from(lastUpdatedTime));
 	}
-	
+
 	@Override
 	public void abandon(UUID lockToken) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.abandon(lockToken);
@@ -223,5 +244,5 @@ public class SubscriptionClient extends InitializableEntity implements ISubscrip
 	@Override
 	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason,	String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
 		return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
-	}	
+	}
 }

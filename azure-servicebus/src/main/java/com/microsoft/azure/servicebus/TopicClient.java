@@ -1,26 +1,33 @@
 package com.microsoft.azure.servicebus;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import com.microsoft.azure.servicebus.primitives.StringUtil;
 
-public final class TopicClient implements ITopicClient
+public final class TopicClient extends InitializableEntity implements ITopicClient
 {
 	private IMessageSender sender;
 	private BrokeredMessageBrowser browser;
 	
-	public TopicClient(String amqpConnectionString) throws InterruptedException, ServiceBusException, IOException
+	private TopicClient()
 	{
+		super(StringUtil.getRandomString(), null);
+	}
+	
+	public TopicClient(String amqpConnectionString) throws InterruptedException, ServiceBusException
+	{
+		this();
 		this.sender = ClientFactory.createMessageSenderFromConnectionString(amqpConnectionString);
 		this.browser = new BrokeredMessageBrowser((BrokeredMessageSender)sender);
 	}
 	
-	public TopicClient(MessagingFactory factory, String topicPath) throws InterruptedException, ServiceBusException, IOException
+	public TopicClient(MessagingFactory factory, String topicPath) throws InterruptedException, ServiceBusException
 	{
+		this();
 		this.sender = ClientFactory.createMessageSenderFromEntityPath(factory, topicPath);
 		this.browser = new BrokeredMessageBrowser((BrokeredMessageSender)sender);
 	}
@@ -71,16 +78,6 @@ public final class TopicClient implements ITopicClient
 	}
 
 	@Override
-	public CompletableFuture<Void> closeAsync() {
-		return this.sender.closeAsync();
-	}
-
-	@Override
-	public void close() throws ServiceBusException {
-		this.sender.close();
-	}
-
-	@Override
 	public IBrokeredMessage peek() throws InterruptedException, ServiceBusException {
 		return this.browser.peek();
 	}
@@ -118,5 +115,16 @@ public final class TopicClient implements ITopicClient
 	@Override
 	public CompletableFuture<Collection<IBrokeredMessage>> peekBatchAsync(long fromSequenceNumber, int messageCount) {
 		return this.browser.peekBatchAsync(fromSequenceNumber, messageCount);
+	}
+
+	// No Op now
+	@Override
+	CompletableFuture<Void> initializeAsync() throws Exception {
+		return CompletableFuture.completedFuture(null);
+	}
+
+	@Override
+	protected CompletableFuture<Void> onClose() {
+		return this.sender.closeAsync();
 	}
 }

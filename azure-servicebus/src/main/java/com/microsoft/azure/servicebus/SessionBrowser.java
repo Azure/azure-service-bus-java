@@ -27,16 +27,16 @@ final class SessionBrowser
 		this.entityPath = entityPath;
 	}
 	
-	public CompletableFuture<Collection<? extends IMessageSession>> getMessageSessionsAsync()
+	public CompletableFuture<Collection<IMessageSession>> getMessageSessionsAsync()
 	{
 		return this.getMessageSessionsAsync(MAXDATE);
 	}
 	
-	public CompletableFuture<Collection<? extends IMessageSession>> getMessageSessionsAsync(Date lastUpdatedTime)
+	public CompletableFuture<Collection<IMessageSession>> getMessageSessionsAsync(Date lastUpdatedTime)
 	{
 		return this.messageReceiver.getInternalReceiver().getMessageSessionsAsync(lastUpdatedTime, this.lastReceivedSkip, PAGESIZE, this.lastSessionId).thenApply((p) ->
 		{
-			ArrayList<BrowsableMessageSession> sessionsList = new ArrayList<>();
+			ArrayList<IMessageSession> sessionsList = new ArrayList<>();
 			this.lastReceivedSkip = p.getSecondItem();
 			String[] sessionIds = p.getFirstItem();
 			if(sessionIds != null && sessionIds.length > 0)
