@@ -24,7 +24,7 @@ final class BrokeredMessageSender extends InitializableEntity implements IMessag
 	
 	private BrokeredMessageSender()
 	{
-		super(StringUtil.getRandomString(), null);
+		super(StringUtil.getShortRandomString(), null);
 	}
 	
 	BrokeredMessageSender(ConnectionStringBuilder amqpConnectionStringBuilder)
@@ -71,7 +71,7 @@ final class BrokeredMessageSender extends InitializableEntity implements IMessag
 			
 			return factoryFuture.thenComposeAsync((v) ->
 			{
-				CompletableFuture<MessageSender> senderFuture = MessageSender.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath);
+				CompletableFuture<MessageSender> senderFuture = MessageSender.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath);
 				return senderFuture.thenAcceptAsync((s) -> 
 				{
 					this.internalSender = s;

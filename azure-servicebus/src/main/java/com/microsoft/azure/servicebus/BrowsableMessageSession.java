@@ -15,25 +15,28 @@ import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 final class BrowsableMessageSession extends BrokeredMessageSession
 {
-	private static final String INVALID_OPERATION_ERROR_MESSAGE = "Unsupported operation on a browse only session.";
+	private static final String INVALID_OPERATION_ERROR_MESSAGE = "Unsupported operation on a browse only session.";	
 	
-	private final String sessionId;
-	
-	BrowsableMessageSession(String sessionId, MessagingFactory messagingFactory, MessageReceiver internalReceiver, String entityPath)
+	BrowsableMessageSession(String sessionId, MessagingFactory messagingFactory, String entityPath)
 	{
-		super(messagingFactory, internalReceiver, entityPath, ReceiveMode.PeekLock);
-		this.sessionId = sessionId;
-		try {
-			this.initializeAsync().get();
-		} catch (InterruptedException | ExecutionException e) {
-			// We can ignore it, as init is a no-operation in this case
-		}
+		super(messagingFactory, entityPath, sessionId, ReceiveMode.PeekLock);	
+//		try {
+//			this.initializeAsync().get();
+//		} catch (InterruptedException | ExecutionException e) {
+//			
+//		}
+	}
+	
+	@Override
+	protected boolean isBrowsableSession()
+	{
+		return true;
 	}
 	
 	@Override
 	public String getSessionId()
 	{
-		return this.sessionId;
+		return this.getRequestedSessionId();
 	}
 	
 	@Override

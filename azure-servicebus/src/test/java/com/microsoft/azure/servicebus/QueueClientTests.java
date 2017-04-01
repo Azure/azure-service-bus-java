@@ -27,46 +27,126 @@ public class QueueClientTests {
 			
 		if(this.sessionfulQueueClient != null)
 		{
-			this.sessionfulQueueClient.close();
-			TestCommons.drainAllMessages(TestUtils.getSessionfulQueueConnectionStringBuilder());
+			TestCommons.drainAllSessions(this.sessionfulQueueClient, TestUtils.getSessionfulQueueConnectionStringBuilder());
+			this.sessionfulQueueClient.close();			
 		}			
 	}
 	
 	private void createQueueClient() throws InterruptedException, ServiceBusException
 	{
-		this.queueClient = new QueueClient(TestUtils.getQueueConnectionStringBuilder().toString(), ReceiveMode.PeekLock);
+		this.createQueueClient(ReceiveMode.PeekLock);
 	}
 	
 	private void createSessionfulQueueClient() throws InterruptedException, ServiceBusException
 	{
-		this.queueClient = new QueueClient(TestUtils.getSessionfulQueueConnectionStringBuilder().toString(), ReceiveMode.PeekLock);
+		this.createSessionfulQueueClient(ReceiveMode.PeekLock);
+	}
+	
+	private void createQueueClient(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+	{
+		this.queueClient = new QueueClient(TestUtils.getQueueConnectionStringBuilder().toString(), receiveMode);
+	}
+	
+	private void createSessionfulQueueClient(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+	{
+		this.sessionfulQueueClient = new QueueClient(TestUtils.getSessionfulQueueConnectionStringBuilder().toString(), receiveMode);
 	}
 	
 	@Test
 	public void testMessagePumpAutoComplete() throws InterruptedException, ServiceBusException
 	{
 		this.createQueueClient();
-		MessagePumpTests.testMessagePumpAutoComplete(this.queueClient, this.queueClient);
+		MessageAndSessionPumpTests.testMessagePumpAutoComplete(this.queueClient, this.queueClient);		
+	}
+	
+	@Test
+	public void testReceiveAndDeleteMessagePump() throws InterruptedException, ServiceBusException
+	{
+		this.createQueueClient(ReceiveMode.ReceiveAndDelete);
+		MessageAndSessionPumpTests.testMessagePumpAutoComplete(this.queueClient, this.queueClient);		
 	}
 	
 	@Test
 	public void testMessagePumpClientComplete() throws InterruptedException, ServiceBusException
 	{
 		this.createQueueClient();
-		MessagePumpTests.testMessagePumpClientComplete(this.queueClient, this.queueClient);
+		MessageAndSessionPumpTests.testMessagePumpClientComplete(this.queueClient, this.queueClient);
 	}
 	
 	@Test
 	public void testMessagePumpAbandonOnException() throws InterruptedException, ServiceBusException
 	{
 		this.createQueueClient();
-		MessagePumpTests.testMessagePumpAbandonOnException(this.queueClient, this.queueClient);
+		MessageAndSessionPumpTests.testMessagePumpAbandonOnException(this.queueClient, this.queueClient);
 	}
 	
 	@Test
 	public void testMessagePumpRenewLock() throws InterruptedException, ServiceBusException
 	{
 		this.createQueueClient();
-		MessagePumpTests.testMessagePumpRenewLock(this.queueClient, this.queueClient);
+		MessageAndSessionPumpTests.testMessagePumpRenewLock(this.queueClient, this.queueClient);
 	}
+	
+	@Test
+	public void testRegisterAnotherHandlerAfterMessageHandler() throws InterruptedException, ServiceBusException
+	{
+		this.createQueueClient();
+		MessageAndSessionPumpTests.testRegisterAnotherHandlerAfterMessageHandler(this.queueClient);
+	}
+	
+	@Test
+	public void testRegisterAnotherHandlerAfterSessionHandler() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		MessageAndSessionPumpTests.testRegisterAnotherHandlerAfterSessionHandler(this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testGetMessageSessions() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		TestCommons.testGetMessageSessions(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testSessionPumpAutoCompleteWithOneConcurrentCallPerSession() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithOneConcurrentCallPerSession(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testReceiveAndDeleteSessionPump() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient(ReceiveMode.ReceiveAndDelete);
+		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithOneConcurrentCallPerSession(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testSessionPumpAutoCompleteWithMultipleConcurrentCallPerSession() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithMultipleConcurrentCallPerSession(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testSessionPumpClientComplete() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		MessageAndSessionPumpTests.testSessionPumpClientComplete(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testSessionPumpAbandonOnException() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		MessageAndSessionPumpTests.testSessionPumpAbandonOnException(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}
+	
+	@Test
+	public void testSessionPumpRenewLock() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulQueueClient();
+		MessageAndSessionPumpTests.testSessionPumpRenewLock(this.sessionfulQueueClient, this.sessionfulQueueClient);
+	}	
 }

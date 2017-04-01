@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
-class Utils {
+final class Utils {
 	
 	static <T> T completeFuture(CompletableFuture<T> future) throws InterruptedException, ServiceBusException
 	{
@@ -15,7 +15,7 @@ class Utils {
 		}
 		catch(InterruptedException ie)
 		{
-			Thread.currentThread().interrupt();
+			// Rare instance			
 			throw ie;
 		}
 		catch(ExecutionException ee)

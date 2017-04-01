@@ -2,7 +2,7 @@ package com.microsoft.azure.servicebus;
 
 import java.time.Duration;
 
-public class MessageHandlerOptions
+public final class MessageHandlerOptions
 {
 	private static final boolean DEFAULT_AUTO_COMPLETE = true;
 	private static final int DEFAULT_MAX_CONCURRENT_CALLS = 1;

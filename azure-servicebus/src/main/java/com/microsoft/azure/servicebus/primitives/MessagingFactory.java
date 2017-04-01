@@ -62,7 +62,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	 */
 	MessagingFactory(final ConnectionStringBuilder builder)
 	{
-		super("MessagingFactory".concat(StringUtil.getRandomString()), null);
+		super("MessagingFactory".concat(StringUtil.getShortRandomString()), null);
 
 		Timer.register(this.getClientId());
 		this.hostName = builder.getEndpoint().getHost();

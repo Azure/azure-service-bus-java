@@ -8,13 +8,13 @@ import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 interface IMessageAndSessionPump
 {
-	public void registerMessageHandler(IMessageHandler handler);
+	public void registerMessageHandler(IMessageHandler handler) throws InterruptedException, ServiceBusException;
 	
-	public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions);
+	public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException;
 	
-	public void registerSessionHandler(ISessionHandler handler);
+	public void registerSessionHandler(ISessionHandler handler) throws InterruptedException, ServiceBusException;
 	
-	public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions);
+	public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException;
 	
     void abandon(UUID lockToken) throws InterruptedException, ServiceBusException;
 

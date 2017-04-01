@@ -1,10 +1,11 @@
 package com.microsoft.azure.servicebus;
 
-public abstract class TestMessageHandler implements IMessageHandler {
+import java.util.concurrent.CompletableFuture;
 
+public abstract class TestSessionHandler implements ISessionHandler
+{
 	@Override
 	public void notifyException(Throwable exception, ExceptionPhase phase) {
-		//exception.printStackTrace();
 		System.out.println(phase + "-" + exception.getMessage());
 	}
 }

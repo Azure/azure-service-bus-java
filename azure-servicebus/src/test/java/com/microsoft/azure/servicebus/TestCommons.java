@@ -3,19 +3,25 @@ package com.microsoft.azure.servicebus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import org.junit.Assert;
+import org.junit.Test;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.MessageNotFoundException;
+import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import com.microsoft.azure.servicebus.primitives.StringUtil;
+import com.microsoft.azure.servicebus.primitives.TimeoutException;
 
 public class TestCommons {
 	
@@ -505,8 +511,60 @@ public class TestCommons {
 			// Expected
 		}
 	}
+		
+	public static void testGetMessageSessions(IMessageSender sender, IMessageSessionEntity sessionsClient) throws InterruptedException, ServiceBusException
+	{		
+		int numSessions = 110; // More than default page size
+		String[] sessionIds = new String[numSessions];
+		for(int i=0; i<numSessions; i++)
+		{
+			sessionIds[i] = StringUtil.getRandomString();
+			BrokeredMessage message = new BrokeredMessage("AMQP message");
+			message.setSessionId(sessionIds[i]);
+			sender.send(message);
+		}
+		
+		Collection<? extends IMessageSession> sessions = Utils.completeFuture(sessionsClient.getMessageSessionsAsync());
+		Assert.assertTrue("GetMessageSessions didnot return all sessions", numSessions <= sessions.size()); // There could be sessions left over from other tests
+		
+		IMessageSession anySession = (IMessageSession)sessions.toArray()[0];
+		try{
+			anySession.receive();
+			Assert.fail("Browsable session should not support receive operation");
+		}
+		catch(UnsupportedOperationException e)
+		{
+			// Expected
+		}
+		
+		try{
+			anySession.setState(null);
+			Assert.fail("Browsable session should not support setstate operation");
+		}
+		catch(UnsupportedOperationException e)
+		{
+			// Expected
+		}
+		
+		// shouldn't throw an exception
+		byte[] sessionState = anySession.getState();
+		
+		IBrokeredMessage peekedMessage = anySession.peek();
+		Assert.assertNotNull("Peek on a browsable session failed.", peekedMessage);
+		
+		// Close all sessions
+		for(IMessageSession session : sessions)
+		{
+			session.closeAsync();
+		}		
+	}
 	
 	public static void drainAllMessagesFromReceiver(IMessageReceiver receiver) throws InterruptedException, ServiceBusException
+	{
+		drainAllMessagesFromReceiver(receiver, true);
+	}
+	
+	public static void drainAllMessagesFromReceiver(IMessageReceiver receiver, boolean cleanDeferredMessages) throws InterruptedException, ServiceBusException
 	{
 		Duration waitTime = Duration.ofSeconds(5);
 		final int batchSize = 10;		
@@ -523,29 +581,68 @@ public class TestCommons {
 			messages = receiver.receiveBatch(batchSize, waitTime);
 		}		
 		
-		IBrokeredMessage peekedMessage;
-		while((peekedMessage = receiver.peek()) != null)
+		if(cleanDeferredMessages)
 		{
-			try
+			IBrokeredMessage peekedMessage;
+			while((peekedMessage = receiver.peek()) != null)
 			{
-				IBrokeredMessage message = receiver.receive(peekedMessage.getSequenceNumber());
-				if(receiver.getReceiveMode() == ReceiveMode.PeekLock)
+				try
 				{
-					receiver.complete(message.getLockToken());
+					IBrokeredMessage message = receiver.receive(peekedMessage.getSequenceNumber());
+					if(receiver.getReceiveMode() == ReceiveMode.PeekLock)
+					{
+						receiver.complete(message.getLockToken());
+					}
 				}
+				catch(MessageNotFoundException mnfe)
+				{
+					// Ignore. May be there were no deferred messages
+					break;
+				}			
 			}
-			catch(MessageNotFoundException mnfe)
-			{
-				// Ignore. May be there were no deferred messages
-				break;
-			}			
-		}
+		}		
 	}
 	
 	public static void drainAllMessages(ConnectionStringBuilder connectionStringBuilder) throws InterruptedException, ServiceBusException
 	{
-		IMessageReceiver receiver = ClientFactory.createMessageReceiverFromConnectionStringBuilder(TestUtils.getSubscriptionConnectionStringBuilder(), ReceiveMode.ReceiveAndDelete);
+		IMessageReceiver receiver = ClientFactory.createMessageReceiverFromConnectionStringBuilder(connectionStringBuilder, ReceiveMode.ReceiveAndDelete);
 		TestCommons.drainAllMessagesFromReceiver(receiver);
 		receiver.close();
+	}
+	
+	public static void drainAllSessions(IMessageSessionEntity sessionsClient, ConnectionStringBuilder connectionStringBuilder) throws InterruptedException, ServiceBusException
+	{
+		int numParallelSessionDrains = 5;
+		Collection<IMessageSession> browsableSessions = sessionsClient.getMessageSessions();
+		if(browsableSessions != null && browsableSessions.size() > 0)
+		{
+			CompletableFuture[] drainFutures = new CompletableFuture[numParallelSessionDrains];
+			int drainFutureIndex = 0;
+			for(IMessageSession browsableSession : browsableSessions)
+			{				
+				CompletableFuture<Void> drainFuture = ClientFactory.acceptSessionFromConnectionStringBuilderAsync
+						(connectionStringBuilder, browsableSession.getSessionId(), ReceiveMode.ReceiveAndDelete).thenAcceptAsync((session) -> {
+							try {
+								TestCommons.drainAllMessagesFromReceiver(session, false);
+								session.setState(null);
+								session.close();
+							} catch (InterruptedException | ServiceBusException e) {								
+								e.printStackTrace();
+							}							
+						});
+				
+				drainFutures[drainFutureIndex++] = drainFuture;
+				if(drainFutureIndex == numParallelSessionDrains)
+				{
+					Utils.completeFuture(CompletableFuture.allOf(drainFutures));
+					drainFutureIndex = 0;					
+				}
+			}
+			
+			if(drainFutureIndex > 0)
+			{				
+				Utils.completeFuture(CompletableFuture.allOf(Arrays.copyOf(drainFutures, drainFutureIndex)));
+			}
+		}	
 	}
 }

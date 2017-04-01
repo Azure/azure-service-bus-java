@@ -2,8 +2,11 @@ package com.microsoft.azure.servicebus;
 
 public enum ExceptionPhase {
 	RECEIVE,
-	RENEWLOCK,
+	RENEWMESSAGELOCK,
 	COMPLETE,
 	ABANDON,
-	USERCALLBACK
+	USERCALLBACK,
+	SESSIONCLOSE,
+	ACCEPTSESSION,
+	RENEWSESSIONLOCK
 }

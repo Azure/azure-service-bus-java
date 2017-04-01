@@ -40,7 +40,7 @@ public abstract class SessionTests {
 	@After
 	public void tearDown() throws ServiceBusException, InterruptedException
 	{
-		this.drainAllMessages();
+		this.drainSession();
 		
 		this.sender.close();
 		if(this.session != null)
@@ -51,7 +51,6 @@ public abstract class SessionTests {
 	@AfterClass
 	public static void afterClass() throws ServiceBusException, InterruptedException
 	{
-//		drainAllSessions();
 		factory.close();
 	}	
 	
@@ -237,80 +236,12 @@ public abstract class SessionTests {
 		Assert.assertArrayEquals("Session state not updated properly", customState, updatedState);
 	}
 	
-	@Test
-	public void testGetMessageSessions() throws InterruptedException, ServiceBusException
-	{		
-		int defaultPageSize = 100;
-		int numSessions = 110; // More than default page size
-		String[] sessionIds = new String[numSessions];
-		for(int i=0; i<numSessions; i++)
-		{
-			sessionIds[i] = getRandomString();
-			BrokeredMessage message = new BrokeredMessage("AMQP message");
-			message.setSessionId(sessionIds[i]);
-			this.sender.send(message);
-		}
-		
-		this.session = ClientFactory.acceptSessionFromEntityPath(factory, receiveBuilder.getEntityPath(), null, ReceiveMode.PeekLock);
-		SessionBrowser sessionBrowser = new SessionBrowser(factory, (BrokeredMessageReceiver)this.session, receiveBuilder.getEntityPath());
-		Collection<? extends IMessageSession> sessions = Utils.completeFuture(sessionBrowser.getMessageSessionsAsync());
-		Assert.assertEquals("GetMessageSessions returned more than " + defaultPageSize + " sessions", defaultPageSize, sessions.size());
-		Collection<? extends IMessageSession> remainingSessions = Utils.completeFuture(sessionBrowser.getMessageSessionsAsync());
-		Assert.assertTrue("GetMessageSessions didnot return all sessions", numSessions >= defaultPageSize);
-		
-		IMessageSession anySession = (IMessageSession)remainingSessions.toArray()[0];
-		try{
-			anySession.receive();
-			Assert.fail("Browsable session should not support receive operation");
-		}
-		catch(UnsupportedOperationException e)
-		{
-			// Expected
-		}
-		
-		try{
-			anySession.setState(null);
-			Assert.fail("Browsable session should not support setstate operation");
-		}
-		catch(UnsupportedOperationException e)
-		{
-			// Expected
-		}
-		
-		// shouldn't throw an exception
-		byte[] sessionState = anySession.getState();	
-		
-		IBrokeredMessage peekedMessage = anySession.peek();
-		Assert.assertNotNull("Peek on a browsable session failed.", peekedMessage);			
-	}
-	
-	private void drainAllMessages() throws InterruptedException, ServiceBusException
+	private void drainSession() throws InterruptedException, ServiceBusException
 	{
 		if(this.session != null)
 		{
 			TestCommons.drainAllMessagesFromReceiver(this.session);
+			session.setState(null);
 		}
-	}
-	
-	private static void drainAllSessions() throws InterruptedException, ServiceBusException
-	{
-		int count = 0;
-		while(true)
-		{
-			try
-			{
-				IMessageSession session = ClientFactory.acceptSessionFromEntityPath(factory, receiveBuilder.getEntityPath(), null, ReceiveMode.ReceiveAndDelete);
-				count++;
-				TestCommons.drainAllMessagesFromReceiver(session);
-				session.setState(null);
-				session.close();				
-			}
-			catch(TimeoutException te)
-			{
-				System.out.println("Breaking.. on count:" + count);
-				// Session not found
-				break;
-			}			
-		}
-	}
+	}	
 }

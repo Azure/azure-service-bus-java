@@ -7,7 +7,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.MessagingEntityAlreadyExistsException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.rules.CorrelationFilter;
@@ -47,21 +46,31 @@ public class SubscriptionClientTests {
 			
 		if(this.sessionfulSubscriptionClient != null)
 		{
-			this.sessionfulSubscriptionClient.close();
-			TestCommons.drainAllMessages(TestUtils.getSessionfulSubscriptionConnectionStringBuilder());
+			TestCommons.drainAllSessions(this.sessionfulSubscriptionClient, TestUtils.getSessionfulSubscriptionConnectionStringBuilder());
+			this.sessionfulSubscriptionClient.close();			
 		}			
 	}	
 	
 	private void createSubscriptionClient() throws InterruptedException, ServiceBusException
 	{
-		this.topicClient = new TopicClient(TestUtils.getTopicConnectionStringBuilder().toString());
-		this.subscriptionClient = new SubscriptionClient(TestUtils.getSubscriptionConnectionStringBuilder().toString(), ReceiveMode.PeekLock);
+		this.createSubscriptionClient(ReceiveMode.PeekLock);
 	}
 	
 	private void createSessionfulSubscriptionClient() throws InterruptedException, ServiceBusException
 	{
+		this.createSessionfulSubscriptionClient(ReceiveMode.PeekLock);
+	}
+	
+	private void createSubscriptionClient(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+	{
+		this.topicClient = new TopicClient(TestUtils.getTopicConnectionStringBuilder().toString());
+		this.subscriptionClient = new SubscriptionClient(TestUtils.getSubscriptionConnectionStringBuilder().toString(), receiveMode);
+	}
+	
+	private void createSessionfulSubscriptionClient(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+	{
 		this.sessionfulTopicClient = new TopicClient(TestUtils.getSessionfulTopicConnectionStringBuilder().toString());
-		this.sessionfulSubscriptionClient = new SubscriptionClient(TestUtils.getSessionfulSubscriptionConnectionStringBuilder().toString(), ReceiveMode.PeekLock);
+		this.sessionfulSubscriptionClient = new SubscriptionClient(TestUtils.getSessionfulSubscriptionConnectionStringBuilder().toString(), receiveMode);
 	}
 	
 	@Test
@@ -113,27 +122,97 @@ public class SubscriptionClientTests {
 	public void testMessagePumpAutoComplete() throws InterruptedException, ServiceBusException
 	{
 		this.createSubscriptionClient();
-		MessagePumpTests.testMessagePumpAutoComplete(this.topicClient, this.subscriptionClient);
+		MessageAndSessionPumpTests.testMessagePumpAutoComplete(this.topicClient, this.subscriptionClient);
+	}
+	
+	@Test
+	public void testReceiveAndDeleteMessagePump() throws InterruptedException, ServiceBusException
+	{
+		this.createSubscriptionClient(ReceiveMode.ReceiveAndDelete);
+		MessageAndSessionPumpTests.testMessagePumpAutoComplete(this.topicClient, this.subscriptionClient);
 	}
 	
 	@Test
 	public void testMessagePumpClientComplete() throws InterruptedException, ServiceBusException
 	{
 		this.createSubscriptionClient();
-		MessagePumpTests.testMessagePumpClientComplete(this.topicClient, this.subscriptionClient);
+		MessageAndSessionPumpTests.testMessagePumpClientComplete(this.topicClient, this.subscriptionClient);
 	}
 	
 	@Test
 	public void testMessagePumpAbandonOnException() throws InterruptedException, ServiceBusException
 	{
 		this.createSubscriptionClient();
-		MessagePumpTests.testMessagePumpAbandonOnException(this.topicClient, this.subscriptionClient);
+		MessageAndSessionPumpTests.testMessagePumpAbandonOnException(this.topicClient, this.subscriptionClient);
 	}
 	
 	@Test
 	public void testMessagePumpRenewLock() throws InterruptedException, ServiceBusException
 	{
 		this.createSubscriptionClient();
-		MessagePumpTests.testMessagePumpRenewLock(this.topicClient, this.subscriptionClient);
+		MessageAndSessionPumpTests.testMessagePumpRenewLock(this.topicClient, this.subscriptionClient);
+	}
+	
+	@Test
+	public void testRegisterAnotherHandlerAfterMessageHandler() throws InterruptedException, ServiceBusException
+	{
+		this.createSubscriptionClient();
+		MessageAndSessionPumpTests.testRegisterAnotherHandlerAfterMessageHandler(this.subscriptionClient);
+	}
+	
+	@Test
+	public void testRegisterAnotherHandlerAfterSessionHandler() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		MessageAndSessionPumpTests.testRegisterAnotherHandlerAfterSessionHandler(this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testGetMessageSessions() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		TestCommons.testGetMessageSessions(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testSessionPumpAutoCompleteWithOneConcurrentCallPerSession() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithOneConcurrentCallPerSession(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testReceiveAndDeleteSessionPump() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient(ReceiveMode.ReceiveAndDelete);
+		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithOneConcurrentCallPerSession(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testSessionPumpAutoCompleteWithMultipleConcurrentCallPerSession() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithMultipleConcurrentCallPerSession(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testSessionPumpClientComplete() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		MessageAndSessionPumpTests.testSessionPumpClientComplete(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testSessionPumpAbandonOnException() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		MessageAndSessionPumpTests.testSessionPumpAbandonOnException(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
+	}
+	
+	@Test
+	public void testSessionPumpRenewLock() throws InterruptedException, ServiceBusException
+	{
+		this.createSessionfulSubscriptionClient();
+		MessageAndSessionPumpTests.testSessionPumpRenewLock(this.sessionfulTopicClient, this.sessionfulSubscriptionClient);
 	}
 }

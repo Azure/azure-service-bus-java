@@ -25,19 +25,18 @@ public class BrokeredMessageSession extends BrokeredMessageReceiver implements I
 	{		
 		super(messagingFactory, entityPath, receiveMode);
 		this.requestedSessionId = requestedSessionId;
-	}
-	
-	// Only to be used by browsable sessions
-	BrokeredMessageSession(MessagingFactory messagingFactory, MessageReceiver internalReceiver, String entityPath, ReceiveMode receiveMode)
-	{		
-		super(messagingFactory, internalReceiver, entityPath, receiveMode);
-		this.requestedSessionId = null;
-	}
+	}	
 	
 	@Override
 	protected final boolean isSessionReceiver()
 	{
 		return true;
+	}
+	
+	@Override
+	protected boolean isBrowsableSession()
+	{
+		return false;
 	}
 	
 	@Override

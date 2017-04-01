@@ -55,7 +55,7 @@ final class BrokeredMessageBrowser implements IMessageBrowser
 
 	@Override
 	public CompletableFuture<IBrokeredMessage> peekAsync(long fromSequenceNumber) {
-		return this.peekBatchAsync(fromSequenceNumber, 1).thenApply((c) -> 
+		return this.peekBatchAsync(fromSequenceNumber, 1).thenApplyAsync((c) -> 
 		{
 			IBrokeredMessage message = null;
 			Iterator<IBrokeredMessage> iterator = c.iterator();
@@ -86,7 +86,7 @@ final class BrokeredMessageBrowser implements IMessageBrowser
 			peekFuture = this.messageSender.getInternalSender().peekMessagesAsync(fromSequenceNumber, messageCount);
 		}		
 		
-		return peekFuture.thenApply((peekedMessages) -> 
+		return peekFuture.thenApplyAsync((peekedMessages) -> 
 		{
 			ArrayList<IBrokeredMessage> convertedMessages = new ArrayList<IBrokeredMessage>();
 			if(peekedMessages != null)

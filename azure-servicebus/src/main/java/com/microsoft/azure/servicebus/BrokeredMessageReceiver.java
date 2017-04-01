@@ -33,8 +33,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	private static final int DEFAULT_PREFETCH_COUNT = 100;
 	
 	private final ReceiveMode receiveMode;
-	private boolean ownsMessagingFactory;
-	private boolean ownsInternalReceiver;
+	private boolean ownsMessagingFactory;	
 	private ConnectionStringBuilder amqpConnectionStringBuilder = null;
 	private String entityPath = null;
 	private MessagingFactory messagingFactory = null;
@@ -47,9 +46,8 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	
 	private BrokeredMessageReceiver(ReceiveMode receiveMode)
 	{
-		super(StringUtil.getRandomString(), null);
+		super(StringUtil.getShortRandomString(), null);
 		this.receiveMode = receiveMode;
-		this.ownsInternalReceiver = true;
 		this.requestResponseLockTokensToLockTimesMap = new ConcurrentHashMap<>();	
 	}
 	
@@ -74,14 +72,6 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	BrokeredMessageReceiver(MessagingFactory messagingFactory, String entityPath, ReceiveMode receiveMode)
 	{		
 		this(messagingFactory, entityPath, false, receiveMode);
-	}	
-	
-	// Only to be used by browsable sessions
-	BrokeredMessageReceiver(MessagingFactory messagingFactory, MessageReceiver internalReceiver, String entityPath, ReceiveMode receiveMode)
-	{		
-		this(messagingFactory, entityPath, false, receiveMode);
-		this.internalReceiver = internalReceiver;
-		this.ownsInternalReceiver = false;
 	}	
 	
 	@Override
@@ -111,11 +101,11 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 					CompletableFuture<MessageReceiver> receiverFuture;
 					if(BrokeredMessageReceiver.this.isSessionReceiver())
 					{
-						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.getRequestedSessionId(), false, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath, this.getRequestedSessionId(), this.isBrowsableSession(), this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
 					}
 					else
 					{
-						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getRandomString(), this.entityPath, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
+						receiverFuture = MessageReceiver.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
 					}
 					
 					acceptReceiverFuture = receiverFuture.thenAcceptAsync((r) -> 
@@ -141,7 +131,12 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	protected boolean isSessionReceiver()
 	{
 		return false;
-	}	
+	}
+	
+	protected boolean isBrowsableSession()
+	{
+		return false;
+	}
 	
 	protected String getRequestedSessionId()
 	{
@@ -346,7 +341,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public CompletableFuture<IBrokeredMessage> receiveAsync() {
-		return this.internalReceiver.receiveAsync(1).thenApply(c -> 
+		return this.internalReceiver.receiveAsync(1).thenApplyAsync(c -> 
 		{	
 			if(c == null)
 				return null;
@@ -359,7 +354,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public CompletableFuture<IBrokeredMessage> receiveAsync(Duration serverWaitTime) {
-		return this.internalReceiver.receiveAsync(1, serverWaitTime).thenApply(c -> 
+		return this.internalReceiver.receiveAsync(1, serverWaitTime).thenApplyAsync(c -> 
 		{	
 			if(c == null)
 				return null;
@@ -372,7 +367,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(int maxMessageCount) {
-		return this.internalReceiver.receiveAsync(maxMessageCount).thenApply(c -> 
+		return this.internalReceiver.receiveAsync(maxMessageCount).thenApplyAsync(c -> 
 		{	
 			if(c == null)
 				return null;
@@ -385,7 +380,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(int maxMessageCount, Duration serverWaitTime) {
-		return this.internalReceiver.receiveAsync(maxMessageCount, serverWaitTime).thenApply(c -> 
+		return this.internalReceiver.receiveAsync(maxMessageCount, serverWaitTime).thenApplyAsync(c -> 
 		{	
 			if(c == null)
 				return null;
@@ -400,7 +395,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	public CompletableFuture<IBrokeredMessage> receiveAsync(long sequenceNumber) {
 		ArrayList<Long> list = new ArrayList<>();
 		list.add(sequenceNumber);
-		return  this.receiveBatchAsync(list).thenApply(c -> 
+		return  this.receiveBatchAsync(list).thenApplyAsync(c -> 
 		{	
 			if(c == null)
 				return null;
@@ -413,7 +408,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 
 	@Override
 	public CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(Collection<Long> sequenceNumbers) {
-		return this.internalReceiver.receiveBySequenceNumbersAsync(sequenceNumbers.toArray(new Long[0])).thenApply(c -> 
+		return this.internalReceiver.receiveBySequenceNumbersAsync(sequenceNumbers.toArray(new Long[0])).thenApplyAsync(c -> 
 		{	
 			if(c == null)
 				return null;
@@ -428,15 +423,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 	protected CompletableFuture<Void> onClose() {
 		if(this.isInitialized)
 		{
-			CompletableFuture<Void> closeReceiverFuture;
-			if(this.ownsInternalReceiver)
-			{
-				closeReceiverFuture = this.internalReceiver.closeAsync();
-			}
-			else
-			{
-				closeReceiverFuture = CompletableFuture.completedFuture(null);
-			}
+			CompletableFuture<Void> closeReceiverFuture = this.internalReceiver.closeAsync();		
 			
 			return closeReceiverFuture.thenComposeAsync((v) -> 
 			{
@@ -566,7 +553,7 @@ class BrokeredMessageReceiver extends InitializableEntity implements IMessageRec
 			lockTokens[messageIndex++] = lockToken;
 		}
 		
-		return this.internalReceiver.renewMessageLocksAsync(lockTokens).thenApply(
+		return this.internalReceiver.renewMessageLocksAsync(lockTokens).thenApplyAsync(
 				(newLockedUntilTimes) ->
 					{
 						// Assuming both collections are of same size and in same order (order doesn't really matter as all instants in the response are same).

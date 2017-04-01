@@ -68,6 +68,7 @@ public class MessageSender extends ClientEntity implements IAmqpSender, IErrorCo
 	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
 	private static final String SEND_TIMED_OUT = "Send operation timed out";
 
+	private final Object requestResonseLinkCreationLock = new Object();
 	private final MessagingFactory underlyingFactory;
 	private final String sendPath;
 	private final Duration operationTimeout;
@@ -111,12 +112,24 @@ public class MessageSender extends ClientEntity implements IAmqpSender, IErrorCo
 			msgSender.linkFirstOpen.completeExceptionally(new ServiceBusException(false, "Failed to create Sender, see cause for more details.", ioException));
 		}
 		
-		// Create request-response link too
-		String requestResponseLinkPath = senderPath + AmqpConstants.MANAGEMENT_ADDRESS_SEGMENT;
-		CompletableFuture<Void> crateAndAssignRequestResponseLink =
-						RequestResponseLink.createAsync(factory, msgSender.getClientId() + "-RequestResponse", requestResponseLinkPath).thenAccept((rrlink) -> {msgSender.requestResponseLink = rrlink;});
-		
-		return crateAndAssignRequestResponseLink.thenComposeAsync((v) -> msgSender.linkFirstOpen);
+		return msgSender.linkFirstOpen;		
+	}
+	
+	private CompletableFuture<Void> createRequestResponseLink()
+	{
+		synchronized (this.requestResonseLinkCreationLock) {
+			if(this.requestResponseLink == null)
+			{
+				String requestResponseLinkPath = RequestResponseLink.getRequestResponseLinkPath(this.sendPath);
+				CompletableFuture<Void> crateAndAssignRequestResponseLink =
+								RequestResponseLink.createAsync(this.underlyingFactory, this.getClientId() + "-RequestResponse", requestResponseLinkPath).thenAccept((rrlink) -> {this.requestResponseLink = rrlink;});
+				return crateAndAssignRequestResponseLink;
+			}
+			else
+			{
+				return CompletableFuture.completedFuture(null);
+			}
+		}				
 	}
 
 	private MessageSender(final MessagingFactory factory, final String sendLinkName, final String senderPath)
@@ -543,7 +556,7 @@ public class MessageSender extends ClientEntity implements IAmqpSender, IErrorCo
 		session.open();
 		BaseHandler.setHandler(session, new SessionHandler(sendPath));
 
-		final String sendLinkNamePrefix = StringUtil.getRandomString();
+		final String sendLinkNamePrefix = StringUtil.getShortRandomString();
 		final String sendLinkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ?
 				sendLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
 				sendLinkNamePrefix;
@@ -823,7 +836,7 @@ public class MessageSender extends ClientEntity implements IAmqpSender, IErrorCo
 		}
 		
 		return this.linkClose.thenCompose((v) -> {
-			return MessageSender.this.requestResponseLink == null ? CompletableFuture.completedFuture(null) : MessageSender.this.requestResponseLink.closeAsync();});
+			return this.requestResponseLink == null ? CompletableFuture.completedFuture(null) : this.requestResponseLink.closeAsync();});
 	}
 	
 	private static class WeightedDeliveryTag
@@ -859,87 +872,94 @@ public class MessageSender extends ClientEntity implements IAmqpSender, IErrorCo
 	
 	public CompletableFuture<long[]> scheduleMessageAsync(Message[] messages, Duration timeout)
 	{
-		HashMap requestBodyMap = new HashMap();
-		Collection<HashMap> messageList = new LinkedList<HashMap>();
-		for(Message message : messages)
-		{
-			HashMap messageEntry = new HashMap();
-			
-			Pair<byte[], Integer> encodedPair = null;
-			try
+		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+			HashMap requestBodyMap = new HashMap();
+			Collection<HashMap> messageList = new LinkedList<HashMap>();
+			for(Message message : messages)
 			{
-				encodedPair = Util.encodeMessageToOptimalSizeArray(message);
+				HashMap messageEntry = new HashMap();
+				
+				Pair<byte[], Integer> encodedPair = null;
+				try
+				{
+					encodedPair = Util.encodeMessageToOptimalSizeArray(message);
+				}
+				catch(PayloadSizeExceededException exception)
+				{
+					final CompletableFuture<long[]> scheduleMessagesTask = new CompletableFuture<long[]>();
+					scheduleMessagesTask.completeExceptionally(exception);
+					return scheduleMessagesTask;
+				}
+				
+				messageEntry.put(ClientConstants.REQUEST_RESPONSE_MESSAGE, new Binary(encodedPair.getFirstItem(), 0, encodedPair.getSecondItem()));
+				messageEntry.put(ClientConstants.REQUEST_RESPONSE_MESSAGE_ID, message.getMessageId());
+				
+				String sessionId = message.getGroupId();
+				if(!StringUtil.isNullOrEmpty(sessionId))
+				{
+					messageEntry.put(ClientConstants.REQUEST_RESPONSE_SESSION_ID, sessionId);
+				}
+				
+				Object partitionKey = message.getMessageAnnotations().getValue().get(Symbol.valueOf(ClientConstants.PARTITIONKEYNAME));
+				if(partitionKey != null && !((String)partitionKey).isEmpty())
+				{
+					messageEntry.put(ClientConstants.REQUEST_RESPONSE_PARTITION_KEY, (String)partitionKey);
+				}
+				
+				messageList.add(messageEntry);
 			}
-			catch(PayloadSizeExceededException exception)
-			{
-				final CompletableFuture<long[]> scheduleMessagesTask = new CompletableFuture<long[]>();
-				scheduleMessagesTask.completeExceptionally(exception);
-				return scheduleMessagesTask;
-			}
-			
-			messageEntry.put(ClientConstants.REQUEST_RESPONSE_MESSAGE, new Binary(encodedPair.getFirstItem(), 0, encodedPair.getSecondItem()));
-			messageEntry.put(ClientConstants.REQUEST_RESPONSE_MESSAGE_ID, message.getMessageId());
-			
-			String sessionId = message.getGroupId();
-			if(!StringUtil.isNullOrEmpty(sessionId))
-			{
-				messageEntry.put(ClientConstants.REQUEST_RESPONSE_SESSION_ID, sessionId);
-			}
-			
-			Object partitionKey = message.getMessageAnnotations().getValue().get(Symbol.valueOf(ClientConstants.PARTITIONKEYNAME));
-			if(partitionKey != null && !((String)partitionKey).isEmpty())
-			{
-				messageEntry.put(ClientConstants.REQUEST_RESPONSE_PARTITION_KEY, (String)partitionKey);
-			}
-			
-			messageList.add(messageEntry);
-		}
-		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_MESSAGES, messageList);
-		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_SCHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout));
-		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, timeout);
-		return responseFuture.thenComposeAsync((responseMessage) -> {
-			CompletableFuture<long[]> returningFuture = new CompletableFuture<long[]>();
-			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
-			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
-			{
-				long[] sequenceNumbers = (long[])RequestResponseUtils.getResponseBody(responseMessage).get(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS);
-				returningFuture.complete(sequenceNumbers);
-			}
-			else
-			{
-				// error response
-				returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
-			}
-			return returningFuture;
-		});
+			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_MESSAGES, messageList);
+			Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_SCHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout));
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, timeout);
+			return responseFuture.thenComposeAsync((responseMessage) -> {
+				CompletableFuture<long[]> returningFuture = new CompletableFuture<long[]>();
+				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
+				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
+				{
+					long[] sequenceNumbers = (long[])RequestResponseUtils.getResponseBody(responseMessage).get(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS);
+					returningFuture.complete(sequenceNumbers);
+				}
+				else
+				{
+					// error response
+					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
+				}
+				return returningFuture;
+			});
+		});		
 	}
 	
 	public CompletableFuture<Void> cancelScheduledMessageAsync(Long[] sequenceNumbers, Duration timeout)
 	{
-		HashMap requestBodyMap = new HashMap();
-		requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS, sequenceNumbers);
-		
-		Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_CANCEL_CHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout));
-		CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, timeout);
-		return responseFuture.thenComposeAsync((responseMessage) -> {
-			CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
-			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
-			if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
-			{
-				returningFuture.complete(null);
-			}
-			else
-			{
-				// error response
-				returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
-			}
-			return returningFuture;
+		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+			HashMap requestBodyMap = new HashMap();
+			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS, sequenceNumbers);
+			
+			Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_CANCEL_CHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout));
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, timeout);
+			return responseFuture.thenComposeAsync((responseMessage) -> {
+				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
+				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
+				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
+				{
+					returningFuture.complete(null);
+				}
+				else
+				{
+					// error response
+					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
+				}
+				return returningFuture;
+			});
 		});
 	}
 	
 	// In case we need to support peek on a topic
 	public CompletableFuture<Collection<Message>> peekMessagesAsync(long fromSequenceNumber, int messageCount)
 	{
-		return MessageBrowserUtil.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, null);
+		return this.createRequestResponseLink().thenComposeAsync((v) ->
+		{
+			return MessageBrowserUtil.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, null);
+		});		
 	}
 }

@@ -67,6 +67,11 @@ public abstract class ClientEntity
 
 	public final CompletableFuture<Void> closeAsync()
 	{
+		if(this.getIsClosingOrClosed())
+		{
+			return CompletableFuture.completedFuture(null);
+		}
+		
 		synchronized (this.syncClose)
 		{
 			this.isClosing = true;

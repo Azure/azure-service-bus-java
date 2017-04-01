@@ -177,5 +177,5 @@ public class ClientFactory {
 		Utils.assertNonNull("messagingFactory", messagingFactory);
 		BrokeredMessageSession session = new BrokeredMessageSession(messagingFactory, entityPath, sessionId, receiveMode);
 		return session.initializeAsync().thenApply((v) -> session);
-	}
+	}	
 }
