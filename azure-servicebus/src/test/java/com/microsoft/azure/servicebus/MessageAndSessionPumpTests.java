@@ -447,7 +447,7 @@ public class MessageAndSessionPumpTests {
 		}
 
 		@Override
-		public CompletableFuture<Void> onSessionClosedAsync(IMessageSession session) {
+		public CompletableFuture<Void> OnCloseSessionAsync(IMessageSession session) {
 			System.out.println("Session closed.-" + session.getSessionId());
 			return CompletableFuture.completedFuture(null);
 		}

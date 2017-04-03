@@ -27,7 +27,7 @@ public final class MessageHandlerOptions
 	{		
 		this.autoComplete = autoComplete;
 		this.maxAutoRenewDuration = maxAutoRenewDuration;
-		this.maxConcurrentCalls = maxConcurrentCalls;		
+		this.maxConcurrentCalls = maxConcurrentCalls;
 	}	
 
 	public boolean isAutoComplete() {

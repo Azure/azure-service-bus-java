@@ -22,7 +22,8 @@ public final class SessionHandlerOptions {
 	 * 
 	 * @param maxConcurrentCalls
 	 * @param autoComplete
-	 * @param maxAutoRenewDuration - Maximum duration within which the client keeps renewing the message lock if the processing of the message is not completed by the handler.
+	 * @param maxAutoRenewDuration - Maximum duration within which the client keeps renewing the session lock if the processing of the session messages or onclose action
+	 * is not completed by the handler.
 	 */
 	public SessionHandlerOptions(int maxConcurrentSessions, boolean autoComplete, Duration maxAutoRenewDuration)
 	{

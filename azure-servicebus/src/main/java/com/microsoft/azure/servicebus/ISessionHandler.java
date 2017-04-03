@@ -6,7 +6,12 @@ public interface ISessionHandler
 {
 	public CompletableFuture<Void> onMessageAsync(IMessageSession session, IBrokeredMessage message);
 	
-	public CompletableFuture<Void> onSessionClosedAsync(IMessageSession session);
+	/**
+	 * Called just before a session is closed by the session pump
+	 * @param session
+	 * @return
+	 */
+	public CompletableFuture<Void> OnCloseSessionAsync(IMessageSession session);
 	
 	public void notifyException(Throwable exception, ExceptionPhase phase);
 }

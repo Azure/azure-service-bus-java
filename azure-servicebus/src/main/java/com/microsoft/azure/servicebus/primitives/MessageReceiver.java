@@ -1150,7 +1150,7 @@ public class MessageReceiver extends ClientEntity implements IAmqpReceiver, IErr
 	{
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
-			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());		
+			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessage(ClientConstants.REQUEST_RESPONSE_RENEW_SESSIONLOCK_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout));
 			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.operationTimeout);
