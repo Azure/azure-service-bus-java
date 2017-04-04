@@ -24,7 +24,7 @@ public class MessageAndSessionPumpTests {
 		int numMessages = 10;
 		for(int i=0; i<numMessages; i++)
 		{
-			sender.send(new BrokeredMessage("AMQPMessage"));
+			sender.send(new Message("AMQPMessage"));
 		}
 		boolean autoComplete = true;
 		CountingMessageHandler messageHandler = new CountingMessageHandler(messagePump, !autoComplete, numMessages, false);		
@@ -46,7 +46,7 @@ public class MessageAndSessionPumpTests {
 		int numMessages = 10;
 		for(int i=0; i<numMessages; i++)
 		{
-			sender.send(new BrokeredMessage("AMQPMessage"));
+			sender.send(new Message("AMQPMessage"));
 		}
 		boolean autoComplete = false;
 		CountingMessageHandler messageHandler = new CountingMessageHandler(messagePump, !autoComplete, numMessages, false);		
@@ -64,7 +64,7 @@ public class MessageAndSessionPumpTests {
 		int numMessages = 10;
 		for(int i=0; i<numMessages; i++)
 		{
-			sender.send(new BrokeredMessage("AMQPMessage"));
+			sender.send(new Message("AMQPMessage"));
 		}
 		boolean autoComplete = false;
 		CountingMessageHandler messageHandler = new CountingMessageHandler(messagePump, !autoComplete, numMessages, true);
@@ -82,7 +82,7 @@ public class MessageAndSessionPumpTests {
 		int numMessages = 5;
 		for(int i=0; i<numMessages; i++)
 		{
-			sender.send(new BrokeredMessage("AMQPMessage"));
+			sender.send(new Message("AMQPMessage"));
 		}
 		boolean autoComplete = true;
 		int sleepMinutes = 1; // This should be less than message lock duration of the queue or subscription
@@ -172,7 +172,7 @@ public class MessageAndSessionPumpTests {
 			sessionIds.add(sessionId);
 			for(int j=0; j<numMessagePerSession; j++)
 			{
-				BrokeredMessage message = new BrokeredMessage("AMQPMessage");
+				Message message = new Message("AMQPMessage");
 				message.setSessionId(sessionId);
 				sender.send(message);
 			}			
@@ -205,7 +205,7 @@ public class MessageAndSessionPumpTests {
 			sessionIds.add(sessionId);
 			for(int j=0; j<numMessagePerSession; j++)
 			{
-				BrokeredMessage message = new BrokeredMessage("AMQPMessage");
+				Message message = new Message("AMQPMessage");
 				message.setSessionId(sessionId);
 				sender.send(message);
 			}			
@@ -236,7 +236,7 @@ public class MessageAndSessionPumpTests {
 			sessionIds.add(sessionId);
 			for(int j=0; j<numMessagePerSession; j++)
 			{
-				BrokeredMessage message = new BrokeredMessage("AMQPMessage");
+				Message message = new Message("AMQPMessage");
 				message.setSessionId(sessionId);
 				sender.send(message);
 			}			
@@ -269,7 +269,7 @@ public class MessageAndSessionPumpTests {
 			sessionIds.add(sessionId);
 			for(int j=0; j<numMessagePerSession; j++)
 			{
-				BrokeredMessage message = new BrokeredMessage("AMQPMessage");
+				Message message = new Message("AMQPMessage");
 				message.setSessionId(sessionId);
 				sender.send(message);
 			}			
@@ -326,7 +326,7 @@ public class MessageAndSessionPumpTests {
 		}
 		
 		@Override
-		public CompletableFuture<Void> onMessageAsync(IBrokeredMessage message) {
+		public CompletableFuture<Void> onMessageAsync(IMessage message) {
 			CompletableFuture<Void> countingFuture = CompletableFuture.runAsync(() -> {
 				this.maxConcurrencyCounter.incrementCount();
 				System.out.println("Message Received - " + message.getMessageId() + " - delivery count:" + message.getDeliveryCount() + " - Thread:" + Thread.currentThread());				
@@ -408,7 +408,7 @@ public class MessageAndSessionPumpTests {
 		}
 		
 		@Override
-		public CompletableFuture<Void> onMessageAsync(IMessageSession session, IBrokeredMessage message) {
+		public CompletableFuture<Void> onMessageAsync(IMessageSession session, IMessage message) {
 			CompletableFuture<Void> countingFuture = CompletableFuture.runAsync(() -> {
 				this.maxConcurrencyCounter.incrementCount();
 				this.receivedSeesions.add(session.getSessionId());

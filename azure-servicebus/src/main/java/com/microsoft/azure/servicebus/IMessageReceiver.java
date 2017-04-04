@@ -22,11 +22,11 @@ public interface IMessageReceiver extends IMessageEntity, IMessageBrowser{
     
     void complete(UUID lockToken) throws InterruptedException, ServiceBusException;
 
-    void completeBatch(Collection<? extends IBrokeredMessage> messages);
+    void completeBatch(Collection<? extends IMessage> messages);
 
     CompletableFuture<Void> completeAsync(UUID lockToken);
 
-    CompletableFuture<Void> completeBatchAsync(Collection<? extends IBrokeredMessage> messages);
+    CompletableFuture<Void> completeBatchAsync(Collection<? extends IMessage> messages);
 
     void defer(UUID lockToken) throws InterruptedException, ServiceBusException;
 
@@ -52,35 +52,35 @@ public interface IMessageReceiver extends IMessageEntity, IMessageBrowser{
     
     CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify);
 
-    IBrokeredMessage receive() throws InterruptedException, ServiceBusException;
+    IMessage receive() throws InterruptedException, ServiceBusException;
     
-    IBrokeredMessage receive(Duration serverWaitTime) throws InterruptedException, ServiceBusException;
+    IMessage receive(Duration serverWaitTime) throws InterruptedException, ServiceBusException;
 
-    IBrokeredMessage receive(long sequenceNumber) throws InterruptedException, ServiceBusException;
+    IMessage receive(long sequenceNumber) throws InterruptedException, ServiceBusException;
 
-    Collection<IBrokeredMessage> receiveBatch(int maxMessageCount) throws InterruptedException, ServiceBusException;
+    Collection<IMessage> receiveBatch(int maxMessageCount) throws InterruptedException, ServiceBusException;
     
-    Collection<IBrokeredMessage> receiveBatch(int maxMessageCount, Duration serverWaitTime) throws InterruptedException, ServiceBusException;
+    Collection<IMessage> receiveBatch(int maxMessageCount, Duration serverWaitTime) throws InterruptedException, ServiceBusException;
     
-    Collection<IBrokeredMessage> receiveBatch(Collection<Long> sequenceNumbers) throws InterruptedException, ServiceBusException;
+    Collection<IMessage> receiveBatch(Collection<Long> sequenceNumbers) throws InterruptedException, ServiceBusException;
 
-    CompletableFuture<IBrokeredMessage> receiveAsync();
+    CompletableFuture<IMessage> receiveAsync();
 
-    CompletableFuture<IBrokeredMessage> receiveAsync(Duration serverWaitTime);
+    CompletableFuture<IMessage> receiveAsync(Duration serverWaitTime);
 
-    CompletableFuture<IBrokeredMessage> receiveAsync(long sequenceNumber);
+    CompletableFuture<IMessage> receiveAsync(long sequenceNumber);
 
-    CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(int maxMessageCount);
+    CompletableFuture<Collection<IMessage>> receiveBatchAsync(int maxMessageCount);
 
-    CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(int maxMessageCount, Duration serverWaitTime);
+    CompletableFuture<Collection<IMessage>> receiveBatchAsync(int maxMessageCount, Duration serverWaitTime);
 
-    CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(Collection<Long> sequenceNumbers);
+    CompletableFuture<Collection<IMessage>> receiveBatchAsync(Collection<Long> sequenceNumbers);
     
-    CompletableFuture<Instant> renewMessageLockAsync(IBrokeredMessage message);
+    CompletableFuture<Instant> renewMessageLockAsync(IMessage message);
     
     //CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(Collection<? extends IBrokeredMessage> messages);
     
-    Instant renewMessageLock(IBrokeredMessage message) throws InterruptedException, ServiceBusException;
+    Instant renewMessageLock(IMessage message) throws InterruptedException, ServiceBusException;
     
     //Collection<Instant> renewMessageLockBatch(Collection<? extends IBrokeredMessage> messages) throws InterruptedException, ServiceBusException;    
     

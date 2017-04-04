@@ -99,7 +99,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 	{
 		if(!this.getIsClosingOrClosed())
 		{
-			CompletableFuture<IBrokeredMessage> receiveMessageFuture = this.innerReceiver.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
+			CompletableFuture<IMessage> receiveMessageFuture = this.innerReceiver.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
 			receiveMessageFuture.handleAsync((message, receiveEx) -> {
 				if(receiveEx != null)
 				{
@@ -241,7 +241,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 		if(!this.getIsClosingOrClosed())
 		{
 			IMessageSession session = sessionTracker.getSession();
-			CompletableFuture<IBrokeredMessage> receiverFuture = session.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
+			CompletableFuture<IMessage> receiverFuture = session.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
 			receiverFuture.handleAsync((message, receiveEx) -> {
 				if(receiveEx != null)
 				{
@@ -516,11 +516,11 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 	{
 		private IMessageReceiver innerReceiver;
 		private HandlerWrapper handlerWrapper;
-		private IBrokeredMessage message;
+		private IMessage message;
 		private Instant stopRenewalAt;
 		ScheduledFuture<?> timerFuture;
 		
-		MessgeRenewLockLoop(IMessageReceiver innerReceiver, HandlerWrapper handlerWrapper, IBrokeredMessage message, Instant stopRenewalAt)
+		MessgeRenewLockLoop(IMessageReceiver innerReceiver, HandlerWrapper handlerWrapper, IMessage message, Instant stopRenewalAt)
 		{
 			super();
 			this.innerReceiver = innerReceiver;

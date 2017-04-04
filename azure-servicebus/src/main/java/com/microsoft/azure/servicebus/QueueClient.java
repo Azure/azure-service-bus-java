@@ -65,27 +65,27 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
 	}	
 
 	@Override
-	public void send(IBrokeredMessage message) throws InterruptedException, ServiceBusException {
+	public void send(IMessage message) throws InterruptedException, ServiceBusException {
 		this.sender.send(message);		
 	}
 
 	@Override
-	public void sendBatch(Collection<? extends IBrokeredMessage> messages) throws InterruptedException, ServiceBusException {
+	public void sendBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException {
 		this.sender.sendBatch(messages);		
 	}
 
 	@Override
-	public CompletableFuture<Void> sendAsync(IBrokeredMessage message) {
+	public CompletableFuture<Void> sendAsync(IMessage message) {
 		return this.sender.sendAsync(message);
 	}
 
 	@Override
-	public CompletableFuture<Void> sendBatchAsync(Collection<? extends IBrokeredMessage> messages) {
+	public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages) {
 		return this.sender.sendBatchAsync(messages);
 	}
 
 	@Override
-	public CompletableFuture<Long> scheduleMessageAsync(IBrokeredMessage message, Instant scheduledEnqueueTimeUtc) {
+	public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
 		return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc);
 	}
 
@@ -95,7 +95,7 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
 	}
 
 	@Override
-	public long scheduleMessage(IBrokeredMessage message, Instant scheduledEnqueueTimeUtc) throws InterruptedException, ServiceBusException {
+	public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc) throws InterruptedException, ServiceBusException {
 		return this.sender.scheduleMessage(message, scheduledEnqueueTimeUtc);
 	}
 

@@ -191,7 +191,7 @@ public abstract class SessionTests {
 	{
 		String sessionId = getRandomString();
 		String messageId = getRandomString();
-		BrokeredMessage message = new BrokeredMessage("AMQP message");
+		Message message = new Message("AMQP message");
 		message.setMessageId(messageId);
 		if(sessionId != null)
 		{

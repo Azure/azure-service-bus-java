@@ -5,60 +5,58 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.qpid.proton.message.Message;
-
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
-final class BrokeredMessageBrowser implements IMessageBrowser
+final class MessageBrowser implements IMessageBrowser
 {
 	private long lastPeekedSequenceNumber = 0;
 	private boolean isReceiveSideBrowser = false;
-	private BrokeredMessageReceiver messageReceiver = null;
-	private BrokeredMessageSender messageSender = null;
+	private MessageReceiver messageReceiver = null;
+	private MessageSender messageSender = null;
 		
-	public BrokeredMessageBrowser(BrokeredMessageReceiver messageReceiver)
+	public MessageBrowser(MessageReceiver messageReceiver)
 	{		
 		this.messageReceiver = messageReceiver;
 		this.isReceiveSideBrowser = true;
 	}
 	
-	public BrokeredMessageBrowser(BrokeredMessageSender messageSender)
+	public MessageBrowser(MessageSender messageSender)
 	{		
 		this.messageSender = messageSender;
 		this.isReceiveSideBrowser = false;
 	}
 	
 	@Override
-	public IBrokeredMessage peek() throws InterruptedException, ServiceBusException {
+	public IMessage peek() throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.peekAsync());
 	}
 
 	@Override
-	public IBrokeredMessage peek(long fromSequenceNumber) throws InterruptedException, ServiceBusException {
+	public IMessage peek(long fromSequenceNumber) throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.peekAsync(fromSequenceNumber));
 	}
 
 	@Override
-	public Collection<IBrokeredMessage> peekBatch(int messageCount) throws InterruptedException, ServiceBusException {
+	public Collection<IMessage> peekBatch(int messageCount) throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.peekBatchAsync(messageCount));
 	}
 
 	@Override
-	public Collection<IBrokeredMessage> peekBatch(long fromSequenceNumber, int messageCount) throws InterruptedException, ServiceBusException {
+	public Collection<IMessage> peekBatch(long fromSequenceNumber, int messageCount) throws InterruptedException, ServiceBusException {
 		return Utils.completeFuture(this.peekBatchAsync(fromSequenceNumber, messageCount));
 	}
 
 	@Override
-	public CompletableFuture<IBrokeredMessage> peekAsync() {
+	public CompletableFuture<IMessage> peekAsync() {
 		return this.peekAsync(this.lastPeekedSequenceNumber + 1);
 	}
 
 	@Override
-	public CompletableFuture<IBrokeredMessage> peekAsync(long fromSequenceNumber) {
+	public CompletableFuture<IMessage> peekAsync(long fromSequenceNumber) {
 		return this.peekBatchAsync(fromSequenceNumber, 1).thenApplyAsync((c) -> 
 		{
-			IBrokeredMessage message = null;
-			Iterator<IBrokeredMessage> iterator = c.iterator();
+			IMessage message = null;
+			Iterator<IMessage> iterator = c.iterator();
 			if(iterator.hasNext())
 			{
 				message = iterator.next();
@@ -69,13 +67,13 @@ final class BrokeredMessageBrowser implements IMessageBrowser
 	}
 
 	@Override
-	public CompletableFuture<Collection<IBrokeredMessage>> peekBatchAsync(int messageCount) {
+	public CompletableFuture<Collection<IMessage>> peekBatchAsync(int messageCount) {
 		return this.peekBatchAsync(this.lastPeekedSequenceNumber + 1, messageCount);
 	}
 
 	@Override
-	public CompletableFuture<Collection<IBrokeredMessage>> peekBatchAsync(long fromSequenceNumber, int messageCount) {
-		CompletableFuture<Collection<Message>> peekFuture;
+	public CompletableFuture<Collection<IMessage>> peekBatchAsync(long fromSequenceNumber, int messageCount) {
+		CompletableFuture<Collection<org.apache.qpid.proton.message.Message>> peekFuture;
 		if(this.isReceiveSideBrowser)
 		{
 			String sessionId = this.messageReceiver.isSessionReceiver()? this.messageReceiver.getInternalReceiver().getSessionId() : null;
@@ -88,13 +86,13 @@ final class BrokeredMessageBrowser implements IMessageBrowser
 		
 		return peekFuture.thenApplyAsync((peekedMessages) -> 
 		{
-			ArrayList<IBrokeredMessage> convertedMessages = new ArrayList<IBrokeredMessage>();
+			ArrayList<IMessage> convertedMessages = new ArrayList<IMessage>();
 			if(peekedMessages != null)
 			{
 				long sequenceNumberOfLastMessage = 0;
-				for(Message message : peekedMessages)
+				for(org.apache.qpid.proton.message.Message message : peekedMessages)
 				{
-					BrokeredMessage convertedMessage = MessageConverter.convertAmqpMessageToBrokeredMessage(message);
+					Message convertedMessage = MessageConverter.convertAmqpMessageToBrokeredMessage(message);
 					sequenceNumberOfLastMessage = convertedMessage.getSequenceNumber();
 					convertedMessages.add(convertedMessage);
 				}

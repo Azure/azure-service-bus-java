@@ -35,14 +35,14 @@ public class ClientFactory {
 	public static CompletableFuture<IMessageSender> createMessageSenderFromConnectionStringBuilderAsync(ConnectionStringBuilder amqpConnectionStringBuilder)
 	{
 		Utils.assertNonNull("amqpConnectionStringBuilder", amqpConnectionStringBuilder);
-		BrokeredMessageSender sender = new BrokeredMessageSender(amqpConnectionStringBuilder);
+		MessageSender sender = new MessageSender(amqpConnectionStringBuilder);
 		return sender.initializeAsync().thenApply((v) -> sender);
 	}
 	
 	public static CompletableFuture<IMessageSender> createMessageSenderFromEntityPathAsync(MessagingFactory messagingFactory, String entityPath)
 	{
 		Utils.assertNonNull("messagingFactory", messagingFactory);
-		BrokeredMessageSender sender = new BrokeredMessageSender(messagingFactory, entityPath);
+		MessageSender sender = new MessageSender(messagingFactory, entityPath);
 		return sender.initializeAsync().thenApply((v) -> sender);
 	}
 	
@@ -97,7 +97,7 @@ public class ClientFactory {
 	public static CompletableFuture<IMessageReceiver> createMessageReceiverFromConnectionStringBuilderAsync(ConnectionStringBuilder amqpConnectionStringBuilder, ReceiveMode receiveMode)
 	{
 		Utils.assertNonNull("amqpConnectionStringBuilder", amqpConnectionStringBuilder);
-		BrokeredMessageReceiver receiver = new BrokeredMessageReceiver(amqpConnectionStringBuilder, receiveMode);
+		MessageReceiver receiver = new MessageReceiver(amqpConnectionStringBuilder, receiveMode);
 		return receiver.initializeAsync().thenApply((v) -> receiver);
 	}
 	
@@ -109,7 +109,7 @@ public class ClientFactory {
 	public static CompletableFuture<IMessageReceiver> createMessageReceiverFromEntityPathAsync(MessagingFactory messagingFactory, String entityPath, ReceiveMode receiveMode)
 	{
 		Utils.assertNonNull("messagingFactory", messagingFactory);
-		BrokeredMessageReceiver receiver = new BrokeredMessageReceiver(messagingFactory, entityPath, receiveMode);
+		MessageReceiver receiver = new MessageReceiver(messagingFactory, entityPath, receiveMode);
 		return receiver.initializeAsync().thenApply((v) -> receiver);
 	}
 	
@@ -163,7 +163,7 @@ public class ClientFactory {
 	public static CompletableFuture<IMessageSession> acceptSessionFromConnectionStringBuilderAsync(ConnectionStringBuilder amqpConnectionStringBuilder, String sessionId, ReceiveMode receiveMode)
 	{
 		Utils.assertNonNull("amqpConnectionStringBuilder", amqpConnectionStringBuilder);
-		BrokeredMessageSession session = new BrokeredMessageSession(amqpConnectionStringBuilder, sessionId, receiveMode);
+		MessageSession session = new MessageSession(amqpConnectionStringBuilder, sessionId, receiveMode);
 		return session.initializeAsync().thenApply((v) -> session);
 	}
 	
@@ -175,7 +175,7 @@ public class ClientFactory {
 	public static CompletableFuture<IMessageSession> acceptSessionFromEntityPathAsync(MessagingFactory messagingFactory, String entityPath, String sessionId, ReceiveMode receiveMode)
 	{
 		Utils.assertNonNull("messagingFactory", messagingFactory);
-		BrokeredMessageSession session = new BrokeredMessageSession(messagingFactory, entityPath, sessionId, receiveMode);
+		MessageSession session = new MessageSession(messagingFactory, entityPath, sessionId, receiveMode);
 		return session.initializeAsync().thenApply((v) -> session);
 	}	
 }

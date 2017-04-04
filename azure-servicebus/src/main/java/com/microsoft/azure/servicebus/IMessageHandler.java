@@ -4,7 +4,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface IMessageHandler
 {
-	public CompletableFuture<Void> onMessageAsync(IBrokeredMessage message);
+	public CompletableFuture<Void> onMessageAsync(IMessage message);
 	
 	public void notifyException(Throwable exception, ExceptionPhase phase);
 }

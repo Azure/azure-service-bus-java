@@ -9,11 +9,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import com.microsoft.azure.servicebus.primitives.MessageReceiver;
+import com.microsoft.azure.servicebus.primitives.CoreMessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
-final class BrowsableMessageSession extends BrokeredMessageSession
+final class BrowsableMessageSession extends MessageSession
 {
 	private static final String INVALID_OPERATION_ERROR_MESSAGE = "Unsupported operation on a browse only session.";	
 	
@@ -84,7 +84,7 @@ final class BrowsableMessageSession extends BrokeredMessageSession
 	}
 	
 	@Override
-	public CompletableFuture<Void> completeBatchAsync(Collection<? extends IBrokeredMessage> messages) {
+	public CompletableFuture<Void> completeBatchAsync(Collection<? extends IMessage> messages) {
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
@@ -101,49 +101,49 @@ final class BrowsableMessageSession extends BrokeredMessageSession
 	}
 	
 	@Override
-	public CompletableFuture<IBrokeredMessage> receiveAsync()
+	public CompletableFuture<IMessage> receiveAsync()
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<IBrokeredMessage> receiveAsync(Duration serverWaitTime)
+	public CompletableFuture<IMessage> receiveAsync(Duration serverWaitTime)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<IBrokeredMessage> receiveAsync(long sequenceNumber)
+	public CompletableFuture<IMessage> receiveAsync(long sequenceNumber)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(int maxMessageCount)
+	public CompletableFuture<Collection<IMessage>> receiveBatchAsync(int maxMessageCount)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(int maxMessageCount, Duration serverWaitTime)
+	public CompletableFuture<Collection<IMessage>> receiveBatchAsync(int maxMessageCount, Duration serverWaitTime)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<Collection<IBrokeredMessage>> receiveBatchAsync(Collection<Long> sequenceNumbers)
+	public CompletableFuture<Collection<IMessage>> receiveBatchAsync(Collection<Long> sequenceNumbers)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<Instant> renewMessageLockAsync(IBrokeredMessage message)
+	public CompletableFuture<Instant> renewMessageLockAsync(IMessage message)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
 	
 	@Override
-	public CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(Collection<? extends IBrokeredMessage> messages)
+	public CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(Collection<? extends IMessage> messages)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}	

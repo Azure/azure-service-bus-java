@@ -6,22 +6,22 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
-import com.microsoft.azure.servicebus.primitives.MessageReceiver;
+import com.microsoft.azure.servicebus.primitives.CoreMessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
 
-public class BrokeredMessageSession extends BrokeredMessageReceiver implements IMessageSession
+public class MessageSession extends MessageReceiver implements IMessageSession
 {
 	private String requestedSessionId;
 	
-	BrokeredMessageSession(ConnectionStringBuilder amqpConnectionStringBuilder, String requestedSessionId, ReceiveMode receiveMode)
+	MessageSession(ConnectionStringBuilder amqpConnectionStringBuilder, String requestedSessionId, ReceiveMode receiveMode)
 	{
 		super(amqpConnectionStringBuilder, receiveMode);
 		this.requestedSessionId = requestedSessionId;
 	}
 	
-	BrokeredMessageSession(MessagingFactory messagingFactory, String entityPath, String requestedSessionId, ReceiveMode receiveMode)
+	MessageSession(MessagingFactory messagingFactory, String entityPath, String requestedSessionId, ReceiveMode receiveMode)
 	{		
 		super(messagingFactory, entityPath, receiveMode);
 		this.requestedSessionId = requestedSessionId;

@@ -1,6 +1,6 @@
 package com.microsoft.azure.servicebus.rules;
 
-import com.microsoft.azure.servicebus.BrokeredMessage;
+import com.microsoft.azure.servicebus.Message;
 
 public class SqlFilter extends Filter {
 
