@@ -1,17 +1,34 @@
-<p align="center">
-  <img src="service-bus.png" alt="Microsoft Azure Relay" width="100"/>
-</p>
+#Microsoft Azure Service Bus SDK for Java
 
-# Microsoft Azure Service Bus Client for Java
+This project provides a client library in Java that makes it easy to consume Microsoft Azure Service Bus. For documentation please see the [JavaDocs](http://azure.github.io/azure-sdk-for-java).
 
-**Please be aware that this library is currently in active development, and is not intended for production**
+#Getting Started
+You will need Java v1.6+. If you would like to develop on the SDK, you will also need maven.
 
-This is the next generation Service Bus Java client library that focuses on Queues & Topics. If you are looking for Event Hubs, follow this [link](https://github.com/azure/azure-event-hubs-java).
+##Via Maven
+Maven distributed jars are the recommended way of getting started with the Azure Service Bus Java SDK. You can add the dependency to many of the Java dependency managment tools (Maven, Gradle, Ivy...).
 
-Azure Service Bus is an asynchronous messaging cloud platform that enables you to send messages between decoupled systems. Microsoft offers this feature as a service, which means that you do not need to host any of your own hardware in order to use it.
+##Via Git
+If using package management is not your thing, then you can grab the sdk directly from source using git. To get the source code of the SDK via git just type:
+```bash
+git clone https://github.com/Azure/azure-service-bus-java.git
+cd ./azure-service-bus-java/
+git checkout azure-sdk-for-java-0.9.0
+```
 
-Refer to [azure.com](https://azure.microsoft.com/services/service-bus/) to learn more about Service Bus. 
+## Need some help?
+If you encounter any bugs with the SDK please file an issue via [Issues](https://github.com/Azure/azure-service-bus-java/issues) or checkout [StackOverflow for Azure Java SDK](http://stackoverflow.com/questions/tagged/azure-java-sdk).
 
-## How to provide feedback
+#Contribute Code
 
-See our [Contribution Guidelines](./.github/CONTRIBUTING.md).
+If you would like to become an active contributor to this project please follow the instructions provided in [Microsoft Azure Projects Contribution Guidelines](http://azure.github.io/guidelines.html).
+
+1. Fork it
+2. Create your feature branch (`git checkout -b my-new-feature`)
+3. Commit your changes (`git commit -am 'Add some feature'`)
+4. Push to the branch (`git push origin my-new-feature`)
+5. Create new Pull Request
+
+#Learn More
+* [JavaDocs](http://azure.github.io/azure-sdk-for-java)
+
