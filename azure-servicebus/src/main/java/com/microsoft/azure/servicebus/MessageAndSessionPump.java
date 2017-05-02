@@ -5,8 +5,10 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
+import com.microsoft.azure.servicebus.primitives.ExceptionUtil;
 import com.microsoft.azure.servicebus.primitives.MessageLockLostException;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.OperationCancelledException;
@@ -25,6 +27,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 	private static final Duration MAXIMUM_RENEW_LOCK_BUFFER = Duration.ofSeconds(10);	
 	private static final Duration SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION = Duration.ofMinutes(1);
 	
+	private final ConcurrentHashMap<String, IMessageSession> openSessions;
 	private final MessagingFactory factory;
 	private final String entityPath;
 	private final ReceiveMode receiveMode;
@@ -34,7 +37,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 	private IMessageHandler messageHandler;
 	private ISessionHandler sessionHandler;
 	private MessageHandlerOptions messageHandlerOptions;
-	private SessionHandlerOptions sessionHandlerOptions;
+	private SessionHandlerOptions sessionHandlerOptions;	
 	
 	public MessageAndSessionPump(MessagingFactory factory, String entityPath, ReceiveMode receiveMode)
 	{
@@ -42,6 +45,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 		this.factory = factory;
 		this.entityPath = entityPath;
 		this.receiveMode = receiveMode;
+		this.openSessions = new ConcurrentHashMap<>();
 	}
 
 	@Override
@@ -103,7 +107,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 			receiveMessageFuture.handleAsync((message, receiveEx) -> {
 				if(receiveEx != null)
 				{
-					this.messageHandler.notifyException(receiveEx, ExceptionPhase.RECEIVE);
+					receiveEx = ExceptionUtil.extractAsyncCompletionCause(receiveEx);
+					this.notifyExceptionToMessageHandler(receiveEx, ExceptionPhase.RECEIVE);
 					this.receiveAndPumpMessage();
 				}
 				else
@@ -119,7 +124,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 						if(this.innerReceiver.getReceiveMode() == ReceiveMode.PeekLock)
 						{
 							Instant stopRenewMessageLockAt = Instant.now().plus(this.messageHandlerOptions.getMaxAutoRenewDuration());
-							renewLockLoop = new MessgeRenewLockLoop(this.innerReceiver, new HandlerWrapper(this.messageHandler), message, stopRenewMessageLockAt);
+							renewLockLoop = new MessgeRenewLockLoop(this.innerReceiver, this, message, stopRenewMessageLockAt);
 							renewLockLoop.startLoop();
 						}
 						else
@@ -130,18 +135,19 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 						CompletableFuture<Void> onMessageFuture;
 						try
 						{
-							onMessageFuture = this.messageHandler.onMessageAsync(message);							
+							onMessageFuture = this.messageHandler.onMessageAsync(message);
 						}
 						catch(Exception onMessageSyncEx)
 						{
 							onMessageFuture = new CompletableFuture<Void>();
-							onMessageFuture.completeExceptionally(onMessageSyncEx);							
+							onMessageFuture.completeExceptionally(onMessageSyncEx);			
 						}						
 						
 						onMessageFuture.handleAsync((v, onMessageEx) -> {
 							if(onMessageEx != null)
 							{
-								this.messageHandler.notifyException(onMessageEx, ExceptionPhase.USERCALLBACK);
+								onMessageEx = ExceptionUtil.extractAsyncCompletionCause(onMessageEx);
+								this.notifyExceptionToMessageHandler(onMessageEx, ExceptionPhase.USERCALLBACK);
 							}
 							if(this.innerReceiver.getReceiveMode() == ReceiveMode.PeekLock)
 							{
@@ -174,8 +180,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 								updateDispositionFuture.handleAsync((u, updateDispositionEx) -> {
 									if(updateDispositionEx != null)
 									{
-										System.out.println(message.getMessageId());
-										this.messageHandler.notifyException(updateDispositionEx, dispositionPhase);
+										updateDispositionEx = ExceptionUtil.extractAsyncCompletionCause(updateDispositionEx);
+										this.notifyExceptionToMessageHandler(updateDispositionEx, dispositionPhase);
 									}
 									this.receiveAndPumpMessage();
 									return null;
@@ -205,10 +211,12 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 			acceptSessionFuture.handleAsync((session, acceptSessionEx) -> {
 				if(acceptSessionEx != null)
 				{
+					acceptSessionEx = ExceptionUtil.extractAsyncCompletionCause(acceptSessionEx);
+					
 					if(!(acceptSessionEx instanceof TimeoutException))
 					{
 						// Timeout exception means no session available.. it is expected so no need to notify client
-						this.sessionHandler.notifyException(acceptSessionEx, ExceptionPhase.ACCEPTSESSION);
+						this.notifyExceptionToSessionHandler(acceptSessionEx, ExceptionPhase.ACCEPTSESSION);
 					}
 					
 					if(!(acceptSessionEx instanceof OperationCancelledException))
@@ -221,7 +229,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 				else
 				{
 					// Received a session.. Now pump messages..
-					SessionRenewLockLoop sessionRenewLockLoop = new SessionRenewLockLoop(session, new HandlerWrapper(this.sessionHandler));
+					this.openSessions.put(session.getSessionId(), session);
+					SessionRenewLockLoop sessionRenewLockLoop = new SessionRenewLockLoop(session, this);
 					sessionRenewLockLoop.startLoop();
 					SessionTracker sessionTracker = new SessionTracker(this, session, sessionRenewLockLoop);
 					for(int i=0; i<this.sessionHandlerOptions.getMaxConcurrentCallsPerSession(); i++)
@@ -245,7 +254,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 			receiverFuture.handleAsync((message, receiveEx) -> {
 				if(receiveEx != null)
 				{
-					this.sessionHandler.notifyException(receiveEx, ExceptionPhase.RECEIVE);
+					receiveEx = ExceptionUtil.extractAsyncCompletionCause(receiveEx);
+					this.notifyExceptionToSessionHandler(receiveEx, ExceptionPhase.RECEIVE);
 					sessionTracker.shouldRetryOnNoMessageOrException().thenAcceptAsync((shouldRetry) -> {
 						if(shouldRetry)
 						{
@@ -276,7 +286,6 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 						try
 						{
 							onMessageFuture = this.sessionHandler.onMessageAsync(session, message);
-							
 						}
 						catch(Exception onMessageSyncEx)
 						{
@@ -288,7 +297,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 							renewCancelTimer.cancel(true);
 							if(onMessageEx != null)
 							{
-								this.sessionHandler.notifyException(onMessageEx, ExceptionPhase.USERCALLBACK);
+								onMessageEx = ExceptionUtil.extractAsyncCompletionCause(onMessageEx);
+								this.notifyExceptionToSessionHandler(onMessageEx, ExceptionPhase.USERCALLBACK);
 							}
 							if(this.receiveMode == ReceiveMode.PeekLock)
 							{								
@@ -317,7 +327,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 								updateDispositionFuture.handleAsync((u, updateDispositionEx) -> {
 									if(updateDispositionEx != null)
 									{
-										this.sessionHandler.notifyException(updateDispositionEx, dispositionPhase);
+										updateDispositionEx = ExceptionUtil.extractAsyncCompletionCause(updateDispositionEx);
+										this.notifyExceptionToSessionHandler(updateDispositionEx, dispositionPhase);
 									}
 									this.receiveFromSessionAndPumpMessage(sessionTracker);
 									return null;
@@ -346,7 +357,14 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
 	@Override
 	protected CompletableFuture<Void> onClose() {
-		return this.innerReceiver == null ? CompletableFuture.completedFuture(null) : this.innerReceiver.closeAsync();
+		CompletableFuture[] closeFutures = new CompletableFuture[this.openSessions.size() + 1];
+		int arrayIndex = 0;
+		for(IMessageSession session : this.openSessions.values())
+		{
+			closeFutures[arrayIndex++] = session.closeAsync();
+		}
+		closeFutures[arrayIndex] = this.innerReceiver == null ? CompletableFuture.completedFuture(null) : this.innerReceiver.closeAsync();		
+		return CompletableFuture.allOf(closeFutures);		 
 	}
 	
 	private static class SessionTracker
@@ -412,7 +430,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 					renewCancelTimer.cancel(true);
 					if(onCloseEx != null)
 					{
-						this.messageAndSessionPump.sessionHandler.notifyException(onCloseEx, ExceptionPhase.USERCALLBACK);
+						onCloseEx = ExceptionUtil.extractAsyncCompletionCause(onCloseEx);
+						this.messageAndSessionPump.notifyExceptionToSessionHandler(onCloseEx, ExceptionPhase.USERCALLBACK);
 					}
 					
 					this.sessionRenewLockLoop.cancelLoop();
@@ -420,9 +439,11 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 					{
 						if(closeEx != null)
 						{
-							this.messageAndSessionPump.sessionHandler.notifyException(closeEx, ExceptionPhase.SESSIONCLOSE);
+							closeEx = ExceptionUtil.extractAsyncCompletionCause(closeEx);
+							this.messageAndSessionPump.notifyExceptionToSessionHandler(closeEx, ExceptionPhase.SESSIONCLOSE);
 						}
 						
+						this.messageAndSessionPump.openSessions.remove(this.session.getSessionId());
 						this.messageAndSessionPump.acceptSessionsAndPumpMessage();
 						return null;
 					});
@@ -432,34 +453,6 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 			}
 			
 			return this.retryFuture;
-		}		
-	}
-	
-	private static class HandlerWrapper
-	{
-		private IMessageHandler messageHandler = null;
-		private ISessionHandler sessionHandler = null;
-		
-		HandlerWrapper(IMessageHandler messageHandler)
-		{
-			this.messageHandler = messageHandler;
-		}
-		
-		HandlerWrapper(ISessionHandler sessionHandler)
-		{
-			this.sessionHandler = sessionHandler;
-		}
-		
-		void notifyException(Throwable exception, ExceptionPhase phase)
-		{
-			if(this.messageHandler != null)
-			{
-				this.messageHandler.notifyException(exception, phase);
-			}
-			else
-			{
-				this.sessionHandler.notifyException(exception, phase);
-			}
 		}		
 	}
 	
@@ -507,24 +500,24 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 				remainingTime = MessageAndSessionPump.MINIMUM_MESSAGE_LOCK_VALIDITY;
 			}
 			
-			Duration buffer = remainingTime.dividedBy(2).compareTo(MAXIMUM_RENEW_LOCK_BUFFER) > 0 ? MAXIMUM_RENEW_LOCK_BUFFER : remainingTime.dividedBy(2);	
-			return remainingTime.minus(buffer);		
+			Duration buffer = remainingTime.dividedBy(2).compareTo(MAXIMUM_RENEW_LOCK_BUFFER) > 0 ? MAXIMUM_RENEW_LOCK_BUFFER : remainingTime.dividedBy(2);
+			return remainingTime.minus(buffer);
 		}
 	}
 	
 	private static class MessgeRenewLockLoop extends RenewLockLoop
 	{
 		private IMessageReceiver innerReceiver;
-		private HandlerWrapper handlerWrapper;
+		private MessageAndSessionPump messageAndSessionPump;
 		private IMessage message;
 		private Instant stopRenewalAt;
 		ScheduledFuture<?> timerFuture;
 		
-		MessgeRenewLockLoop(IMessageReceiver innerReceiver, HandlerWrapper handlerWrapper, IMessage message, Instant stopRenewalAt)
+		MessgeRenewLockLoop(IMessageReceiver innerReceiver, MessageAndSessionPump messageAndSessionPump, IMessage message, Instant stopRenewalAt)
 		{
 			super();
 			this.innerReceiver = innerReceiver;
-			this.handlerWrapper = handlerWrapper;
+			this.messageAndSessionPump = messageAndSessionPump;
 			this.message = message;
 			this.stopRenewalAt = stopRenewalAt;			
 		}
@@ -548,7 +541,8 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 						{
 							if(renewLockEx != null)
 							{
-								this.handlerWrapper.notifyException(renewLockEx, ExceptionPhase.RENEWMESSAGELOCK);
+								renewLockEx = ExceptionUtil.extractAsyncCompletionCause(renewLockEx);
+								this.messageAndSessionPump.notifyExceptionToMessageHandler(renewLockEx, ExceptionPhase.RENEWMESSAGELOCK);
 								if(!(renewLockEx instanceof MessageLockLostException || renewLockEx instanceof OperationCancelledException))
 								{
 									this.loop();
@@ -583,14 +577,14 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 	private static class SessionRenewLockLoop extends RenewLockLoop
 	{
 		private IMessageSession session;
-		private HandlerWrapper handlerWrapper;
+		private MessageAndSessionPump messageAndSessionPump;
 		ScheduledFuture<?> timerFuture;
 		
-		SessionRenewLockLoop(IMessageSession session, HandlerWrapper handlerWrapper)
+		SessionRenewLockLoop(IMessageSession session, MessageAndSessionPump messageAndSessionPump)
 		{
 			super();
 			this.session = session;
-			this.handlerWrapper = handlerWrapper;			
+			this.messageAndSessionPump = messageAndSessionPump;
 		}
 		
 		@Override
@@ -612,7 +606,9 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 						{
 							if(renewLockEx != null)
 							{
-								this.handlerWrapper.notifyException(renewLockEx, ExceptionPhase.RENEWSESSIONLOCK);
+								renewLockEx = ExceptionUtil.extractAsyncCompletionCause(renewLockEx);
+								System.out.println(this.session.getSessionId() + "-" + renewLockEx.getMessage() + ":" + Instant.now());								
+								this.messageAndSessionPump.notifyExceptionToSessionHandler(renewLockEx, ExceptionPhase.RENEWSESSIONLOCK);
 								if(!(renewLockEx instanceof SessionLockLostException || renewLockEx instanceof OperationCancelledException))
 								{
 									this.loop();
@@ -745,4 +741,33 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 			throw new UnsupportedOperationException("This operation is not supported on a message received from a session. Use the session to perform the operation.");
 		}
 	}
+	
+	// Don't notify handler if the pump is already closed
+	private void notifyExceptionToSessionHandler(Throwable ex, ExceptionPhase phase)
+	{
+		if(!(ex instanceof IllegalStateException && this.getIsClosingOrClosed()))
+		{
+			this.sessionHandler.notifyException(ex, phase);
+		}
+	}
+	
+	private void notifyExceptionToMessageHandler(Throwable ex, ExceptionPhase phase)
+	{
+		if(!(ex instanceof IllegalStateException && this.getIsClosingOrClosed()))
+		{
+			this.messageHandler.notifyException(ex, phase);
+		}
+	}
+
+    @Override
+    public int getPrefetchCount() {
+        this.checkInnerReceiveCreated();
+        return this.innerReceiver.getPrefetchCount();
+    }
+
+    @Override
+    public void setPrefetchCount(int prefetchCount) throws ServiceBusException {
+        this.checkInnerReceiveCreated();
+        this.innerReceiver.setPrefetchCount(prefetchCount);
+    }
 }

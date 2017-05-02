@@ -15,6 +15,10 @@ public final class ClientConstants
 {
 	private ClientConstants() { }
 	
+	public final static String PRODUCT_NAME = "MSJavaClient";
+    public final static String CURRENT_JAVACLIENT_VERSION = "0.13.1";
+    public static final String PLATFORM_INFO = getPlatformInfo();
+    
 	public static final int LOCKTOKENSIZE = 16;
 	public static final String ENQUEUEDTIMEUTCNAME = "x-opt-enqueued-time";
 	public static final String SCHEDULEDENQUEUETIMENAME = "x-opt-scheduled-enqueue-time";
@@ -87,6 +91,9 @@ public final class ClientConstants
     public static final String REQUEST_RESPONSE_GET_MESSAGE_SESSIONS_OPERATION = AmqpConstants.VENDOR + ":get-message-sessions";
     public static final String REQUEST_RESPONSE_ADD_RULE_OPERATION = AmqpConstants.VENDOR + ":add-rule";
     public static final String REQUEST_RESPONSE_REMOVE_RULE_OPERATION = AmqpConstants.VENDOR + ":remove-rule";
+    public static final String REQUEST_RESPONSE_PUT_TOKEN_OPERATION = "put-token";
+    public static final String REQUEST_RESPONSE_PUT_TOKEN_TYPE = "type";
+    public static final String REQUEST_RESPONSE_PUT_TOKEN_AUDIENCE = "name";    
 	public static final String REQUEST_RESPONSE_LOCKTOKENS = "lock-tokens";
 	public static final String REQUEST_RESPONSE_LOCKTOKEN = "lock-token";
 	public static final String REQUEST_RESPONSE_EXPIRATION = "expiration";
@@ -105,6 +112,10 @@ public final class ClientConstants
 	public static final String REQUEST_RESPONSE_STATUS_CODE = "statusCode";
     public static final String REQUEST_RESPONSE_STATUS_DESCRIPTION = "statusDescription";
     public static final String REQUEST_RESPONSE_ERROR_CONDITION = "errorCondition";
+    // Legacy property names are used in CBS responses
+    public static final String REQUEST_RESPONSE_LEGACY_STATUS_CODE = "status-code";
+    public static final String REQUEST_RESPONSE_LEGACY_STATUS_DESCRIPTION = "status-description";
+    public static final String REQUEST_RESPONSE_LEGACY_ERROR_CONDITION = "error-condition";
     public static final String REQUEST_RESPONSE_DISPOSITION_STATUS = "disposition-status";
     public static final String REQUEST_RESPONSE_DEADLETTER_REASON = "deadletter-reason";
     public static final String REQUEST_RESPONSE_DEADLETTER_DESCRIPTION = "deadletter-description";
@@ -136,9 +147,33 @@ public final class ClientConstants
 //    public static final String DISPOSITION_STATUS_UNLOCKED = "unlocked";
     
     public static final int REQUEST_RESPONSE_OK_STATUS_CODE = 200;
+    public static final int REQUEST_RESPONSE_ACCEPTED_STATUS_CODE = 0xca;
     public static final int REQUEST_RESPONSE_NOCONTENT_STATUS_CODE = 0xcc;
     public static final int REQUEST_RESPONSE_NOTFOUND_STATUS_CODE = 0x194;
     public static final int REQUEST_RESPONSE_UNDEFINED_STATUS_CODE = -1;
     public static final int REQUEST_RESPONSE_SERVER_BUSY_STATUS_CODE = 0x1f7;
+    
+    static final String SAS_TOKEN_TYPE = "servicebus.windows.net:sastoken";
+    static final int DEFAULT_SAS_TOKEN_VALIDITY_IN_SECONDS = 20*60; // 20 minutes
+    static final String SAS_TOKEN_AUDIENCE_FORMAT = "amqp://%s/%s";
+    
+    private static String getPlatformInfo() {
+        final Package javaRuntimeClassPkg = Runtime.class.getPackage();
+        final StringBuilder patformInfo = new StringBuilder();
+        patformInfo.append("jre:");
+        patformInfo.append(javaRuntimeClassPkg.getImplementationVersion());
+        patformInfo.append(";vendor:");
+        patformInfo.append(javaRuntimeClassPkg.getImplementationVendor());
+        patformInfo.append(";jvm:");
+        patformInfo.append(System.getProperty("java.vm.version"));
+        patformInfo.append(";arch:");
+        patformInfo.append(System.getProperty("os.arch"));
+        patformInfo.append(";os:");
+        patformInfo.append(System.getProperty("os.name"));
+        patformInfo.append(";os version:");
+        patformInfo.append(System.getProperty("os.version"));
+
+        return patformInfo.toString();
+    }
 	
 }

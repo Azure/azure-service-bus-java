@@ -36,5 +36,5 @@ final class Utils {
 	{
 		if(argument == null)
 			throw new IllegalArgumentException("Argument '" + argumentName +"' is null.");
-	}	
+	}
 }

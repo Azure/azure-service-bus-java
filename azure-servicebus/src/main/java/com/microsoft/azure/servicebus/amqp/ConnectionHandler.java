@@ -4,10 +4,13 @@
  */
 package com.microsoft.azure.servicebus.amqp;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Connection;
@@ -27,17 +30,11 @@ public final class ConnectionHandler extends BaseHandler
 {
 
 	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
-
-	private final String username;
-	private final String password;
 	private final IAmqpConnection messagingFactory;
 
-	public ConnectionHandler(final IAmqpConnection messagingFactory, final String username, final String password)
+	public ConnectionHandler(final IAmqpConnection messagingFactory)
 	{
 		add(new Handshaker());
-
-		this.username = username;
-		this.password = password;
 		this.messagingFactory = messagingFactory;
 	}
 	
@@ -48,6 +45,13 @@ public final class ConnectionHandler extends BaseHandler
 		final String hostName = event.getReactor().getConnectionAddress(connection);
 		connection.setHostname(hostName);
 		connection.setContainer(StringUtil.getShortRandomString());
+		
+		final Map<Symbol, Object> connectionProperties = new HashMap<Symbol, Object>();
+        connectionProperties.put(AmqpConstants.PRODUCT, ClientConstants.PRODUCT_NAME);
+        connectionProperties.put(AmqpConstants.VERSION, ClientConstants.CURRENT_JAVACLIENT_VERSION);
+        connectionProperties.put(AmqpConstants.PLATFORM, ClientConstants.PLATFORM_INFO);
+        connection.setProperties(connectionProperties);
+        
 		connection.open();
 	}
 
@@ -60,7 +64,7 @@ public final class ConnectionHandler extends BaseHandler
 		transport.ssl(domain);
 
 		Sasl sasl = transport.sasl();
-		sasl.plain(this.username, this.password);
+		sasl.setMechanisms("ANONYMOUS");
 	}
 
 	@Override

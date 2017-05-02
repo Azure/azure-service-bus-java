@@ -105,10 +105,15 @@ class RequestResponseLink extends ClientEntity{
 		return requestReponseLink.createFuture;
 	}
 	
-	public static String getRequestResponseLinkPath(String entityPath)
+	public static String getManagementNodeLinkPath(String entityPath)
 	{
-		return entityPath + AmqpConstants.MANAGEMENT_ADDRESS_SEGMENT;
+		return String.format("%s/%s", entityPath,  AmqpConstants.MANAGEMENT_NODE_ADDRESS_SEGMENT);
 	}
+	
+	public static String getCBSNodeLinkPath()
+    {
+        return AmqpConstants.CBS_NODE_ADDRESS_SEGMENT;
+    }
 	
 	private RequestResponseLink(MessagingFactory messagingFactory, String linkName, String linkPath)
 	{
@@ -234,23 +239,15 @@ class RequestResponseLink extends ClientEntity{
 	
 	public CompletableFuture<Message> requestAysnc(Message requestMessage, Duration timeout)
 	{
+		this.throwIfClosed(null);
 		CompletableFuture<Message> responseFuture = new CompletableFuture<Message>();
-		
-		if(this.getIsClosingOrClosed())
-		{			
-			responseFuture.completeExceptionally(new ServiceBusException(false, "RequestResponseLink is closing or closed."));			
-		}
-		else
-		{
-			RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, responseFuture, timeout);
-			String requestId = "request:" +  this.requestCounter.incrementAndGet();
-			requestMessage.setMessageId(requestId);
-			requestMessage.setReplyTo(this.replyTo);
-			this.pendingRequests.put(requestId, workItem);
-			workItem.setTimeoutTask(this.scheduleRequestTimeout(requestId, timeout));
-			this.amqpSender.sendRequest(requestMessage, false);			
-		}
-		
+		RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, responseFuture, timeout);
+		String requestId = "request:" +  this.requestCounter.incrementAndGet();
+		requestMessage.setMessageId(requestId);
+		requestMessage.setReplyTo(this.replyTo);
+		this.pendingRequests.put(requestId, workItem);
+		workItem.setTimeoutTask(this.scheduleRequestTimeout(requestId, timeout));
+		this.amqpSender.sendRequest(requestMessage, false);
 		return responseFuture;
 	}
 	
@@ -338,7 +335,7 @@ class RequestResponseLink extends ClientEntity{
 
 	@Override
 	protected CompletableFuture<Void> onClose() {
-		return this.amqpSender.closeAsync().thenCompose((v) -> this.amqpReceiver.closeAsync());
+		return this.amqpSender.closeAsync().thenComposeAsync((v) -> this.amqpReceiver.closeAsync());
 	}
 	
 	private static void scheduleLinkCloseTimeout(CompletableFuture<Void> closeFuture, Duration timeout, String linkName)
@@ -385,9 +382,22 @@ class RequestResponseLink extends ClientEntity{
 			{				
 				if (this.receiveLink != null && this.receiveLink.getLocalState() != EndpointState.CLOSED)
 				{
-					this.receiveLink.close();
-					this.parent.underlyingFactory.deregisterForConnectionError(this.receiveLink);
-					RequestResponseLink.scheduleLinkCloseTimeout(this.closeFuture, this.parent.underlyingFactory.getOperationTimeout(), this.receiveLink.getName());
+					try {
+						this.parent.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
+							
+							@Override
+							public void onEvent() {
+								if (InternalReceiver.this.receiveLink != null && InternalReceiver.this.receiveLink.getLocalState() != EndpointState.CLOSED)
+								{
+									InternalReceiver.this.receiveLink.close();
+									InternalReceiver.this.parent.underlyingFactory.deregisterForConnectionError(InternalReceiver.this.receiveLink);
+									RequestResponseLink.scheduleLinkCloseTimeout(InternalReceiver.this.closeFuture, InternalReceiver.this.parent.underlyingFactory.getOperationTimeout(), InternalReceiver.this.receiveLink.getName());
+								}							
+							}
+						});
+					} catch (IOException e) {
+						this.closeFuture.completeExceptionally(e);
+					}					
 				}
 				else
 				{
@@ -528,13 +538,26 @@ class RequestResponseLink extends ClientEntity{
 		@Override
 		protected CompletableFuture<Void> onClose() {
 			if (!this.getIsClosed())
-			{				
+			{
 				if (this.sendLink != null && this.sendLink.getLocalState() != EndpointState.CLOSED)
 				{
-					this.sendLink.close();
-					this.parent.underlyingFactory.deregisterForConnectionError(this.sendLink);
-					RequestResponseLink.scheduleLinkCloseTimeout(this.closeFuture, this.parent.underlyingFactory.getOperationTimeout(), this.sendLink.getName());
-				}
+					try {
+						this.parent.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
+							
+							@Override
+							public void onEvent() {
+								if (InternalSender.this.sendLink != null && InternalSender.this.sendLink.getLocalState() != EndpointState.CLOSED)
+								{
+									InternalSender.this.sendLink.close();
+									InternalSender.this.parent.underlyingFactory.deregisterForConnectionError(InternalSender.this.sendLink);
+									RequestResponseLink.scheduleLinkCloseTimeout(InternalSender.this.closeFuture, InternalSender.this.parent.underlyingFactory.getOperationTimeout(), InternalSender.this.sendLink.getName());
+								}								
+							}
+						});
+					} catch (IOException e) {
+						this.closeFuture.completeExceptionally(e);
+					}
+				}				
 				else
 				{
 					this.closeFuture.complete(null);
