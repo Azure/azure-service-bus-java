@@ -65,9 +65,7 @@ public final class ClientConstants
 	public final static Duration DEFAULT_RERTRY_MIN_BACKOFF = Duration.ofSeconds(0);
 	public final static Duration DEFAULT_RERTRY_MAX_BACKOFF = Duration.ofSeconds(30);
 
-	public final static int DEFAULT_MAX_RETRY_COUNT = 10;
-
-	public final static String SERVICEBUS_CLIENT_TRACE = "servicebus.trace";
+	public final static int DEFAULT_MAX_RETRY_COUNT = 10;	
 
 	public final static boolean DEFAULT_IS_TRANSIENT = true;
 
