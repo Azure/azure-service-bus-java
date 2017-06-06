@@ -6,7 +6,6 @@ package com.microsoft.azure.servicebus.primitives;
 
 import java.time.Duration;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
