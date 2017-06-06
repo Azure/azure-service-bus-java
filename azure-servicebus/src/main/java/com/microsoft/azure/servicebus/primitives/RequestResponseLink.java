@@ -17,8 +17,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.qpid.proton.Proton;
@@ -38,6 +36,8 @@ import org.apache.qpid.proton.engine.Sender;
 import org.apache.qpid.proton.engine.Session;
 import org.apache.qpid.proton.engine.impl.DeliveryImpl;
 import org.apache.qpid.proton.message.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.amqp.AmqpConstants;
 import com.microsoft.azure.servicebus.amqp.DispatchHandler;
@@ -48,7 +48,7 @@ import com.microsoft.azure.servicebus.amqp.SendLinkHandler;
 import com.microsoft.azure.servicebus.amqp.SessionHandler;
 
 class RequestResponseLink extends ClientEntity{
-	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
+	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(RequestResponseLink.class);
 	
 	private MessagingFactory underlyingFactory;
 	private String linkPath;
@@ -71,12 +71,9 @@ class RequestResponseLink extends ClientEntity{
 						if (!requestReponseLink.createFuture.isDone())
 						{
 							Exception operationTimedout = new TimeoutException(
-									String.format(Locale.US, "Open operation on RequestResponseLink(%s) on Entity(%s) timed out at %s.", requestReponseLink.getClientId(), requestReponseLink.linkPath, ZonedDateTime.now().toString()));
-
-							if (TRACE_LOGGER.isLoggable(Level.WARNING))
-							{
-								TRACE_LOGGER.log(Level.WARNING, operationTimedout.getMessage());
-							}
+									String.format(Locale.US, "Open operation on RequestResponseLink(%s) on Entity(%s) timed out at %s.", requestReponseLink.getClientId(), requestReponseLink.linkPath, ZonedDateTime.now().toString()));							
+							
+							TRACE_LOGGER.warn(operationTimedout.getMessage());
 
 							requestReponseLink.createFuture.completeExceptionally(operationTimedout);
 						}
@@ -347,12 +344,8 @@ class RequestResponseLink extends ClientEntity{
 					{
 						if (!closeFuture.isDone())
 						{
-							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Link(%s) timed out at %s", "Close", linkName, ZonedDateTime.now()));
-							if (TRACE_LOGGER.isLoggable(Level.WARNING))
-							{
-								TRACE_LOGGER.log(Level.WARNING, 
-										String.format(Locale.US, "linkName[%s], %s call timedout", linkName, "Close"), operationTimedout);
-							}
+							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Link(%s) timed out at %s", "Close", linkName, ZonedDateTime.now()));							
+							TRACE_LOGGER.warn(operationTimedout.getMessage());
 							
 							closeFuture.completeExceptionally(operationTimedout);
 						}

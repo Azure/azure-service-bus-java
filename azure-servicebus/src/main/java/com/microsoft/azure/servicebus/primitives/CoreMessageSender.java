@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Microsoft. All rights reserved.
+; * Copyright (c) Microsoft. All rights reserved.
  * Licensed under the MIT license. See LICENSE file in the project root for full license information.
  */
 package com.microsoft.azure.servicebus.primitives;
@@ -20,8 +20,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
@@ -43,6 +41,8 @@ import org.apache.qpid.proton.engine.Sender;
 import org.apache.qpid.proton.engine.Session;
 import org.apache.qpid.proton.engine.impl.DeliveryImpl;
 import org.apache.qpid.proton.message.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.amqp.AmqpConstants;
 import com.microsoft.azure.servicebus.amqp.DispatchHandler;
@@ -56,7 +56,7 @@ import com.microsoft.azure.servicebus.amqp.SessionHandler;
  */
 public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErrorContextProvider
 {
-	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
+	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(CoreMessageSender.class);
 	private static final String SEND_TIMED_OUT = "Send operation timed out";
 
 	private final Object requestResonseLinkCreationLock = new Object();
@@ -216,13 +216,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		this.throwIfClosed(this.lastKnownLinkError);
 
 		if (tracker != null && onSend != null && (tracker.remaining().isNegative() || tracker.remaining().isZero()))
-		{
-			if (TRACE_LOGGER.isLoggable(Level.FINE))
-			{
-				TRACE_LOGGER.log(Level.FINE,
-						String.format(Locale.US, 
-						"path[%s], linkName[%s], deliveryTag[%s] - timed out at sendCore", this.sendPath, this.sendLink.getName(), deliveryTag));
-			}
+		{			
+			TRACE_LOGGER.debug("path:{}, linkName:{}, deliveryTag:{} - timed out at sendCore", this.sendPath, this.sendLink.getName(), deliveryTag);
 
 			if (timeoutTask != null)
 			{
@@ -470,11 +465,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	{
 		final DeliveryState outcome = delivery.getRemoteState();
 		final String deliveryTag = new String(delivery.getTag());
-
-		if (TRACE_LOGGER.isLoggable(Level.FINEST))
-			TRACE_LOGGER.log(Level.FINEST,
-				String.format(Locale.US, "path[%s], linkName[%s], deliveryTag[%s]", CoreMessageSender.this.sendPath, this.sendLink.getName(), deliveryTag));
-
+		
+		TRACE_LOGGER.debug("Received delivery. path:{}, linkName:{}, deliveryTag:{}", CoreMessageSender.this.sendPath, this.sendLink.getName(), deliveryTag);
 		final SendWorkItem<Void> pendingSendWorkItem = this.pendingSendsData.remove(deliveryTag);
 
 		if (pendingSendWorkItem != null)
@@ -540,9 +532,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		}
 		else
 		{
-			if (TRACE_LOGGER.isLoggable(Level.WARNING))
-				TRACE_LOGGER.log(Level.WARNING, 
-						String.format(Locale.US, "path[%s], linkName[%s], delivery[%s] - mismatch", this.sendPath, this.sendLink.getName(), deliveryTag));
+			TRACE_LOGGER.warn("Delivery mismatch. path:{}, linkName:{}, delivery:{}", this.sendPath, this.sendLink.getName(), deliveryTag);
 		}
 	}
 
@@ -647,13 +637,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 							Exception operationTimedout = new TimeoutException(
 									String.format(Locale.US, "Open operation on SendLink(%s) on Entity(%s) timed out at %s.",	CoreMessageSender.this.sendLink.getName(), CoreMessageSender.this.getSendPath(), ZonedDateTime.now().toString()),
 									CoreMessageSender.this.lastKnownErrorReportedAt.isAfter(Instant.now().minusSeconds(ClientConstants.SERVER_BUSY_BASE_SLEEP_TIME_IN_SECS)) ? CoreMessageSender.this.lastKnownLinkError : null);
-
-							if (TRACE_LOGGER.isLoggable(Level.WARNING))
-							{
-								TRACE_LOGGER.log(Level.WARNING, 
-										String.format(Locale.US, "path[%s], linkName[%s], open call timedout", CoreMessageSender.this.sendPath, CoreMessageSender.this.sendLink.getName()), 
-										operationTimedout);
-							}
+							
+							TRACE_LOGGER.warn(operationTimedout.getMessage());
 
 							ExceptionUtil.completeExceptionally(CoreMessageSender.this.linkFirstOpen, operationTimedout, CoreMessageSender.this, false);
 						}
@@ -685,14 +670,10 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		this.lastKnownLinkError = null;
 
 		if (creditIssued <= 0)
-			return;
-
-		if (TRACE_LOGGER.isLoggable(Level.FINE))
-		{
-			int numberOfSendsWaitingforCredit = this.pendingSends.size();
-			TRACE_LOGGER.log(Level.FINE, String.format(Locale.US, "path[%s], linkName[%s], remoteLinkCredit[%s], pendingSendsWaitingForCredit[%s], pendingSendsWaitingDelivery[%s]",
-					this.sendPath, this.sendLink.getName(), creditIssued, numberOfSendsWaitingforCredit, this.pendingSendsData.size() - numberOfSendsWaitingforCredit));
-		}
+			return;	
+		
+		TRACE_LOGGER.debug("Received flow frame. path:{}, linkName:{}, remoteLinkCredit:{}, pendingSendsWaitingForCredit:{}, pendingSendsWaitingDelivery:{}",
+                    this.sendPath, this.sendLink.getName(), creditIssued, this.pendingSends.size(), this.pendingSendsData.size() - this.pendingSends.size());
 
 		this.linkCredit = this.linkCredit + creditIssued;
 		this.sendWork.onEvent();
@@ -782,13 +763,9 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 					sendData.setWaitingForAck();
 				}
 				else
-				{
-					if (TRACE_LOGGER.isLoggable(Level.FINE))
-					{
-						TRACE_LOGGER.log(Level.FINE,
-								String.format(Locale.US, "path[%s], linkName[%s], deliveryTag[%s], sentMessageSize[%s], payloadActualSize[%s] - sendlink advance failed",
-								this.sendPath, this.sendLink.getName(), deliveryTag, sentMsgSize, sendData.getEncodedMessageSize()));
-					}
+				{					
+					TRACE_LOGGER.warn("Sendlink advance failed. path:{}, linkName:{}, deliveryTag:{}, sentMessageSize:{}, payloadActualSiz:{}",
+					        this.sendPath, this.sendLink.getName(), deliveryTag, sentMsgSize, sendData.getEncodedMessageSize());
 
 					if (delivery != null)
 					{
@@ -803,13 +780,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			else
 			{
 				if (deliveryTag != null)
-				{
-					if (TRACE_LOGGER.isLoggable(Level.SEVERE))
-					{
-						TRACE_LOGGER.log(Level.SEVERE,
-								String.format(Locale.US, "path[%s], linkName[%s], deliveryTag[%s] - sendData not found for this delivery.",
-								this.sendPath, this.sendLink.getName(), deliveryTag));
-					}
+				{					
+					TRACE_LOGGER.error("SendData not found for this delivery. path:{}, linkName:{}, deliveryTag:{}", this.sendPath, this.sendLink.getName(), deliveryTag);
 				}
 
 				break;
@@ -843,13 +815,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 					{
 						if (!linkClose.isDone())
 						{
-							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Send Link(%s) timed out at %s", "Close", CoreMessageSender.this.sendLink.getName(), ZonedDateTime.now()));
-							if (TRACE_LOGGER.isLoggable(Level.WARNING))
-							{
-								TRACE_LOGGER.log(Level.WARNING, 
-										String.format(Locale.US, "message recever(linkName: %s, path: %s) %s call timedout", CoreMessageSender.this.sendLink.getName(), CoreMessageSender.this.sendPath, "Close"), 
-										operationTimedout);
-							}
+							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Send Link(%s) timed out at %s", "Close", CoreMessageSender.this.sendLink.getName(), ZonedDateTime.now()));							
+							TRACE_LOGGER.warn(operationTimedout.getMessage());
 
 							ExceptionUtil.completeExceptionally(linkClose, operationTimedout, CoreMessageSender.this, false);
 						}

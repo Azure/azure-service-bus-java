@@ -13,8 +13,6 @@ import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
@@ -25,6 +23,10 @@ import org.apache.qpid.proton.engine.Handler;
 import org.apache.qpid.proton.engine.HandlerException;
 import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.reactor.Reactor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import com.microsoft.azure.servicebus.amqp.BaseLinkHandler;
 import com.microsoft.azure.servicebus.amqp.ConnectionHandler;
@@ -40,9 +42,9 @@ import com.microsoft.azure.servicebus.amqp.ReactorDispatcher;
  */
 public class MessagingFactory extends ClientEntity implements IAmqpConnection, IConnectionFactory
 {
-	public static final Duration DefaultOperationTimeout = Duration.ofSeconds(30);
-
-	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessagingFactory.class);
+    
+	public static final Duration DefaultOperationTimeout = Duration.ofSeconds(30);	
 	private static final int MAX_CBS_LINK_CREATION_ATTEMPTS = 3;
 	private final ConnectionStringBuilder builder;
 	private final String hostName;
@@ -230,7 +232,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 			}
 			catch (IOException e)
 			{
-				TRACE_LOGGER.log(Level.SEVERE, ExceptionUtil.toStackTraceString(e, "Re-starting reactor failed with error"));				
+			    Marker fatalMarker = MarkerFactory.getMarker(ClientConstants.FATAL_MARKER);
+			    TRACE_LOGGER.error(fatalMarker, "Re-starting reactor failed with exception.", e);							
 				this.onReactorError(cause);
 			}
 			
@@ -372,11 +375,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 
 		public void run()
 		{
-			if(TRACE_LOGGER.isLoggable(Level.FINE))
-			{
-				TRACE_LOGGER.log(Level.FINE, "starting reactor instance.");
-			}
-
+		    TRACE_LOGGER.debug("starting reactor instance.");
 			try
 			{
 				this.rctr.setTimeout(3141);
@@ -400,12 +399,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 				{
 					cause = handlerException;
 				}
-
-				if(TRACE_LOGGER.isLoggable(Level.WARNING))
-				{
-					TRACE_LOGGER.log(Level.WARNING,
-							ExceptionUtil.toStackTraceString(handlerException, "UnHandled exception while processing events in reactor:"));
-				}
+				
+				TRACE_LOGGER.warn("UnHandled exception while processing events in reactor:", handlerException);
 
 				String message = !StringUtil.isNullOrEmpty(cause.getMessage()) ? 
 						cause.getMessage():

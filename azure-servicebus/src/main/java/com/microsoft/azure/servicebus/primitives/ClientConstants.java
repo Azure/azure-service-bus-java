@@ -15,6 +15,7 @@ public final class ClientConstants
 {
 	private ClientConstants() { }
 	
+	public static final String FATAL_MARKER = "FATAL";
 	public final static String PRODUCT_NAME = "MSJavaClient";
     public final static String CURRENT_JAVACLIENT_VERSION = "0.13.1";
     public static final String PLATFORM_INFO = getPlatformInfo();

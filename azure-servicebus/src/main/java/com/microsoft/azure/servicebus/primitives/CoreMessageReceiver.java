@@ -24,8 +24,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.qpid.proton.Proton;
@@ -50,6 +48,8 @@ import org.apache.qpid.proton.engine.EndpointState;
 import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.engine.Session;
 import org.apache.qpid.proton.message.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.amqp.DispatchHandler;
 import com.microsoft.azure.servicebus.amqp.IAmqpReceiver;
@@ -64,7 +64,7 @@ import com.microsoft.azure.servicebus.amqp.SessionHandler;
 // TODO Take a re-look at the choice of collections used. Some of them are overkill may be.
 public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, IErrorContextProvider
 {
-	private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
+	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(CoreMessageReceiver.class);
 	
 	private final Object requestResonseLinkCreationLock = new Object();
 	private final List<ReceiveWorkItem> pendingReceives;
@@ -538,13 +538,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			this.underlyingFactory.getRetryPolicy().resetRetryCount(this.underlyingFactory.getClientId());
 
 			this.nextCreditToFlow = 0;
-			this.sendFlow(this.prefetchCount - this.prefetchedMessages.size());
-
-			if(TRACE_LOGGER.isLoggable(Level.FINE))
-			{
-				TRACE_LOGGER.log(Level.FINE, String.format("receiverPath[%s], linkname[%s], updated-link-credit[%s], sentCredits[%s]",
-						this.receivePath, this.receiveLink.getName(), this.receiveLink.getCredit(), this.prefetchCount));
-			}
+			this.sendFlow(this.prefetchCount - this.prefetchedMessages.size());			
+			
+			TRACE_LOGGER.debug("receiverPath:{}, linkname:{}, updated-link-credit:{}, sentCredits:{}",
+                    this.receivePath, this.receiveLink.getName(), this.receiveLink.getCredit(), this.prefetchCount);
 		}
 		else
 		{
@@ -773,13 +770,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			{
 				final int tempFlow = this.nextCreditToFlow;
 				this.receiveLink.flow(tempFlow);
-				this.nextCreditToFlow = 0;
+				this.nextCreditToFlow = 0;				
 				
-				if(TRACE_LOGGER.isLoggable(Level.FINE))
-				{
-					TRACE_LOGGER.log(Level.FINE, String.format("receiverPath[%s], linkname[%s], updated-link-credit[%s], sentCredits[%s]",
-							this.receivePath, this.receiveLink.getName(), this.receiveLink.getCredit(), tempFlow));
-				}
+				TRACE_LOGGER.debug("receiverPath:{}, linkname:{}, updated-link-credit:{}, sentCredits:{}",
+                            this.receivePath, this.receiveLink.getName(), this.receiveLink.getCredit(), tempFlow);
 			}
 		}		
 	}
@@ -797,13 +791,9 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 						    CoreMessageReceiver.this.cancelSASTokenRenewTimer();
 							Exception operationTimedout = new TimeoutException(
 									String.format(Locale.US, "%s operation on ReceiveLink(%s) to path(%s) timed out at %s.", "Open", CoreMessageReceiver.this.receiveLink.getName(), CoreMessageReceiver.this.receivePath, ZonedDateTime.now()),
-									CoreMessageReceiver.this.lastKnownLinkError);
-							if (TRACE_LOGGER.isLoggable(Level.WARNING))
-							{
-								TRACE_LOGGER.log(Level.WARNING, 
-										String.format(Locale.US, "receiverPath[%s], linkName[%s], %s call timedout", CoreMessageReceiver.this.receivePath, CoreMessageReceiver.this.receiveLink.getName(),  "Open"), 
-										operationTimedout);
-							}
+									CoreMessageReceiver.this.lastKnownLinkError);							
+							
+							TRACE_LOGGER.warn(operationTimedout.getMessage());
 
 							ExceptionUtil.completeExceptionally(linkOpen.getWork(), operationTimedout, CoreMessageReceiver.this, false);
 						}
@@ -824,12 +814,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 						if (!linkClose.isDone())
 						{
 							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Receive Link(%s) timed out at %s", "Close", CoreMessageReceiver.this.receiveLink.getName(), ZonedDateTime.now()));
-							if (TRACE_LOGGER.isLoggable(Level.WARNING))
-							{
-								TRACE_LOGGER.log(Level.WARNING, 
-										String.format(Locale.US, "receiverPath[%s], linkName[%s], %s call timedout", CoreMessageReceiver.this.receivePath, CoreMessageReceiver.this.receiveLink.getName(), "Close"), 
-										operationTimedout);
-							}
+							TRACE_LOGGER.warn(operationTimedout.getMessage());
 
 							ExceptionUtil.completeExceptionally(linkClose, operationTimedout, CoreMessageReceiver.this, false);
 						}

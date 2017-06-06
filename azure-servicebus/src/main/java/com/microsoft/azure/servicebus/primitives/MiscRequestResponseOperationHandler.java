@@ -7,16 +7,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.apache.qpid.proton.message.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.rules.RuleDescription;
 
 public final class MiscRequestResponseOperationHandler extends ClientEntity
 {
-    private static final Logger TRACE_LOGGER = Logger.getLogger(ClientConstants.SERVICEBUS_CLIENT_TRACE);
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MiscRequestResponseOperationHandler.class);
     
 	private final Object requestResonseLinkCreationLock = new Object();
 	private final String entityPath;
@@ -60,11 +60,8 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
                         {
                             requestResponseOperationHandler.cancelSASTokenRenewTimer();
                             Exception operationTimedout = new TimeoutException(
-                                    String.format(Locale.US, "Open operation on CBSLink(%s) on Entity(%s) timed out at %s.", requestResponseOperationHandler.getClientId(), requestResponseOperationHandler.entityPath, ZonedDateTime.now().toString()));
-                            if (TRACE_LOGGER.isLoggable(Level.WARNING))
-                            {
-                                TRACE_LOGGER.log(Level.WARNING, operationTimedout.getMessage());
-                            }
+                                    String.format(Locale.US, "Open operation on CBSLink(%s) on Entity(%s) timed out at %s.", requestResponseOperationHandler.getClientId(), requestResponseOperationHandler.entityPath, ZonedDateTime.now().toString()));                            
+                            TRACE_LOGGER.warn(operationTimedout.getMessage());
 
                             creationFuture.completeExceptionally(operationTimedout);
                         }

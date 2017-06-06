@@ -87,6 +87,10 @@ public final class ConnectionHandler extends BaseHandler
 		}
 
 		this.messagingFactory.onConnectionError(condition);
+		Connection connection = event.getConnection();
+		if (connection != null) {
+            connection.free();
+        }
 	}
 
 	@Override
@@ -110,7 +114,30 @@ public final class ConnectionHandler extends BaseHandler
 		}
 
 		this.messagingFactory.onConnectionError(error);
+		this.freeOnCloseResponse(connection);
 	}
+	
+	@Override
+    public void onConnectionFinal(Event event) {
+        final Transport transport = event.getTransport();
+        if (transport != null) {
+            transport.unbind();
+            transport.free();
+        }
+    }
+	
+	@Override
+    public void onConnectionLocalClose(Event event) {
+        this.freeOnCloseResponse(event.getConnection());
+    }
+	
+	private void freeOnCloseResponse(Connection connection) {
+        if (connection != null &&
+                connection.getLocalState() == EndpointState.CLOSED &&
+                (connection.getRemoteState() == EndpointState.CLOSED)) {
+            connection.free();
+        }
+    }
 
 	private static SslDomain makeDomain(SslDomain.Mode mode)
 	{
