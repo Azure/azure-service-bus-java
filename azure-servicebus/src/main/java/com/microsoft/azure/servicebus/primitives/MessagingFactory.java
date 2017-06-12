@@ -94,6 +94,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 				super.onReactorInit(e);
 
 				final Reactor r = e.getReactor();
+				TRACE_LOGGER.info("Creatina connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
 				connection = r.connectionToHost(hostName, ClientConstants.AMQPS_PORT, connectionHandler);
 			}
 		};
@@ -122,6 +123,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 
 	private void startReactor(ReactorHandler reactorHandler) throws IOException
 	{
+	    TRACE_LOGGER.info("Creating and starting reactor");
 		final Reactor newReactor = ProtonUtil.reactor(reactorHandler);
 		synchronized (this.reactorLock)
 		{
@@ -131,6 +133,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 		
 		final Thread reactorThread = new Thread(new RunReactor());
 		reactorThread.start();
+		TRACE_LOGGER.info("Started reactor");
 	}
 
 	@Override
@@ -138,6 +141,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
+		    TRACE_LOGGER.info("Creatina connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
 			this.connection = this.getReactor().connectionToHost(this.hostName, ClientConstants.AMQPS_PORT, this.connectionHandler);
 		}
 
@@ -155,12 +159,18 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	}
 
 	public static CompletableFuture<MessagingFactory> createFromConnectionStringBuilderAsync(final ConnectionStringBuilder builder)
-	{		
+	{	
+	    if(TRACE_LOGGER.isInfoEnabled())
+	    {
+	        TRACE_LOGGER.info("Creating messaging factory from connection string '{}'", builder.toLoggableString());
+	    }
+	    
 		MessagingFactory messagingFactory = new MessagingFactory(builder);
 		try {			
 			messagingFactory.startReactor(messagingFactory.reactorHandler);
-		} catch (IOException e) {			
-			e.printStackTrace();
+		} catch (IOException e) {
+		    Marker fatalMarker = MarkerFactory.getMarker(ClientConstants.FATAL_MARKER);
+			TRACE_LOGGER.error(fatalMarker, "Starting reactor failed", e);
 			messagingFactory.factoryOpenFuture.completeExceptionally(e);
 		}
 		return messagingFactory.factoryOpenFuture;
@@ -187,18 +197,21 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	{
 	    if(!factoryOpenFuture.isDone())
 	    {
+	        TRACE_LOGGER.info("MessagingFactory opened.");
 	        AsyncUtil.completeFuture(this.factoryOpenFuture, this);
 	    }
 	    
 	    // Connection opened. Initiate new cbs link creation
+	    TRACE_LOGGER.info("Connection opened to host.");
 	    this.createCBSLinkAsync();
 	}
 
 	@Override
 	public void onConnectionError(ErrorCondition error)
 	{
+	    TRACE_LOGGER.error("Connection error. '{}'", error);
 		if (!this.factoryOpenFuture.isDone())
-		{
+		{		    
 		    AsyncUtil.completeFutureExceptionally(this.factoryOpenFuture, ExceptionUtil.toException(error));
 		}
 		else
@@ -208,6 +221,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 
 		if (this.getIsClosingOrClosed() && !this.connetionCloseFuture.isDone())
 		{
+		    TRACE_LOGGER.info("Connection to host closed.");
 		    this.connetionCloseFuture.complete(null);
 			Timer.unregister(this.getClientId());
 		}
@@ -215,6 +229,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 
 	private void onReactorError(Exception cause)
 	{
+	    TRACE_LOGGER.error("Reactor error occured", cause);
 		if (!this.factoryOpenFuture.isDone())
 		{
 		    AsyncUtil.completeFutureExceptionally(this.factoryOpenFuture, cause);
@@ -244,12 +259,14 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	// One of the parameters must be null
 	private void closeConnection(ErrorCondition error, Exception cause)
 	{
+	    TRACE_LOGGER.info("Closing connection to host");
 	    // Important to copy the reference of the connection as a call to getConnection might create a new connection while we are still in this method
 	    Connection currentConnection = this.connection;
 	    if(connection != null)
 	    {
 	        Link[] links = this.registeredLinks.toArray(new Link[0]);
 	        
+	        TRACE_LOGGER.debug("Closing all links on the connection. Number of links '{}'", links.length);
 	        for(Link link : links)
 	        {
 	            if (link.getLocalState() != EndpointState.CLOSED && link.getRemoteState() != EndpointState.CLOSED)
@@ -258,14 +275,19 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	            }
 	        }
 	        
+	        TRACE_LOGGER.debug("Closed all links on the connection. Number of links '{}'", links.length);
+	        	        
 	        if(this.cbsLink != null)
 	        {
+	            TRACE_LOGGER.debug("Closing CBS link on the connection");
 	            try {
 	                this.cbsLink.close();
+	                TRACE_LOGGER.debug("Closed CBS on the connection");
 	            } catch (ServiceBusException e) {
-	               // Ignore this exception
-	            }
+	                TRACE_LOGGER.warn("Closing CBS link on the connection failed.", e);
+	            }	            
 	        }
+	        
 	        
 	        if(this.cbsLinkCreationFuture != null && !this.cbsLinkCreationFuture.isDone())
 	        {
@@ -277,6 +299,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	        if (currentConnection.getLocalState() != EndpointState.CLOSED && currentConnection.getRemoteState() != EndpointState.CLOSED)
 	        {
 	            currentConnection.close();
+	            currentConnection.free();	            
 	        }
 	        
 	        for(Link link : links)
@@ -303,6 +326,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	{
 		if (!this.getIsClosed())
 		{
+		    TRACE_LOGGER.info("Closing messaging factory");
 		    CompletableFuture<Void> cbsLinkCloseFuture;
 		    if(this.cbsLink == null)
 		    {
@@ -310,6 +334,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 		    }
 		    else
 		    {
+		        TRACE_LOGGER.info("Closing CBS link");
 		        cbsLinkCloseFuture = this.cbsLink.closeAsync();
 		    }
 		    
@@ -329,6 +354,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	                        {
 	                            if (MessagingFactory.this.connection != null && MessagingFactory.this.connection.getLocalState() != EndpointState.CLOSED)
 	                            {
+	                                TRACE_LOGGER.info("Closing connection to host");
 	                                MessagingFactory.this.connection.close();
 	                            }
 	                        }
@@ -344,7 +370,9 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	                    {
 	                        if (!MessagingFactory.this.connetionCloseFuture.isDone())
 	                        {
-	                            MessagingFactory.this.connetionCloseFuture.completeExceptionally(new TimeoutException("Closing MessagingFactory timed out."));
+	                            String errorMessage = "Closing MessagingFactory timed out.";
+	                            TRACE_LOGGER.warn(errorMessage);
+	                            MessagingFactory.this.connetionCloseFuture.completeExceptionally(new TimeoutException(errorMessage));
 	                        }
 	                    }
 	                },
@@ -375,7 +403,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 
 		public void run()
 		{
-		    TRACE_LOGGER.debug("starting reactor instance.");
+		    TRACE_LOGGER.info("starting reactor instance.");
 			try
 			{
 				this.rctr.setTimeout(3141);
@@ -386,10 +414,12 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 				    // If factory is closed, stop reactor too
 				    if(MessagingFactory.this.getIsClosed())
 				    {
+				        TRACE_LOGGER.info("Gracefull releasing reactor thread as messaging factory is closed");
 				        break;
 				    }
 				    continuteProcessing = this.rctr.process();
 				}
+				TRACE_LOGGER.info("Stopping reactor");
 				this.rctr.stop();
 			}
 			catch (HandlerException handlerException)
@@ -400,7 +430,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 					cause = handlerException;
 				}
 				
-				TRACE_LOGGER.warn("UnHandled exception while processing events in reactor:", handlerException);
+				TRACE_LOGGER.error("UnHandled exception while processing events in reactor:", handlerException);
 
 				String message = !StringUtil.isNullOrEmpty(cause.getMessage()) ? 
 						cause.getMessage():
@@ -452,6 +482,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	
 	CompletableFuture<ScheduledFuture<?>> sendSASTokenAndSetRenewTimer(String sasTokenAudienceURI, Runnable validityRenewer)
     {
+	    TRACE_LOGGER.debug("Sending CBS Token for {}", sasTokenAudienceURI);
 	    boolean isSasTokenGenerated = false;
 	    String sasToken = this.builder.getSharedAccessSignatureToken();
         try
@@ -474,6 +505,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
             return CommonRequestResponseOperations.sendCBSTokenAsync(this.cbsLink, Util.adjustServerTimeout(this.operationTimeout), finalSasToken, ClientConstants.SAS_TOKEN_TYPE, sasTokenAudienceURI);
         });
         return sendTokenFuture.thenApplyAsync((v) -> {
+            TRACE_LOGGER.debug("Sent CBS Token for {}", sasTokenAudienceURI);
             if(finalIsSasTokenGenerated)
             {
                 // It will eventually expire. Renew it
@@ -492,24 +524,27 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
     {
 	    if(++this.cbsLinkCreationAttempts > MAX_CBS_LINK_CREATION_ATTEMPTS )
 	    {
-	        Throwable completionEx = this.lastCBSLinkCreationException == null ? new Exception("CBS link creation failed multiple times.") : this.lastCBSLinkCreationException;
+	        Throwable completionEx = this.lastCBSLinkCreationException == null ? new Exception("CBS link creation failed multiple times.") : this.lastCBSLinkCreationException;	        
 	        this.cbsLinkCreationFuture.completeExceptionally(completionEx);
-	        return CompletableFuture.completedFuture(null);	        
+	        return CompletableFuture.completedFuture(null);     
 	    }
 	    else
-	    {
+	    {	        
 	        String requestResponseLinkPath = RequestResponseLink.getCBSNodeLinkPath();
+	        TRACE_LOGGER.info("Creating CBS link to {}", requestResponseLinkPath);
 	        CompletableFuture<Void> crateAndAssignRequestResponseLink =
 	                        RequestResponseLink.createAsync(this, this.getClientId() + "-cbs", requestResponseLinkPath).handleAsync((cbsLink, ex) ->
 	                        {
 	                            if(ex == null)
 	                            {
-	                                this.cbsLink = cbsLink;
+	                                TRACE_LOGGER.info("Created CBS link to {}", requestResponseLinkPath);
+	                                this.cbsLink = cbsLink;	                                
 	                                this.cbsLinkCreationFuture.complete(null);
 	                            }
 	                            else
-	                            {
+	                            {	                                
 	                                this.lastCBSLinkCreationException = ExceptionUtil.extractAsyncCompletionCause(ex);
+	                                TRACE_LOGGER.error("Creating CBS link to {} failed. Attempts '{}'", requestResponseLinkPath, this.cbsLinkCreationAttempts);
 	                                this.createCBSLinkAsync();
 	                            }
 	                            return null;

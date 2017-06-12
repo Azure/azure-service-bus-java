@@ -37,7 +37,7 @@ public final class ReceiveLinkHandler extends BaseLinkHandler
 		if (link instanceof Receiver)
 		{
 			Receiver receiver = (Receiver) link;			
-			TRACE_LOGGER.debug("linkName:{}, localSource:{}", receiver.getName(), receiver.getSource());
+			TRACE_LOGGER.debug("onLinkLocalOpen: linkName:{}, localSource:{}", receiver.getName(), receiver.getSource());
 		}
 	}
 
@@ -50,7 +50,7 @@ public final class ReceiveLinkHandler extends BaseLinkHandler
 			Receiver receiver = (Receiver) link;
 			if (link.getRemoteSource() != null)
 			{				
-				TRACE_LOGGER.debug("linkName:{}, remoteSource:{}", receiver.getName(), receiver.getRemoteSource());
+				TRACE_LOGGER.debug("onLinkRemoteOpen: linkName:{}, remoteSource:{}", receiver.getName(), receiver.getRemoteSource());
 
 				synchronized (this.firstResponse)
 				{
@@ -60,7 +60,7 @@ public final class ReceiveLinkHandler extends BaseLinkHandler
 			}
 			else
 			{				
-				TRACE_LOGGER.debug("linkName:{}, remoteTarget:{}, remoteTarget:{}, action:{}", receiver.getName(), null, null, "waitingForError");
+				TRACE_LOGGER.debug("onLinkRemoteOpen: linkName:{}, remoteTarget:{}, remoteTarget:{}, action:{}", receiver.getName(), null, null, "waitingForError");
 			}
 		}
 	}
@@ -80,6 +80,9 @@ public final class ReceiveLinkHandler extends BaseLinkHandler
 		Delivery delivery = event.getDelivery();
 		Receiver receiveLink = (Receiver) delivery.getLink();
 
+		TRACE_LOGGER.debug("onDelivery: linkName:{}, updatedLinkCredit:{}, remoteCredit:{}, remoteCondition:{}, delivery.isPartial:{}", 
+                receiveLink.getName(), receiveLink.getCredit(), receiveLink.getRemoteCredit(), receiveLink.getRemoteCondition(), delivery.isPartial());
+		
 		//TODO: What happens when a delivery has no message, but only disposition from the remote link? Like when ServiceBus service sends just a disposition to the receiver?"
 		
 		// If a message spans across deliveries (for ex: 200k message will be 4 frames (deliveries) 64k 64k 64k 8k), 
@@ -89,8 +92,5 @@ public final class ReceiveLinkHandler extends BaseLinkHandler
 		{	
 			this.amqpReceiver.onReceiveComplete(delivery);
 		}
-		
-		TRACE_LOGGER.debug("linkName:{}, updatedLinkCredit:{}, remoteCredit:{}, remoteCondition:{}, delivery.isPartial:{}", 
-                        receiveLink.getName(), receiveLink.getCredit(), receiveLink.getRemoteCredit(), receiveLink.getRemoteCondition(), delivery.isPartial());
 	}
 }

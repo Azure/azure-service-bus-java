@@ -42,10 +42,12 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	    requestResponseOperationHandler.sendSASTokenAndSetRenewTimer().handleAsync((v, ex) -> {
 	        if(ex == null)
 	        {
+	            TRACE_LOGGER.info("Opened MiscRequestResponseOperationHandler");
 	            creationFuture.complete(requestResponseOperationHandler);
 	        }
 	        else
 	        {
+	            TRACE_LOGGER.error("Opening of MiscRequestResponseOperationHandler failed", ex);
 	            creationFuture.completeExceptionally(ExceptionUtil.extractAsyncCompletionCause(ex));
 	        }
 	        return null;
@@ -74,11 +76,12 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	
 	@Override
 	protected CompletableFuture<Void> onClose() {
+	    TRACE_LOGGER.trace("Closing MiscRequestResponseOperationHandler");
 	    this.cancelSASTokenRenewTimer();
 		return this.requestResponseLink == null ? CompletableFuture.completedFuture(null) : this.requestResponseLink.closeAsync();
 	}
 	
-	CompletableFuture<Void> sendSASTokenAndSetRenewTimer()
+	private CompletableFuture<Void> sendSASTokenAndSetRenewTimer()
     {
         if(this.getIsClosingOrClosed())
         {
@@ -87,7 +90,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
         else
         {
             CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSASTokenAndSetRenewTimer(this.sasTokenAudienceURI, () -> this.sendSASTokenAndSetRenewTimer());
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;});
+            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Set SAS Token renew timer");});
         }
     }
     
@@ -95,6 +98,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
     {
         if(this.sasTokenRenewTimerFuture != null && !this.sasTokenRenewTimerFuture.isDone())
         {
+            TRACE_LOGGER.debug("Cancelling SAS Token renew timer");
             this.sasTokenRenewTimerFuture.cancel(true);
         }
     }
@@ -103,19 +107,23 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	{
 	    synchronized (this.requestResonseLinkCreationLock) {
             if(this.requestResponseLinkCreationFuture == null)
-            {
+            {                
                 this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.entityPath);                
+                String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.entityPath);
+                TRACE_LOGGER.debug("Creating requestresponselink to '{}'", requestResponseLinkPath);
                 RequestResponseLink.createAsync(this.underlyingFactory, this.getClientId() + "-RequestResponse", requestResponseLinkPath).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
                     {
+                        TRACE_LOGGER.info("Created requestresponselink to '{}'", requestResponseLinkPath);
                         this.requestResponseLink = rrlink;
                         this.requestResponseLinkCreationFuture.complete(null);
                     }
                     else
                     {
-                        this.requestResponseLinkCreationFuture.completeExceptionally(ExceptionUtil.extractAsyncCompletionCause(ex));
+                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);
+                        TRACE_LOGGER.error("Creating requestresponselink to '{}' failed.", requestResponseLinkPath, cause);
+                        this.requestResponseLinkCreationFuture.completeExceptionally(cause);
                         // Set it to null so next call will retry rr link creation
                         synchronized (this.requestResonseLinkCreationLock)
                         {
@@ -132,6 +140,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	
 	public CompletableFuture<Pair<String[], Integer>> getMessageSessionsAsync(Date lastUpdatedTime, int skip, int top, String lastSessionId)
 	{
+	    TRACE_LOGGER.debug("Getting message sessions from entity '{}' with lastupdatedtime '{}', skip '{}', top '{}', lastsessionid '{}'", this.entityPath, lastUpdatedTime, skip, top, lastSessionId);
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_LAST_UPDATED_TIME, lastUpdatedTime);
@@ -148,20 +157,23 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 				CompletableFuture<Pair<String[], Integer>> returningFuture = new CompletableFuture<Pair<String[], Integer>>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
-				{
+				{				    
 					Map responseBodyMap = RequestResponseUtils.getResponseBody(responseMessage);
 					int responseSkip = (int)responseBodyMap.get(ClientConstants.REQUEST_RESPONSE_SKIP);
 					String[] sessionIds = (String[])responseBodyMap.get(ClientConstants.REQUEST_RESPONSE_SESSIONIDS);
+					TRACE_LOGGER.debug("Received '{}' sessions from entity '{}'. Response skip '{}'", sessionIds.length, this.entityPath, responseSkip);
 					returningFuture.complete(new Pair<>(sessionIds, responseSkip));				
 				}
 				else if(statusCode == ClientConstants.REQUEST_RESPONSE_NOCONTENT_STATUS_CODE ||
 						(statusCode == ClientConstants.REQUEST_RESPONSE_NOTFOUND_STATUS_CODE && ClientConstants.SESSION_NOT_FOUND_ERROR.equals(RequestResponseUtils.getResponseErrorCondition(responseMessage))))
 				{
+				    TRACE_LOGGER.debug("Received no sessions from entity '{}'.", this.entityPath);
 					returningFuture.complete(new Pair<>(new String[0], 0));
 				}
 				else
 				{
 					// error response
+				    TRACE_LOGGER.debug("Receiving sessions from entity '{}' failed with status code '{}'", this.entityPath, statusCode);
 					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
 				}
 				return returningFuture;
@@ -171,6 +183,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	
 	public CompletableFuture<Void> removeRuleAsync(String ruleName)
 	{
+	    TRACE_LOGGER.debug("Removing rule '{}' from entity '{}'", ruleName, this.entityPath);
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_RULENAME, ruleName);
@@ -182,11 +195,13 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
 				{
+				    TRACE_LOGGER.debug("Removed rule '{}' from entity '{}'", ruleName, this.entityPath);
 					returningFuture.complete(null);
 				}
 				else
 				{
 					// error response
+				    TRACE_LOGGER.error("Removing rule '{}' from entity '{}' failed with status code '{}'", ruleName, this.entityPath, statusCode);
 					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
 				}
 				return returningFuture;
@@ -196,6 +211,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	
 	public CompletableFuture<Void> addRuleAsync(RuleDescription ruleDescription)
 	{
+	    TRACE_LOGGER.debug("Adding rule '{}' to entity '{}'", ruleDescription.getName(), this.entityPath);
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_RULENAME, ruleDescription.getName());
@@ -208,11 +224,13 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
 				{
+				    TRACE_LOGGER.debug("Added rule '{}' to entity '{}'", ruleDescription.getName(), this.entityPath);
 					returningFuture.complete(null);
 				}
 				else
 				{
 					// error response
+				    TRACE_LOGGER.error("Adding rule '{}' to entity '{}' failed with status code '{}'", ruleDescription.getName(), this.entityPath, statusCode);
 					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
 				}
 				return returningFuture;

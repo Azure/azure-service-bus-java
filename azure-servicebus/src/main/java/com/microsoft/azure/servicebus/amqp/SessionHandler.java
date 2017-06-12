@@ -25,7 +25,7 @@ public class SessionHandler extends BaseHandler
 	@Override
 	public void onSessionRemoteOpen(Event e) 
 	{		
-		TRACE_LOGGER.debug("entityName: {}, sessionIncCapacity: {}, sessionOutgoingWindow: {}", this.name, e.getSession().getIncomingCapacity(), e.getSession().getOutgoingWindow());
+		TRACE_LOGGER.debug("onSessionRemoteOpen - entityName: {}, sessionIncCapacity: {}, sessionOutgoingWindow: {}", this.name, e.getSession().getIncomingCapacity(), e.getSession().getOutgoingWindow());
 
 		Session session = e.getSession();
 		if (session != null && session.getLocalState() == EndpointState.UNINITIALIZED)
@@ -38,13 +38,13 @@ public class SessionHandler extends BaseHandler
 	@Override 
 	public void onSessionLocalClose(Event e)
 	{		
-		TRACE_LOGGER.debug("entityName: {}, condition: {}", this.name, e.getSession().getCondition() == null ? "none" : e.getSession().getCondition().toString());
+		TRACE_LOGGER.debug("onSessionLocalClose - entityName: {}, condition: {}", this.name, e.getSession().getCondition() == null ? "none" : e.getSession().getCondition().toString());
 	}
 
 	@Override
 	public void onSessionRemoteClose(Event e)
 	{		
-		TRACE_LOGGER.debug("entityName: {}, condition: {}", this.name, e.getSession().getCondition() == null ? "none" : e.getSession().getCondition().toString());
+		TRACE_LOGGER.debug("onSessionRemoteClose - entityName: {}, condition: {}", this.name, e.getSession().getCondition() == null ? "none" : e.getSession().getCondition().toString());
 
 		Session session = e.getSession();
 		if (session != null && session.getLocalState() != EndpointState.CLOSED)
@@ -56,6 +56,6 @@ public class SessionHandler extends BaseHandler
 	@Override
 	public void onSessionFinal(Event e)
 	{ 
-	    TRACE_LOGGER.debug("session final - entityName: {}", this.name);
+	    TRACE_LOGGER.debug("onSessionFinal - entityName: {}", this.name);
 	}
 }

@@ -28,7 +28,6 @@ import com.microsoft.azure.servicebus.primitives.StringUtil;
 // amqp_connection/transport related events from reactor
 public final class ConnectionHandler extends BaseHandler
 {
-
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ConnectionHandler.class);
 	private final IAmqpConnection messagingFactory;
 
@@ -43,6 +42,7 @@ public final class ConnectionHandler extends BaseHandler
 	{
 		final Connection connection = event.getConnection();
 		final String hostName = event.getReactor().getConnectionAddress(connection);
+		TRACE_LOGGER.debug("onConnectionInit: hostname:{}" + hostName);
 		connection.setHostname(hostName);
 		connection.setContainer(StringUtil.getShortRandomString());
 		
@@ -58,6 +58,7 @@ public final class ConnectionHandler extends BaseHandler
 	@Override
 	public void onConnectionBound(Event event)
 	{
+	    TRACE_LOGGER.debug("onConnectionBound: hostname:{}" + event.getConnection().getHostname());
 		Transport transport = event.getTransport();
 
 		SslDomain domain = makeDomain(SslDomain.Mode.CLIENT);
@@ -106,7 +107,7 @@ public final class ConnectionHandler extends BaseHandler
 		final Connection connection = event.getConnection();
 		final ErrorCondition error = connection.getRemoteCondition();
 		
-		TRACE_LOGGER.debug("hostname:{},errorCondition:{}", connection.getHostname(), error != null ? error.getCondition() + "," + error.getDescription() : null);
+		TRACE_LOGGER.debug("onConnectionRemoteClose: hostname:{},errorCondition:{}", connection.getHostname(), error != null ? error.getCondition() + "," + error.getDescription() : null);
 		
 		if (connection.getRemoteState() != EndpointState.CLOSED)
 		{
@@ -128,7 +129,9 @@ public final class ConnectionHandler extends BaseHandler
 	
 	@Override
     public void onConnectionLocalClose(Event event) {
-        this.freeOnCloseResponse(event.getConnection());
+	    Connection connection = event.getConnection();
+	    TRACE_LOGGER.debug("onConnectionLocalClose: hostname:{}", connection.getHostname());
+        this.freeOnCloseResponse(connection);
     }
 	
 	private void freeOnCloseResponse(Connection connection) {

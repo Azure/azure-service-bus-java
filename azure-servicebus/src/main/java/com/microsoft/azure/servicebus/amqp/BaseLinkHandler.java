@@ -30,33 +30,34 @@ public class BaseLinkHandler extends BaseHandler {
 
     @Override
     public void onLinkRemoteClose(Event event) {
-        final Link link = event.getLink();
+        final Link link = event.getLink();        
+        if(link != null)
+        {
+            TRACE_LOGGER.debug("link remote close. linkName:{}", link.getName());
+            if (link.getLocalState() != EndpointState.CLOSED) {
+                link.close();
+            }
 
-        if (link.getLocalState() != EndpointState.CLOSED) {
-            link.close();
-        }
-
-        if (link != null) {
             ErrorCondition condition = link.getRemoteCondition();
             this.processOnClose(link, condition);
-        }
-
-        closeSession(link);
+            closeSession(link);
+        }        
     }
 
     @Override
     public void onLinkRemoteDetach(Event event) {
         final Link link = event.getLink();
-
-        if (link.getLocalState() != EndpointState.CLOSED) {
-            link.close();
-        }
-
-        if (link != null) {
+        if(link != null)
+        {
+            TRACE_LOGGER.debug("link remote detach. linkName:{}", link.getName());
+            if (link.getLocalState() != EndpointState.CLOSED) {
+                link.close();
+            }
+            
             this.processOnClose(link, link.getRemoteCondition());
+            closeSession(link);
         }
-
-        closeSession(link);
+        
     }
 
     public void processOnClose(Link link, ErrorCondition condition) {
