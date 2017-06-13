@@ -232,26 +232,22 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		return this.linkOpen.getWork();		
 	}
 	
-	private CompletableFuture<Void> createRequestResponseLink()
+	private CompletableFuture<Void> createRequestResponseLinkAsync()
 	{
 	    synchronized (this.requestResonseLinkCreationLock) {
             if(this.requestResponseLinkCreationFuture == null)
             {
                 this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.receivePath);
-                TRACE_LOGGER.info("Creating requestresponselink to '{}'", requestResponseLinkPath);
-                RequestResponseLink.createAsync(this.underlyingFactory, this.getClientId() + "-RequestResponse", requestResponseLinkPath).handleAsync((rrlink, ex) ->
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.receivePath).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
-                    {
-                        TRACE_LOGGER.info("Created requestresponselink to '{}'", requestResponseLinkPath);
+                    {                        
                         this.requestResponseLink = rrlink;
                         this.requestResponseLinkCreationFuture.complete(null);
                     }
                     else
                     {
-                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);
-                        TRACE_LOGGER.error("Creating requestresponselink to '{}' failed.", requestResponseLinkPath, cause);
+                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);                        
                         this.requestResponseLinkCreationFuture.completeExceptionally(cause);
                         // Set it to null so next call will retry rr link creation
                         synchronized (this.requestResonseLinkCreationLock)
@@ -922,9 +918,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 
 		this.cancelSASTokenRenewTimer();
-		
-		return this.linkClose.thenCompose((v) -> {
-			return this.requestResponseLink == null ? CompletableFuture.completedFuture(null) : this.requestResponseLink.closeAsync();});
+		this.underlyingFactory.releaseRequestResponseLink(this.receivePath);
+		return this.linkClose;
 	}
 	
 	public CompletableFuture<Void> completeMessageAsync(byte[] deliveryTag)
@@ -1110,7 +1105,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	    {
 	        TRACE_LOGGER.debug("Renewing message locks for lock tokens '{}' of entity '{}', sesion '{}'", Arrays.toString(lockTokens), this.receivePath, this.isSessionReceiver ? this.getSessionId() : "");
 	    }
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_LOCKTOKENS, lockTokens);
 			if(this.isSessionReceiver)
@@ -1151,7 +1146,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         {
             TRACE_LOGGER.debug("Receiving messges for sequence numbers '{}' from entity '{}', sesion '{}'", Arrays.toString(sequenceNumbers), this.receivePath, this.isSessionReceiver ? this.getSessionId() : "");
         }
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS, sequenceNumbers);
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_RECEIVER_SETTLE_MODE, UnsignedInteger.valueOf(this.settleModePair.getReceiverSettleMode() == ReceiverSettleMode.FIRST ? 0 : 1));		
@@ -1216,7 +1211,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         {
             TRACE_LOGGER.debug("Update disposition of deliveries '{}' to '{}' on entity '{}', sesion '{}'", Arrays.toString(lockTokens), dispositionStatus, this.receivePath, this.isSessionReceiver ? this.getSessionId() : "");
         }
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_LOCKTOKENS, lockTokens);
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_DISPOSITION_STATUS, dispositionStatus);
@@ -1269,7 +1264,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	public CompletableFuture<Void> renewSessionLocksAsync()
 	{
 	    TRACE_LOGGER.debug("Renewing session lock on entity '{}' of sesion '{}'", this.receivePath, this.getSessionId());
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());
 			
@@ -1300,7 +1295,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	public CompletableFuture<byte[]> getSessionStateAsync()
 	{
 	    TRACE_LOGGER.debug("Getting session state of sesion '{}' from entity '{}'", this.getSessionId(), this.receivePath);
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());		
 			
@@ -1341,7 +1336,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	public CompletableFuture<Void> setSessionStateAsync(byte[] sessionState)
 	{
 	    TRACE_LOGGER.debug("Setting session state of sesion '{}' on entity '{}'", this.getSessionId(), this.receivePath);
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSION_STATE, sessionState == null ? null : new Binary(sessionState));
@@ -1371,7 +1366,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	// A receiver can be used to peek messages from any session-id, useful for browsable sessions
 	public CompletableFuture<Collection<Message>> peekMessagesAsync(long fromSequenceNumber, int messageCount, String sessionId)
 	{
-		return this.createRequestResponseLink().thenComposeAsync((v) -> {
+		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			return CommonRequestResponseOperations.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, sessionId);
 		});		
 	}	

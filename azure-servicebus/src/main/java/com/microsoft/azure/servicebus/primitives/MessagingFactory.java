@@ -53,6 +53,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	private final ReactorHandler reactorHandler;
 	private final LinkedList<Link> registeredLinks;
 	private final Object reactorLock;
+	private final RequestResponseLinkcache managementLinksCache;
 	
 	private Reactor reactor;
 	private ReactorDispatcher reactorScheduler;
@@ -65,6 +66,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	private RequestResponseLink cbsLink;
 	private int cbsLinkCreationAttempts = 0;
 	private Throwable lastCBSLinkCreationException = null;
+	
 
 	/**
 	 * @param reactor parameter reactor is purely for testing purposes and the SDK code should always set it to null
@@ -85,7 +87,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 		this.connectionHandler = new ConnectionHandler(this);
 		this.factoryOpenFuture = new CompletableFuture<MessagingFactory>();
 		this.cbsLinkCreationFuture = new CompletableFuture<Void>();
-		
+		this.managementLinksCache = new RequestResponseLinkcache(this);
 		this.reactorHandler = new ReactorHandler()
 		{
 			@Override
@@ -340,9 +342,9 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 		    {
 		        TRACE_LOGGER.info("Closing CBS link");
 		        cbsLinkCloseFuture = this.cbsLink.closeAsync();
-		    }
+		    }		    
 		    
-		    cbsLinkCloseFuture.thenRun(() -> {
+		    cbsLinkCloseFuture.thenRun(() -> this.managementLinksCache.freeAsync()).thenRun(() -> {
 		        if(this.cbsLinkCreationFuture != null && !this.cbsLinkCreationFuture.isDone())
 	            {
 	                AsyncUtil.completeFutureExceptionally(this.cbsLinkCreationFuture, new Exception("Connection closed."));
@@ -365,28 +367,28 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	                    });
 	                } catch (IOException e) {
 	                    AsyncUtil.completeFutureExceptionally(this.connetionCloseFuture, e);
-	                }
-
-	                Timer.schedule(new Runnable()
-	                {
-	                    @Override
-	                    public void run()
-	                    {
-	                        if (!MessagingFactory.this.connetionCloseFuture.isDone())
-	                        {
-	                            String errorMessage = "Closing MessagingFactory timed out.";
-	                            TRACE_LOGGER.warn(errorMessage);
-	                            MessagingFactory.this.connetionCloseFuture.completeExceptionally(new TimeoutException(errorMessage));
-	                        }
-	                    }
-	                },
-	                this.operationTimeout, TimerType.OneTimeRun);
+	                }	                
 	            }
 	            else if(this.connection == null || this.connection.getRemoteState() == EndpointState.CLOSED)
 	            {
 	                this.connetionCloseFuture.complete(null);
 	            }
 		    });
+		    
+		    Timer.schedule(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    if (!MessagingFactory.this.connetionCloseFuture.isDone())
+                    {
+                        String errorMessage = "Closing MessagingFactory timed out.";
+                        TRACE_LOGGER.warn(errorMessage);
+                        MessagingFactory.this.connetionCloseFuture.completeExceptionally(new TimeoutException(errorMessage));
+                    }
+                }
+            },
+            this.operationTimeout, TimerType.OneTimeRun);
 			
 			return this.connetionCloseFuture;
 		}
@@ -523,6 +525,20 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
             }
         });
     }
+	
+	CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath)
+	{
+	    this.throwIfClosed(null);
+	    return this.managementLinksCache.obtainRequestResponseLinkAsync(entityPath);
+	}
+	
+	void releaseRequestResponseLink(String entityPath)
+	{
+	    if(!this.getIsClosed())
+	    {
+	        this.managementLinksCache.releaseRequestResponseLink(entityPath);
+	    }	    
+	}
 	
 	private CompletableFuture<Void> createCBSLinkAsync()
     {

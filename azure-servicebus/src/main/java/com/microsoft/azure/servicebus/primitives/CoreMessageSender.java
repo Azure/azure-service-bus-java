@@ -130,21 +130,17 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		synchronized (this.requestResonseLinkCreationLock) {
             if(this.requestResponseLinkCreationFuture == null)
             {
-                this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.sendPath);
-                TRACE_LOGGER.debug("Creating requestresponselink to '{}'", requestResponseLinkPath);
-                RequestResponseLink.createAsync(this.underlyingFactory, this.getClientId() + "-RequestResponse", requestResponseLinkPath).handleAsync((rrlink, ex) ->
+                this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();                
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
-                    {
-                        TRACE_LOGGER.info("Created requestresponselink to '{}'", requestResponseLinkPath);
+                    {                        
                         this.requestResponseLink = rrlink;
                         this.requestResponseLinkCreationFuture.complete(null);
                     }
                     else
                     {
-                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);
-                        TRACE_LOGGER.error("Creating requestresponselink to '{}' failed.", requestResponseLinkPath, cause);
+                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);                        
                         this.requestResponseLinkCreationFuture.completeExceptionally(cause);
                         // Set it to null so next call will retry rr link creation
                         synchronized (this.requestResonseLinkCreationLock)
@@ -888,9 +884,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		}
 		
 		this.cancelSASTokenRenewTimer();
-		
-		return this.linkClose.thenCompose((v) -> {
-			return this.requestResponseLink == null ? CompletableFuture.completedFuture(null) : this.requestResponseLink.closeAsync();});
+		this.underlyingFactory.releaseRequestResponseLink(this.sendPath);
+		return this.linkClose;
 	}
 	
 	private static class WeightedDeliveryTag

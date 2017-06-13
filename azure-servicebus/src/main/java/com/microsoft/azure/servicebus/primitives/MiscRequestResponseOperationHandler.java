@@ -78,7 +78,8 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	protected CompletableFuture<Void> onClose() {
 	    TRACE_LOGGER.trace("Closing MiscRequestResponseOperationHandler");
 	    this.cancelSASTokenRenewTimer();
-		return this.requestResponseLink == null ? CompletableFuture.completedFuture(null) : this.requestResponseLink.closeAsync();
+	    this.underlyingFactory.releaseRequestResponseLink(this.entityPath);
+	    return CompletableFuture.completedFuture(null);
 	}
 	
 	private CompletableFuture<Void> sendSASTokenAndSetRenewTimer()
@@ -108,21 +109,17 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 	    synchronized (this.requestResonseLinkCreationLock) {
             if(this.requestResponseLinkCreationFuture == null)
             {                
-                this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.entityPath);
-                TRACE_LOGGER.debug("Creating requestresponselink to '{}'", requestResponseLinkPath);
-                RequestResponseLink.createAsync(this.underlyingFactory, this.getClientId() + "-RequestResponse", requestResponseLinkPath).handleAsync((rrlink, ex) ->
+                this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();                
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.entityPath).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
-                    {
-                        TRACE_LOGGER.info("Created requestresponselink to '{}'", requestResponseLinkPath);
+                    {                        
                         this.requestResponseLink = rrlink;
                         this.requestResponseLinkCreationFuture.complete(null);
                     }
                     else
                     {
-                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);
-                        TRACE_LOGGER.error("Creating requestresponselink to '{}' failed.", requestResponseLinkPath, cause);
+                        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);                        
                         this.requestResponseLinkCreationFuture.completeExceptionally(cause);
                         // Set it to null so next call will retry rr link creation
                         synchronized (this.requestResonseLinkCreationLock)
