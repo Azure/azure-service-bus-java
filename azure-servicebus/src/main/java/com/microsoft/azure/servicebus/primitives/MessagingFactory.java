@@ -209,7 +209,11 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 	@Override
 	public void onConnectionError(ErrorCondition error)
 	{
-	    TRACE_LOGGER.error("Connection error. '{}'", error);
+	    if(error != null && error.getCondition() != null)
+	    {
+	        TRACE_LOGGER.error("Connection error. '{}'", error);
+	    }
+	    
 		if (!this.factoryOpenFuture.isDone())
 		{		    
 		    AsyncUtil.completeFutureExceptionally(this.factoryOpenFuture, ExceptionUtil.toException(error));

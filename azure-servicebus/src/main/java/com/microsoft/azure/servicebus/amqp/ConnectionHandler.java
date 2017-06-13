@@ -42,7 +42,7 @@ public final class ConnectionHandler extends BaseHandler
 	{
 		final Connection connection = event.getConnection();
 		final String hostName = event.getReactor().getConnectionAddress(connection);
-		TRACE_LOGGER.debug("onConnectionInit: hostname:{}" + hostName);
+		TRACE_LOGGER.debug("onConnectionInit: hostname:{}", hostName);
 		connection.setHostname(hostName);
 		connection.setContainer(StringUtil.getShortRandomString());
 		
@@ -58,7 +58,7 @@ public final class ConnectionHandler extends BaseHandler
 	@Override
 	public void onConnectionBound(Event event)
 	{
-	    TRACE_LOGGER.debug("onConnectionBound: hostname:{}" + event.getConnection().getHostname());
+	    TRACE_LOGGER.debug("onConnectionBound: hostname:{}", event.getConnection().getHostname());
 		Transport transport = event.getTransport();
 
 		SslDomain domain = makeDomain(SslDomain.Mode.CLIENT);
@@ -71,7 +71,7 @@ public final class ConnectionHandler extends BaseHandler
 	@Override
 	public void onConnectionUnbound(Event event)
 	{
-		TRACE_LOGGER.debug("Connection.onConnectionUnbound: hostname:{}" + event.getConnection().getHostname());
+		TRACE_LOGGER.debug("Connection.onConnectionUnbound: hostname:{}", event.getConnection().getHostname());
 	}
 
 	@Override

@@ -387,11 +387,10 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 
 	@Override
 	public void onClose(ErrorCondition condition)
-	{
+	{	    
 		Exception completionException = condition != null ? ExceptionUtil.toException(condition) 
 				: new ServiceBusException(ClientConstants.DEFAULT_IS_TRANSIENT,
-						"The entity has been closed due to transient failures (underlying link closed), please retry the operation.");
-		TRACE_LOGGER.error("Send link to '{}' closed", completionException);
+						"The entity has been closed due to transient failures (underlying link closed), please retry the operation.");		
 		this.onError(completionException);
 	}
 

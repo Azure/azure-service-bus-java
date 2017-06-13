@@ -257,7 +257,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                         synchronized (this.requestResonseLinkCreationLock)
                         {
                             this.requestResponseLinkCreationFuture = null;
-                        }                        
+                        }
                     }
                     return null;
                 });

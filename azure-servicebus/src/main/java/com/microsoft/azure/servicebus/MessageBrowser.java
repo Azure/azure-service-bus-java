@@ -81,7 +81,7 @@ final class MessageBrowser implements IMessageBrowser
 		if(this.isReceiveSideBrowser)
 		{
 			String sessionId = this.messageReceiver.isSessionReceiver()? this.messageReceiver.getInternalReceiver().getSessionId() : null;
-			TRACE_LOGGER.debug("Browsing '{}' messages from entity '{}' in sessionId '{}' from sequence number '{}', ", messageCount, this.messageSender.getEntityPath(), sessionId, fromSequenceNumber);
+			TRACE_LOGGER.debug("Browsing '{}' messages from entity '{}' in sessionId '{}' from sequence number '{}'", messageCount, this.messageReceiver.getEntityPath(), sessionId, fromSequenceNumber);
 			peekFuture = this.messageReceiver.getInternalReceiver().peekMessagesAsync(fromSequenceNumber, messageCount, sessionId);
 		}
 		else

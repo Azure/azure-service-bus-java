@@ -548,7 +548,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 			}
 			
 			Duration buffer = remainingTime.dividedBy(2).compareTo(MAXIMUM_RENEW_LOCK_BUFFER) > 0 ? MAXIMUM_RENEW_LOCK_BUFFER : remainingTime.dividedBy(2);
-			TRACE_LOGGER.debug("Lock is valid for '{}'. It will be renewed '{}' before it expires.");
+			TRACE_LOGGER.debug("Lock is valid for '{}'. It will be renewed '{}' before it expires.", remainingTime, buffer);
 			return remainingTime.minus(buffer);
 		}
 	}

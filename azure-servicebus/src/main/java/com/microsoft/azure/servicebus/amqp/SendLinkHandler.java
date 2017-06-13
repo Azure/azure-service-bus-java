@@ -61,7 +61,7 @@ public class SendLinkHandler extends BaseLinkHandler
 		{
 			Sender sender = (Sender) delivery.getLink();			
 			
-			TRACE_LOGGER.debug("onDelivery: linkName:{}, unsettled:{}, credit:{}, deliveryState:{}, delivery.isBuffered:{}, delivery.id",
+			TRACE_LOGGER.debug("onDelivery: linkName:{}, unsettled:{}, credit:{}, deliveryState:{}, delivery.isBuffered:{}, delivery.tag:{}",
 			        sender.getName(), sender.getUnsettled(), sender.getRemoteCredit(), delivery.getRemoteState(), delivery.isBuffered(), delivery.getTag());
 			
 			msgSender.onSendComplete(delivery);
