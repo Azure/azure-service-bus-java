@@ -90,6 +90,7 @@ public final class ClientConstants
     public static final String REQUEST_RESPONSE_GET_MESSAGE_SESSIONS_OPERATION = AmqpConstants.VENDOR + ":get-message-sessions";
     public static final String REQUEST_RESPONSE_ADD_RULE_OPERATION = AmqpConstants.VENDOR + ":add-rule";
     public static final String REQUEST_RESPONSE_REMOVE_RULE_OPERATION = AmqpConstants.VENDOR + ":remove-rule";
+    public static final String REQUEST_RESPONSE_GET_RULES_OPERATION = AmqpConstants.VENDOR + ":enumerate-rules";
     public static final String REQUEST_RESPONSE_PUT_TOKEN_OPERATION = "put-token";
     public static final String REQUEST_RESPONSE_PUT_TOKEN_TYPE = "type";
     public static final String REQUEST_RESPONSE_PUT_TOKEN_AUDIENCE = "name";    
@@ -124,6 +125,7 @@ public final class ClientConstants
     public static final String REQUEST_RESPONSE_SKIP = "skip";
     public static final String REQUEST_RESPONSE_TOP = "top";
     public static final String REQUEST_RESPONSE_SESSIONIDS = "sessions-ids";
+    public static final String REQUEST_RESPONSE_RULES = "rules";
     public static final String REQUEST_RESPONSE_RULENAME = "rule-name";
     public static final String REQUEST_RESPONSE_RULEDESCRIPTION = "rule-description";
     public static final String REQUEST_RESPONSE_SQLFILTER = "sql-filter";

@@ -3,6 +3,7 @@ package com.microsoft.azure.servicebus;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -108,6 +109,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	@Override
 	public CompletableFuture<Void> removeRuleAsync(String ruleName) {
 		return this.miscRequestResponseHandler.removeRuleAsync(ruleName);
+	}
+
+	@Override
+	public List<RuleDescription> getRules() throws ServiceBusException, InterruptedException {
+		return Utils.completeFuture(this.getRulesAsync());
+	}
+
+	@Override
+	public CompletableFuture<List<RuleDescription>> getRulesAsync()
+	{
+		int skip = 0, top = Integer.MAX_VALUE;
+		return this.miscRequestResponseHandler.getRulesAsync(skip, top);
 	}
 
 	@Override

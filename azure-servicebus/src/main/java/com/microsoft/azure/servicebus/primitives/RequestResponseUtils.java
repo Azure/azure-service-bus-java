@@ -4,16 +4,12 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.microsoft.azure.servicebus.rules.*;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.message.Message;
-
-import com.microsoft.azure.servicebus.rules.CorrelationFilter;
-import com.microsoft.azure.servicebus.rules.RuleDescription;
-import com.microsoft.azure.servicebus.rules.SqlFilter;
-import com.microsoft.azure.servicebus.rules.SqlRuleAction;
 
 public class RequestResponseUtils {
 	public static Message createRequestMessageFromPropertyBag(String operation, Map propertyBag, Duration timeout)
@@ -131,5 +127,43 @@ public class RequestResponseUtils {
 		}
 		
 		return descriptionMap;
+	}
+
+	public static RuleDescription decodeRuleDescriptionMap(Map<String, Object> ruleDescriptionMap)
+	{
+		RuleDescription ruleDescription = new RuleDescription();
+		Map sqlFilterMap = (Map)ruleDescriptionMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_SQLFILTER, null);
+		if (sqlFilterMap != null)
+		{
+			ruleDescription.setFilter(new SqlFilter((String)sqlFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_EXPRESSION, "")));
+		}
+		else
+		{
+			Map correlationFilterMap = (Map)ruleDescriptionMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_CORRELATION_FILTER, null);
+			if (correlationFilterMap != null)
+			{
+				CorrelationFilter correlationFilter = new CorrelationFilter();
+				correlationFilter.setCorrelationId((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_CORRELATION_ID, null));
+				correlationFilter.setMessageId((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_MESSAGE_ID, null));
+				correlationFilter.setTo((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_TO, null));
+				correlationFilter.setReplyTo((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_REPLY_TO, null));
+				correlationFilter.setLabel((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_LABEL, null));
+				correlationFilter.setSessionId((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_SESSION_ID, null));
+				correlationFilter.setReplyToSessionId((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_REPLY_TO_SESSION_ID, null));
+				correlationFilter.setContentType((String)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_CONTENT_TYPE, null));
+				correlationFilter.setProperties((Map<String, Object>)correlationFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_CORRELATION_FILTER_PROPERTIES, null));
+
+				ruleDescription.setFilter(correlationFilter);
+			}
+		}
+
+		Map sqlRuleActionMap = (Map)ruleDescriptionMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_SQLRULEACTION, null);
+		if (sqlRuleActionMap != null)
+		{
+			ruleDescription.setAction(new SqlRuleAction((String)sqlFilterMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_EXPRESSION, "")));
+		}
+
+		ruleDescription.setName((String)ruleDescriptionMap.getOrDefault(ClientConstants.REQUEST_RESPONSE_RULENAME, ""));
+		return ruleDescription;
 	}
 }
