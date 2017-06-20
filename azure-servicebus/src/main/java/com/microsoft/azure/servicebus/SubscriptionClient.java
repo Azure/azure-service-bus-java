@@ -3,7 +3,6 @@ package com.microsoft.azure.servicebus;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -30,7 +29,9 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	private MessageAndSessionPump messageAndSessionPump;
 	private SessionBrowser sessionBrowser;
 	private MiscRequestResponseOperationHandler miscRequestResponseHandler;
-	
+
+	public static final String DEFAULT_RULE_NAME = "$Default";
+
 	private SubscriptionClient(ReceiveMode receiveMode)
 	{
 		super(StringUtil.getShortRandomString(), null);		
@@ -112,13 +113,15 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
-	public List<RuleDescription> getRules() throws ServiceBusException, InterruptedException {
+	public Collection<RuleDescription> getRules() throws ServiceBusException, InterruptedException {
 		return Utils.completeFuture(this.getRulesAsync());
 	}
 
 	@Override
-	public CompletableFuture<List<RuleDescription>> getRulesAsync()
+	public CompletableFuture<Collection<RuleDescription>> getRulesAsync()
 	{
+		// Skip and Top can be used to implement pagination.
+		// In this case, we are trying to fetch all the rules associated with the subscription.
 		int skip = 0, top = Integer.MAX_VALUE;
 		return this.miscRequestResponseHandler.getRulesAsync(skip, top);
 	}

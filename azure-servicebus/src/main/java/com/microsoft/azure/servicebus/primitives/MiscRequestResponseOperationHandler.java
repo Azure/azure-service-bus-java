@@ -232,7 +232,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 		});		
 	}
 
-	public CompletableFuture<List<RuleDescription>> getRulesAsync(int skip, int top)
+	public CompletableFuture<Collection<RuleDescription>> getRulesAsync(int skip, int top)
 	{
 		TRACE_LOGGER.debug("Fetching rules for entity '{}'", this.entityPath);
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
@@ -244,12 +244,11 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 					ClientConstants.REQUEST_RESPONSE_GET_RULES_OPERATION,
 					requestBodyMap,
 					Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()));
-			CompletableFuture<Message> responseFuture =
-					this.requestResponseLink.requestAysnc(requestMessage, this.underlyingFactory.getOperationTimeout());
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, this.underlyingFactory.getOperationTimeout());
 			return responseFuture.thenComposeAsync((responseMessage) -> {
-				CompletableFuture<List<RuleDescription>> returningFuture = new CompletableFuture<>();
+				CompletableFuture<Collection<RuleDescription>> returningFuture = new CompletableFuture<>();
 
-				List<RuleDescription> rules = new ArrayList<RuleDescription>();
+				Collection<RuleDescription> rules = new ArrayList<RuleDescription>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
 				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
 				{
@@ -260,7 +259,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 						rules.add(RequestResponseUtils.decodeRuleDescriptionMap(ruleMap));
 					}
 
-					TRACE_LOGGER.debug("Fetched rules from entity '{}'", this.entityPath);
+					TRACE_LOGGER.debug("Fetched {} rules from entity '{}'", rules.size(), this.entityPath);
 					returningFuture.complete(rules);
 				}
 				else if(statusCode == ClientConstants.REQUEST_RESPONSE_NOCONTENT_STATUS_CODE)

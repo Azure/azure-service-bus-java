@@ -1,7 +1,7 @@
 package com.microsoft.azure.servicebus;
 
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.After;
@@ -79,7 +79,9 @@ public class SubscriptionClientTests {
 	public void testGetAddRemoveRules() throws InterruptedException, ServiceBusException
 	{
 		this.createSubscriptionClient();
-		
+
+		this.subscriptionClient.removeRule(SubscriptionClient.DEFAULT_RULE_NAME);
+
 		// Simple rule
 		RuleDescription trueFilterRule = new RuleDescription("customRule1", TrueFilter.DEFAULT);
 		this.subscriptionClient.addRule(trueFilterRule);
@@ -92,10 +94,10 @@ public class SubscriptionClientTests {
 		{
 			// Expected
 		}
-		List<RuleDescription> rules = this.subscriptionClient.getRules();
-		Assert.assertEquals("More than one rules are present", 1, rules.size());
-		Assert.assertEquals("Returned rule name doesn't match", trueFilterRule.getName(), rules.get(0).getName());
-		Assert.assertTrue(rules.get(0).getFilter() instanceof TrueFilter);
+		RuleDescription[] rules = (RuleDescription[])this.subscriptionClient.getRules().toArray();
+		Assert.assertEquals("More than one rules are present", 1, rules.length);
+		Assert.assertEquals("Returned rule name doesn't match", trueFilterRule.getName(), rules[0].getName());
+		Assert.assertTrue(rules[0].getFilter() instanceof TrueFilter);
 		this.subscriptionClient.removeRule(trueFilterRule.getName());
 		
 		// Custom SQL Filter rule
@@ -104,9 +106,9 @@ public class SubscriptionClientTests {
 		RuleDescription sqlRule = new RuleDescription("customRule2", sqlFilter);
 		sqlRule.setAction(action);
 		this.subscriptionClient.addRule(sqlRule);
-		rules = this.subscriptionClient.getRules();
-		Assert.assertEquals("More than one rules are present", 1, rules.size());
-		RuleDescription returnedRule = rules.get(0);
+		rules = (RuleDescription[]) this.subscriptionClient.getRules().toArray();
+		Assert.assertEquals("More than one rules are present", 1, rules.length);
+		RuleDescription returnedRule = rules[0];
 		Assert.assertEquals("Returned rule name doesn't match", sqlRule.getName(), returnedRule.getName());
 		Assert.assertTrue(returnedRule.getFilter() instanceof SqlFilter);
 		Assert.assertEquals(sqlFilter.getSqlExpression(), ((SqlFilter)returnedRule.getFilter()).getSqlExpression());
@@ -129,9 +131,9 @@ public class SubscriptionClientTests {
 		RuleDescription correlationRule = new RuleDescription("customRule3", correlationFilter);
 		correlationRule.setAction(action);
 		this.subscriptionClient.addRule(correlationRule);
-		rules = this.subscriptionClient.getRules();
-		Assert.assertEquals("More than one rules are present", 1, rules.size());
-		returnedRule = rules.get(0);
+		rules = (RuleDescription[])this.subscriptionClient.getRules().toArray();
+		Assert.assertEquals("More than one rules are present", 1, rules.length);
+		returnedRule = rules[0];
 		Assert.assertEquals("Returned rule name doesn't match", correlationRule.getName(), returnedRule.getName());
 		Assert.assertTrue(returnedRule.getAction() instanceof SqlRuleAction);
 		Assert.assertEquals(action.getSqlExpression(), ((SqlRuleAction)returnedRule.getAction()).getSqlExpression());
@@ -149,6 +151,36 @@ public class SubscriptionClientTests {
 			Assert.assertEquals(entry.getValue(), returnedFilter.getProperties().get(entry.getKey()));
 		}
 		this.subscriptionClient.removeRule(correlationRule.getName());
+		this.subscriptionClient.addRule(SubscriptionClient.DEFAULT_RULE_NAME, TrueFilter.DEFAULT);
+	}
+
+	@Test
+	public void testGetRulesForMultipleRules() throws InterruptedException, ServiceBusException
+	{
+		this.createSubscriptionClient();
+
+		RuleDescription trueFilterRule = new RuleDescription("getRules1", TrueFilter.DEFAULT);
+		this.subscriptionClient.addRule(trueFilterRule);
+
+		RuleDescription trueFilterRule2 = new RuleDescription("getRules2", TrueFilter.DEFAULT);
+		this.subscriptionClient.addRule(trueFilterRule2);
+
+		SqlFilter sqlFilter = new SqlFilter("1=1");
+		RuleDescription sqlRule = new RuleDescription("getRules3", sqlFilter);
+		this.subscriptionClient.addRule(sqlRule);
+
+		CorrelationFilter correlationFilter = new CorrelationFilter();
+		correlationFilter.setCorrelationId("TestCorrelationId");
+		RuleDescription correlationRule = new RuleDescription("getRules4", correlationFilter);
+		this.subscriptionClient.addRule(correlationRule);
+
+		RuleDescription[] rules = (RuleDescription[])this.subscriptionClient.getRules().toArray();
+		Assert.assertEquals(5, rules.length);
+
+		subscriptionClient.removeRule(trueFilterRule.getName());
+		subscriptionClient.removeRule(trueFilterRule2.getName());
+		subscriptionClient.removeRule(sqlRule.getName());
+		subscriptionClient.removeRule(correlationRule.getName());
 	}
 	
 	@Test
