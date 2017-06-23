@@ -96,7 +96,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection, I
 				super.onReactorInit(e);
 
 				final Reactor r = e.getReactor();
-				TRACE_LOGGER.info("Creatina connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
+				TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
 				connection = r.connectionToHost(hostName, ClientConstants.AMQPS_PORT, connectionHandler);
 			}
 		};
