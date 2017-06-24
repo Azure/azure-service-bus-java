@@ -191,7 +191,7 @@ class RequestResponseLink extends ClientEntity{
 	
 	private void recreateInternalLinks() throws InterruptedException, ExecutionException
 	{
-	    TRACE_LOGGER.info("RequestResponseLink - recreating internal send and receive links to {}" + this.linkPath);
+	    TRACE_LOGGER.info("RequestResponseLink - recreating internal send and receive links to {}", this.linkPath);
 		try
 		{
 			this.amqpSender.close();
