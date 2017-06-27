@@ -32,6 +32,7 @@ import java.util.regex.*;
  * <li> SharedAccessKeyName - the key name to the corresponding shared access policy rule for the namespace, or entity.
  * <li> SharedAccessKey - the key for the corresponding shared access policy rule of the namespace or entity.
  * </ul>
+ * @since 1.0
  */
 public class ConnectionStringBuilder
 {	

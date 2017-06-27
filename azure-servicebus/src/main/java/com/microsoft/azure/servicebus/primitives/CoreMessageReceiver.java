@@ -56,7 +56,7 @@ import com.microsoft.azure.servicebus.amqp.IAmqpReceiver;
 import com.microsoft.azure.servicebus.amqp.ReceiveLinkHandler;
 import com.microsoft.azure.servicebus.amqp.SessionHandler;
 
-/**
+/*
  * Common Receiver that abstracts all amqp related details
  * translates event-driven reactor model into async receive Api
  */

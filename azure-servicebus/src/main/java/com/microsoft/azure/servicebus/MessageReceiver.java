@@ -526,7 +526,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 	
 	private static SettleModePair getSettleModePairForRecevieMode(ReceiveMode receiveMode)
 	{
-		if(receiveMode == ReceiveMode.ReceiveAndDelete)
+		if(receiveMode == ReceiveMode.RECEIVEANDDELETE)
 		{
 			return new SettleModePair(SenderSettleMode.SETTLED, ReceiverSettleMode.FIRST);
 		}
@@ -565,7 +565,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 	
 	private void ensurePeekLockReceiveMode()
 	{
-		if(this.receiveMode != ReceiveMode.PeekLock)
+		if(this.receiveMode != ReceiveMode.PEEKLOCK)
 		{
 			throw new UnsupportedOperationException("Operations Complete/Abandon/DeadLetter/Defer cannot be called on a receiver opened in ReceiveAndDelete mode.");
 		}

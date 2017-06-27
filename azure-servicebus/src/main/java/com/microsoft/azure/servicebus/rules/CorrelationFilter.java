@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * Represents a correlation filter expression. A correlation filter is an efficient shortcut for declarations of filters that deal only with correlation equality of message properties.
- * A correlation filter can be created to match one or more of standard or custom properties of a message. In the service correlation filters are implemented as hashtable lookups. 
+ * A correlation filter can be created to match one or more of standard or custom properties of a message. In the service, correlation filters are implemented as hashtable lookups. 
  * So they are much faster at run time than other types of filters.
  * @since 1.0
  *
