@@ -10,7 +10,7 @@ public class SqlFilter extends Filter {
 	private String sqlExpression;
 	
 	/**
-	 * Creates an instance of <code>SqlFilter<code> with the given match expression.
+	 * Creates an instance of <code>SqlFilter</code> with the given match expression.
 	 * @param sqlExpression SQL language-based filter expression
 	 */
 	public SqlFilter(String sqlExpression)

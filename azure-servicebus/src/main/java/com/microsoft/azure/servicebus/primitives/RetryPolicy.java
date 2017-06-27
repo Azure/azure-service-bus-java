@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Represents an abstraction of a policy for retrying messaging operations when an exception is encountered. Some exceptions encountered by a sender or receiver can be transient like ServerBusy and the operation
  * will succeed if retried. Clients can specify a retry policy using {@link ConnectionStringBuilder} which guides senders and receivers to automatically retry the failed operation before throwing the exception to the client application.  
- * Users should not implement this class, and instead should use one of the provided implementations {@link RetryExponential} or {@link NO_RETRY}.
+ * Users should not implement this class, instead should use one of the provided implementations through {@link #getDefault} or {@link #getNoRetry}.
  * @since 1.0
  *
  */
@@ -44,7 +44,7 @@ public abstract class RetryPolicy
 
 	/**
 	 * Resets the number of retry attempts made by a client. This method is called by the client when retried operation succeeds. 
-	 * @param clientId
+	 * @param clientId id of the client that just retried a failed operation and succeeded.
 	 */
 	public void resetRetryCount(String clientId)
 	{
@@ -58,7 +58,7 @@ public abstract class RetryPolicy
 	/**
 	 * Determines if an exception is retry-able or not. Only transient exceptions should be retried. 
 	 * @param exception exception encountered by an operation, to be determined if it is retry-able.
-	 * @return
+	 * @return true if the exception is retry-able (like ServerBusy or other transient exception), else returns false
 	 */
 	public static boolean isRetryableException(Exception exception)
 	{

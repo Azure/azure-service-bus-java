@@ -10,7 +10,7 @@ public class SqlRuleAction extends RuleAction
 	private String sqlExpression;
 	
 	/**
-	 * Creates an instance of <code>SqlRuleAction<code> with the given transformation expression.
+	 * Creates an instance of <code>SqlRuleAction</code> with the given transformation expression.
 	 * @param sqlExpression SQL language-based transformation expression
 	 */
 	public SqlRuleAction(String sqlExpression)
