@@ -110,7 +110,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 			
 			return factoryFuture.thenComposeAsync((v) ->
 			{
-				CompletableFuture<Void> acceptReceiverFuture;
+				CompletableFuture<CoreMessageReceiver> acceptReceiverFuture;
 				if(this.internalReceiver == null)
 				{
 				    
@@ -124,25 +124,36 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 					{
 					    TRACE_LOGGER.info("Creating MessageReceiver to entity '{}', ReceiveMode '{}'", this.entityPath, this.receiveMode);
 						receiverFuture = CoreMessageReceiver.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath, this.messagePrefetchCount, getSettleModePairForRecevieMode(this.receiveMode));
-					}
+					}					
 					
-					acceptReceiverFuture = receiverFuture.thenAcceptAsync((r) -> 
+					acceptReceiverFuture = receiverFuture.whenCompleteAsync((r, coreReceiverCreationEx) -> 
 					{
-						this.internalReceiver = r;
-						if(MessageReceiver.this.isSessionReceiver())
-						{
-						    TRACE_LOGGER.info("Created SessionReceiver to entity '{}', requestedSessionId '{}', browsable session '{}', acceptedSessionId '{}'", this.entityPath, this.getRequestedSessionId(), this.isBrowsableSession(), this.internalReceiver.getSessionId());
-						}
-						else
-						{
-						    TRACE_LOGGER.info("Created MessageReceiver to entity '{}'", this.entityPath);
-						}
+					    if(coreReceiverCreationEx == null)
+					    {
+					        this.internalReceiver = r;
+	                        if(MessageReceiver.this.isSessionReceiver())
+	                        {
+	                            TRACE_LOGGER.info("Created SessionReceiver to entity '{}', requestedSessionId '{}', browsable session '{}', acceptedSessionId '{}'", this.entityPath, this.getRequestedSessionId(), this.isBrowsableSession(), this.internalReceiver.getSessionId());
+	                        }
+	                        else
+	                        {
+	                            TRACE_LOGGER.info("Created MessageReceiver to entity '{}'", this.entityPath);
+	                        }
+					    }
+					    else
+					    {
+					        if(this.ownsMessagingFactory)
+					        {
+					            //Close factory
+					            this.messagingFactory.closeAsync();
+					        }
+					    }
 					});
 				}
 				else
 				{
 					acceptReceiverFuture = CompletableFuture.completedFuture(null);
-				}				
+				}
 				
 				return acceptReceiverFuture.thenRunAsync(() -> 
 				{					
