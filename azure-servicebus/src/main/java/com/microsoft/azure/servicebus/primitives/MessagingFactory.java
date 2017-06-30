@@ -138,7 +138,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
-		    TRACE_LOGGER.info("Creatina connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
+		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
 			this.connection = this.getReactor().connectionToHost(this.hostName, ClientConstants.AMQPS_PORT, this.connectionHandler);
 		}
 
@@ -317,25 +317,6 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	        }
 	        
 	        TRACE_LOGGER.debug("Closed all links on the connection. Number of links '{}'", links.length);
-	        	        
-	        if(this.cbsLink != null)
-	        {
-	            TRACE_LOGGER.debug("Closing CBS link on the connection");
-	            try {
-	                this.cbsLink.close();
-	                TRACE_LOGGER.debug("Closed CBS on the connection");
-	            } catch (ServiceBusException e) {
-	                TRACE_LOGGER.warn("Closing CBS link on the connection failed.", e);
-	            }	            
-	        }
-	        
-	        
-	        if(this.cbsLinkCreationFuture != null && !this.cbsLinkCreationFuture.isDone())
-	        {
-	            AsyncUtil.completeFutureExceptionally(this.cbsLinkCreationFuture, new Exception("Connection closed."));
-	        }
-	        
-	        this.cbsLinkCreationFuture = new CompletableFuture<Void>();
 
 	        if (currentConnection.getLocalState() != EndpointState.CLOSED && currentConnection.getRemoteState() != EndpointState.CLOSED)
 	        {
@@ -382,7 +363,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		    cbsLinkCloseFuture.thenRun(() -> this.managementLinksCache.freeAsync()).thenRun(() -> {
 		        if(this.cbsLinkCreationFuture != null && !this.cbsLinkCreationFuture.isDone())
 	            {
-	                AsyncUtil.completeFutureExceptionally(this.cbsLinkCreationFuture, new Exception("Connection closed."));
+	                this.cbsLinkCreationFuture.completeExceptionally(new Exception("Connection closed."));
 	            }
 		        
 		        if (this.connection != null && this.connection.getRemoteState() != EndpointState.CLOSED)

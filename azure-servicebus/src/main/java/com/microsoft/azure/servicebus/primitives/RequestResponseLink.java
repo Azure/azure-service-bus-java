@@ -214,6 +214,16 @@ class RequestResponseLink extends ClientEntity{
 		this.amqpSender.openFuture.thenComposeAsync((v) -> this.amqpReceiver.openFuture).get();
 	}
 	
+	private void handleConnectionErrorInReceiver(Exception exception)
+	{
+	    // Ignore connection errors coming from internal receiver as internal sender also receives the same connection error.
+	}
+	
+	private void handleConnectionErrorInSender(Exception exception)
+    {
+        this.handleConnectionError(exception);
+    }
+	
 	private void handleConnectionError(Exception exception)
 	{
 	    TRACE_LOGGER.error("Connection error in request response link", exception);
@@ -485,7 +495,7 @@ class RequestResponseLink extends ClientEntity{
 					}
 					else
 					{
-						this.parent.handleConnectionError(exception);
+						this.parent.handleConnectionErrorInReceiver(exception);
 					}
 				}
 			}						
@@ -650,7 +660,7 @@ class RequestResponseLink extends ClientEntity{
 					}
 					else
 					{
-						this.parent.handleConnectionError(exception);
+						this.parent.handleConnectionErrorInSender(exception);
 					}
 				}
 			}
