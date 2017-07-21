@@ -82,6 +82,9 @@ public class SubscriptionClientTests {
 
 		this.subscriptionClient.removeRule(SubscriptionClient.DEFAULT_RULE_NAME);
 
+		RuleDescription[] rules = this.subscriptionClient.getRules().toArray(new RuleDescription[0]);
+		Assert.assertEquals(0, rules.length);
+
 		// Simple rule
 		RuleDescription trueFilterRule = new RuleDescription("customRule1", TrueFilter.DEFAULT);
 		this.subscriptionClient.addRule(trueFilterRule);
@@ -94,10 +97,10 @@ public class SubscriptionClientTests {
 		{
 			// Expected
 		}
-		RuleDescription[] rules = (RuleDescription[])this.subscriptionClient.getRules().toArray();
+		rules = this.subscriptionClient.getRules().toArray(new RuleDescription[0]);
 		Assert.assertEquals("More than one rules are present", 1, rules.length);
 		Assert.assertEquals("Returned rule name doesn't match", trueFilterRule.getName(), rules[0].getName());
-		Assert.assertTrue(rules[0].getFilter() instanceof TrueFilter);
+		Assert.assertTrue(rules[0].getFilter() instanceof SqlFilter);
 		this.subscriptionClient.removeRule(trueFilterRule.getName());
 		
 		// Custom SQL Filter rule
@@ -106,7 +109,7 @@ public class SubscriptionClientTests {
 		RuleDescription sqlRule = new RuleDescription("customRule2", sqlFilter);
 		sqlRule.setAction(action);
 		this.subscriptionClient.addRule(sqlRule);
-		rules = (RuleDescription[]) this.subscriptionClient.getRules().toArray();
+		rules = this.subscriptionClient.getRules().toArray(new RuleDescription[0]);
 		Assert.assertEquals("More than one rules are present", 1, rules.length);
 		RuleDescription returnedRule = rules[0];
 		Assert.assertEquals("Returned rule name doesn't match", sqlRule.getName(), returnedRule.getName());
@@ -131,7 +134,7 @@ public class SubscriptionClientTests {
 		RuleDescription correlationRule = new RuleDescription("customRule3", correlationFilter);
 		correlationRule.setAction(action);
 		this.subscriptionClient.addRule(correlationRule);
-		rules = (RuleDescription[])this.subscriptionClient.getRules().toArray();
+		rules = this.subscriptionClient.getRules().toArray(new RuleDescription[0]);
 		Assert.assertEquals("More than one rules are present", 1, rules.length);
 		returnedRule = rules[0];
 		Assert.assertEquals("Returned rule name doesn't match", correlationRule.getName(), returnedRule.getName());
@@ -174,8 +177,8 @@ public class SubscriptionClientTests {
 		RuleDescription correlationRule = new RuleDescription("getRules4", correlationFilter);
 		this.subscriptionClient.addRule(correlationRule);
 
-		RuleDescription[] rules = (RuleDescription[])this.subscriptionClient.getRules().toArray();
-		Assert.assertEquals(5, rules.length);
+		Collection<RuleDescription> rules = this.subscriptionClient.getRules();
+		Assert.assertEquals(5, rules.size());
 
 		subscriptionClient.removeRule(trueFilterRule.getName());
 		subscriptionClient.removeRule(trueFilterRule2.getName());

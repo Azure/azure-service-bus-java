@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 
+import org.apache.qpid.proton.amqp.DescribedType;
 import org.apache.qpid.proton.message.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -253,10 +254,11 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 				if(statusCode == ClientConstants.REQUEST_RESPONSE_OK_STATUS_CODE)
 				{
 					Map responseBodyMap = RequestResponseUtils.getResponseBody(responseMessage);
-					Map[] rulesMap = (Map[])responseBodyMap.get(ClientConstants.REQUEST_RESPONSE_RULES);
+					ArrayList<Map> rulesMap = (ArrayList<Map>)responseBodyMap.get(ClientConstants.REQUEST_RESPONSE_RULES);
 					for (Map ruleMap : rulesMap)
 					{
-						rules.add(RequestResponseUtils.decodeRuleDescriptionMap(ruleMap));
+						DescribedType ruleDescription = (DescribedType) ruleMap.getOrDefault("rule-description", null);
+						rules.add(RequestResponseUtils.decodeRuleDescriptionMap(ruleDescription));
 					}
 
 					TRACE_LOGGER.debug("Fetched {} rules from entity '{}'", rules.size(), this.entityPath);
