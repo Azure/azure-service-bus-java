@@ -132,7 +132,7 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 
 	// No op now
 	@Override
-	CompletableFuture<Void> initializeAsync() throws Exception {
+	CompletableFuture<Void> initializeAsync() {
 		return CompletableFuture.completedFuture(null);
 	}
 
