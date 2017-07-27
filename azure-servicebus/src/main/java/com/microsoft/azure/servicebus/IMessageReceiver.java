@@ -62,7 +62,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser{
     
     Collection<IMessage> receiveBatch(int maxMessageCount, Duration serverWaitTime) throws InterruptedException, ServiceBusException;
     
-    Collection<IMessage> receiveDeferredMessages(Collection<Long> sequenceNumbers) throws InterruptedException, ServiceBusException;
+    Collection<IMessage> receiveDeferredMessageBatch(Collection<Long> sequenceNumbers) throws InterruptedException, ServiceBusException;
 
     CompletableFuture<IMessage> receiveAsync();
 
@@ -74,7 +74,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser{
 
     CompletableFuture<Collection<IMessage>> receiveBatchAsync(int maxMessageCount, Duration serverWaitTime);
 
-    CompletableFuture<Collection<IMessage>> receiveDeferredMessagesAsync(Collection<Long> sequenceNumbers);
+    CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers);
     
     CompletableFuture<Instant> renewMessageLockAsync(IMessage message);
     

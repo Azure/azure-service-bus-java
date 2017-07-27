@@ -389,8 +389,8 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 	}
 
 	@Override
-	public Collection<IMessage> receiveDeferredMessages(Collection<Long> sequenceNumbers) throws ServiceBusException, InterruptedException {
-		return Utils.completeFuture(this.receiveDeferredMessagesAsync(sequenceNumbers));
+	public Collection<IMessage> receiveDeferredMessageBatch(Collection<Long> sequenceNumbers) throws ServiceBusException, InterruptedException {
+		return Utils.completeFuture(this.receiveDeferredMessageBatchAsync(sequenceNumbers));
 	}
 
 	@Override
@@ -449,7 +449,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 	public CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber) {
 		ArrayList<Long> list = new ArrayList<>();
 		list.add(sequenceNumber);
-		return  this.receiveDeferredMessagesAsync(list).thenApplyAsync(c ->
+		return  this.receiveDeferredMessageBatchAsync(list).thenApplyAsync(c ->
 		{	
 			if(c == null)
 				return null;
@@ -461,9 +461,9 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 	}
 
 	@Override
-	public CompletableFuture<Collection<IMessage>> receiveDeferredMessagesAsync(Collection<Long> sequenceNumbers) {
+	public CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers) {
 	    TRACE_LOGGER.debug("Receiving messages by sequence numbers '{}' from entity '{}'", sequenceNumbers, this.entityPath);
-		return this.internalReceiver.receiveDeferredMessagesAsync(sequenceNumbers.toArray(new Long[0])).thenApplyAsync(c ->
+		return this.internalReceiver.receiveDeferredMessageBatchAsync(sequenceNumbers.toArray(new Long[0])).thenApplyAsync(c ->
 		{	
 			if(c == null)
 				return null;

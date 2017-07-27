@@ -1188,7 +1188,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		});					
 	}
 	
-	public CompletableFuture<Collection<MessageWithLockToken>> receiveDeferredMessagesAsync(Long[] sequenceNumbers)
+	public CompletableFuture<Collection<MessageWithLockToken>> receiveDeferredMessageBatchAsync(Long[] sequenceNumbers)
 	{
 	    this.throwIfInUnusableState();
 	    if(TRACE_LOGGER.isDebugEnabled())

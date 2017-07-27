@@ -132,7 +132,7 @@ final class BrowsableMessageSession extends MessageSession
 	}
 	
 	@Override
-	public CompletableFuture<Collection<IMessage>> receiveDeferredMessagesAsync(Collection<Long> sequenceNumbers)
+	public CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers)
 	{
 		throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
 	}
