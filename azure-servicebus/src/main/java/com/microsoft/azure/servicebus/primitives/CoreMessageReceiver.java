@@ -65,6 +65,7 @@ import com.microsoft.azure.servicebus.amqp.SessionHandler;
 public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, IErrorContextProvider
 {
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(CoreMessageReceiver.class);
+	private static final Duration LINK_REOPEN_TIMEOUT = Duration.ofMinutes(5); // service closes link long before this timeout expires
 	
 	private final Object requestResonseLinkCreationLock = new Object();
 	private final List<ReceiveWorkItem> pendingReceives;
@@ -1113,7 +1114,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                                 linkReopenFutureThatCanBeCancelled.completeExceptionally(operationTimedout);
                             }
 	                    }	                    
-	                    , this.underlyingFactory.getOperationTimeout()
+	                    , CoreMessageReceiver.LINK_REOPEN_TIMEOUT
 	                    , TimerType.OneTimeRun);
 	            this.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
 	                if(sendTokenEx != null)

@@ -59,6 +59,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 {
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(CoreMessageSender.class);
 	private static final String SEND_TIMED_OUT = "Send operation timed out";
+	private static final Duration LINK_REOPEN_TIMEOUT = Duration.ofMinutes(5); // service closes link long before this timeout expires
 
 	private final Object requestResonseLinkCreationLock = new Object();
 	private final MessagingFactory underlyingFactory;
@@ -720,7 +721,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                                 linkReopenFutureThatCanBeCancelled.completeExceptionally(operationTimedout);
                             }
                         }                       
-                        , this.underlyingFactory.getOperationTimeout()
+                        , CoreMessageSender.LINK_REOPEN_TIMEOUT
                         , TimerType.OneTimeRun);
                 this.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
                     if(sendTokenEx != null)
