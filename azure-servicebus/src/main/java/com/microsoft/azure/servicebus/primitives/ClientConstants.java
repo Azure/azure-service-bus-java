@@ -4,7 +4,9 @@
  */
 package com.microsoft.azure.servicebus.primitives;
 
+import java.io.IOException;
 import java.time.*;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.qpid.proton.amqp.*;
@@ -17,7 +19,7 @@ public final class ClientConstants
 	
 	public static final String FATAL_MARKER = "FATAL";
 	public final static String PRODUCT_NAME = "MSJavaClient";
-    public final static String CURRENT_JAVACLIENT_VERSION = "0.13.1";
+    public final static String CURRENT_JAVACLIENT_VERSION =  getClientVersion();
     public static final String PLATFORM_INFO = getPlatformInfo();
     
 	public static final int LOCKTOKENSIZE = 16;
@@ -166,7 +168,19 @@ public final class ClientConstants
     static final int DEFAULT_SAS_TOKEN_VALIDITY_IN_SECONDS = 20*60; // 20 minutes
     static final int DEFAULT_SAS_TOKEN_SEND_RETRY_INTERVAL_IN_SECONDS = 5;
     static final String SAS_TOKEN_AUDIENCE_FORMAT = "amqp://%s/%s";
-    
+
+    private static String getClientVersion() {
+        String clientVersion = "";
+        final Properties properties = new Properties();
+        try {
+            properties.load(ClientConstants.class.getResourceAsStream("/client.properties"));
+            clientVersion = properties.getProperty("client.version");
+        } catch (IOException e) {
+        }
+
+        return clientVersion;
+    }
+
     private static String getPlatformInfo() {
         final Package javaRuntimeClassPkg = Runtime.class.getPackage();
         final StringBuilder patformInfo = new StringBuilder();
