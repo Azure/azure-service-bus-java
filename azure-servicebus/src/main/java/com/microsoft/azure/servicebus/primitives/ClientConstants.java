@@ -12,11 +12,15 @@ import java.util.UUID;
 import org.apache.qpid.proton.amqp.*;
 
 import com.microsoft.azure.servicebus.amqp.AmqpConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ClientConstants
 {
 	private ClientConstants() { }
-	
+
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ClientConstants.class);
+
 	public static final String FATAL_MARKER = "FATAL";
 	public final static String PRODUCT_NAME = "MSJavaClient";
     public final static String CURRENT_JAVACLIENT_VERSION =  getClientVersion();
@@ -170,12 +174,14 @@ public final class ClientConstants
     static final String SAS_TOKEN_AUDIENCE_FORMAT = "amqp://%s/%s";
 
     private static String getClientVersion() {
-        String clientVersion = "";
+        String clientVersion;
         final Properties properties = new Properties();
         try {
             properties.load(ClientConstants.class.getResourceAsStream("/client.properties"));
             clientVersion = properties.getProperty("client.version");
         } catch (IOException e) {
+            clientVersion = "NOTFOUND";
+            TRACE_LOGGER.error("Exception while retrieving client version. Exception: ", e.toString());
         }
 
         return clientVersion;
