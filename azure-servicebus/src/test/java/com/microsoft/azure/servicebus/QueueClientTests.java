@@ -34,22 +34,22 @@ public class QueueClientTests {
 	
 	private void createQueueClient() throws InterruptedException, ServiceBusException
 	{
-		this.createQueueClient(ReceiveMode.PeekLock);
+		this.createQueueClient(ReceiveMode.PEEKLOCK);
 	}
 	
 	private void createSessionfulQueueClient() throws InterruptedException, ServiceBusException
 	{
-		this.createSessionfulQueueClient(ReceiveMode.PeekLock);
+		this.createSessionfulQueueClient(ReceiveMode.PEEKLOCK);
 	}
 	
 	private void createQueueClient(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
 	{
-		this.queueClient = new QueueClient(TestUtils.getNonPartitionedQueueConnectionStringBuilder().toString(), receiveMode);
+		this.queueClient = new QueueClient(TestUtils.getNonPartitionedQueueConnectionStringBuilder(), receiveMode);
 	}
 	
 	private void createSessionfulQueueClient(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
 	{
-		this.sessionfulQueueClient = new QueueClient(TestUtils.getNonPartitionedSessionfulQueueConnectionStringBuilder().toString(), receiveMode);
+		this.sessionfulQueueClient = new QueueClient(TestUtils.getNonPartitionedSessionfulQueueConnectionStringBuilder(), receiveMode);
 	}
 	
 	@Test
@@ -62,7 +62,7 @@ public class QueueClientTests {
 	@Test
 	public void testReceiveAndDeleteMessagePump() throws InterruptedException, ServiceBusException
 	{
-		this.createQueueClient(ReceiveMode.ReceiveAndDelete);
+		this.createQueueClient(ReceiveMode.RECEIVEANDDELETE);
 		MessageAndSessionPumpTests.testMessagePumpAutoComplete(this.queueClient, this.queueClient);		
 	}
 	
@@ -118,7 +118,7 @@ public class QueueClientTests {
 	@Test
 	public void testReceiveAndDeleteSessionPump() throws InterruptedException, ServiceBusException
 	{
-		this.createSessionfulQueueClient(ReceiveMode.ReceiveAndDelete);
+		this.createSessionfulQueueClient(ReceiveMode.RECEIVEANDDELETE);
 		MessageAndSessionPumpTests.testSessionPumpAutoCompleteWithOneConcurrentCallPerSession(this.sessionfulQueueClient, this.sessionfulQueueClient);
 	}
 	

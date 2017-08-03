@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
 package com.microsoft.azure.servicebus;
 
 import java.time.Duration;
@@ -20,14 +23,14 @@ import com.microsoft.azure.servicebus.primitives.MessageWithLockToken;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
 import com.microsoft.azure.servicebus.primitives.Util;
 
-public class MessageConverter
+class MessageConverter
 {	
 	public static org.apache.qpid.proton.message.Message convertBrokeredMessageToAmqpMessage(Message brokeredMessage)	
 	{
 		org.apache.qpid.proton.message.Message amqpMessage = Proton.message();
-		if(brokeredMessage.getContent() != null)
+		if(brokeredMessage.getBody() != null)
 		{
-			amqpMessage.setBody(new Data(new Binary(brokeredMessage.getContent())));
+			amqpMessage.setBody(new Data(new Binary(brokeredMessage.getBody())));
 		}
 		
 		if(brokeredMessage.getProperties() != null)
@@ -144,18 +147,15 @@ public class MessageConverter
 					switch(entryName)
 					{
 						case ClientConstants.ENQUEUEDTIMEUTCNAME:
-							//brokeredMessage.setEnqueuedTimeUtc(Utils.convertDotNetTicksToInstant((long)entry.getValue()));
 							brokeredMessage.setEnqueuedTimeUtc(((Date)entry.getValue()).toInstant());
 							break;
 						case ClientConstants.SCHEDULEDENQUEUETIMENAME:
-	                        //brokeredMessage.setScheduledEnqueuedTimeUtc(Utils.convertDotNetTicksToInstant((long)entry.getValue()));
 	                        brokeredMessage.setScheduledEnqueuedTimeUtc(((Date)entry.getValue()).toInstant());
 	                        break;
 	                    case ClientConstants.SEQUENCENUBMERNAME:
 	                        brokeredMessage.setSequenceNumber((long)entry.getValue());
 	                        break;                    
-	                    case ClientConstants.LOCKEDUNTILNAME:
-	                        //brokeredMessage.setLockedUntilUtc(Utils.convertDotNetTicksToInstant((long)entry.getValue()));
+	                    case ClientConstants.LOCKEDUNTILNAME:	                        
 	                        brokeredMessage.setLockedUntilUtc(((Date)entry.getValue()).toInstant());
 	                        break;                    
 	                    case ClientConstants.PARTITIONKEYNAME:

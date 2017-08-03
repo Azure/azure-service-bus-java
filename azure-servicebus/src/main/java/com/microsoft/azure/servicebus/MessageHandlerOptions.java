@@ -1,6 +1,7 @@
 package com.microsoft.azure.servicebus;
 
 import java.time.Duration;
+import java.util.Locale;
 
 public final class MessageHandlerOptions
 {
@@ -19,8 +20,8 @@ public final class MessageHandlerOptions
 	
 	/**
 	 * 
-	 * @param maxConcurrentCalls
-	 * @param autoComplete
+	 * @param maxConcurrentCalls maximum number of concurrent calls to the onMessage handler
+	 * @param autoComplete true if the pump should automatically complete message after onMessageHandler action is completed. false otherwise.
 	 * @param maxAutoRenewDuration - Maximum duration within which the client keeps renewing the message lock if the processing of the message is not completed by the handler.
 	 */
 	public MessageHandlerOptions(int maxConcurrentCalls, boolean autoComplete, Duration maxAutoRenewDuration)
@@ -40,5 +41,11 @@ public final class MessageHandlerOptions
 
 	public Duration getMaxAutoRenewDuration() {
 		return this.maxAutoRenewDuration;
+	}
+	
+	@Override
+	public String toString()
+	{
+	    return String.format(Locale.US, "MessageHandlerOptions - AutoComplete:%s, MaxConcurrentCalls:%s, MaxAutoRenewDuration:%s", this.autoComplete, this.maxConcurrentCalls, this.maxAutoRenewDuration);
 	}
 }

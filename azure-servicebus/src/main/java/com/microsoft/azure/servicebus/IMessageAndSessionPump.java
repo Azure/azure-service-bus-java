@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
 package com.microsoft.azure.servicebus;
 
 import java.util.Map;
@@ -28,9 +31,9 @@ interface IMessageAndSessionPump
     
     CompletableFuture<Void> completeAsync(UUID lockToken);
     
-    void defer(UUID lockToken) throws InterruptedException, ServiceBusException;
-
-    void defer(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
+//    void defer(UUID lockToken) throws InterruptedException, ServiceBusException;
+//
+//    void defer(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
     CompletableFuture<Void> deferAsync(UUID lockToken);
 

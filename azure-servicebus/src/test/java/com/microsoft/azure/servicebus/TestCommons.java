@@ -186,12 +186,11 @@ public class TestCommons {
 				
 		ArrayList<IMessage> totalReceivedMessages = new ArrayList<>();		
 		
-		Collection<IMessage> receivedMessages = receiver.receiveBatch(numMessages);
-		totalReceivedMessages.addAll(receivedMessages);		
+		Collection<IMessage> receivedMessages = receiver.receiveBatch(numMessages);				
 		while(receivedMessages != null && receivedMessages.size() > 0 && totalReceivedMessages.size() < numMessages)
-		{						
+		{
+		    totalReceivedMessages.addAll(receivedMessages);
 			receivedMessages = receiver.receiveBatch(numMessages);
-			totalReceivedMessages.addAll(receivedMessages);	
 		}
 		Assert.assertEquals("All messages not received", numMessages, totalReceivedMessages.size());
 		
@@ -394,7 +393,7 @@ public class TestCommons {
 		receiver.defer(receivedMessage.getLockToken());
 		
 		// Now receive by sequence number
-		receivedMessage = receiver.receive(sequenceNumber);
+		receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", sequenceNumber, receivedMessage.getSequenceNumber());
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", messageId, receivedMessage.getMessageId());		
 		receiver.complete(receivedMessage.getLockToken());
@@ -402,7 +401,7 @@ public class TestCommons {
 		// Try to receive by sequence number again
 		try
 		{
-			receivedMessage = receiver.receive(sequenceNumber);
+			receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 			Assert.fail("Message recieved by sequnce number was not properly completed.");
 		}
 		catch(MessageNotFoundException e)
@@ -426,14 +425,14 @@ public class TestCommons {
 		receiver.defer(receivedMessage.getLockToken());
 		
 		// Now receive by sequence number
-		receivedMessage = receiver.receive(sequenceNumber);
+		receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", sequenceNumber, receivedMessage.getSequenceNumber());
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", messageId, receivedMessage.getMessageId());
 		long deliveryCount = receivedMessage.getDeliveryCount();
 		receiver.abandon(receivedMessage.getLockToken());
 		
 		// Try to receive by sequence number again
-		receivedMessage = receiver.receive(sequenceNumber);
+		receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 		Assert.assertEquals("Abandon didn't increase the delivery count for the message received by sequence number.", deliveryCount + 1, receivedMessage.getDeliveryCount());
 		receiver.complete(receivedMessage.getLockToken());
 	}
@@ -463,7 +462,7 @@ public class TestCommons {
 		receiver.defer(receivedMessage.getLockToken(), customProperties);
 		
 		// Now receive by sequence number
-		receivedMessage = receiver.receive(sequenceNumber);
+		receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", sequenceNumber, receivedMessage.getSequenceNumber());
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", messageId, receivedMessage.getMessageId());
 		Assert.assertEquals("Defer didn't update properties of the message received by sequence number", firstDeferredPhase, receivedMessage.getProperties().get(phaseKey));
@@ -471,7 +470,7 @@ public class TestCommons {
 		receiver.defer(receivedMessage.getLockToken(), customProperties);
 		
 		// Try to receive by sequence number again
-		receivedMessage = receiver.receive(sequenceNumber);
+		receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message after deferrring", sequenceNumber, receivedMessage.getSequenceNumber());
 		Assert.assertEquals("Defer didn't update properties of the message received by sequence number", secondDeferredPhase, receivedMessage.getProperties().get(phaseKey));
 		receiver.complete(receivedMessage.getLockToken());
@@ -492,7 +491,7 @@ public class TestCommons {
 		receiver.defer(receivedMessage.getLockToken());		
 		
 		// Now receive by sequence number
-		receivedMessage = receiver.receive(sequenceNumber);
+		receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", sequenceNumber, receivedMessage.getSequenceNumber());
 		Assert.assertEquals("ReceiveBySequenceNumber didn't receive the right message.", messageId, receivedMessage.getMessageId());
 		String deadLetterReason = "java client deadletter test";		
@@ -501,7 +500,7 @@ public class TestCommons {
 		// Try to receive by sequence number again
 		try
 		{
-			receivedMessage = receiver.receive(sequenceNumber);
+			receivedMessage = receiver.receiveDeferredMessage(sequenceNumber);
 			Assert.fail("Message received by sequence number was not properly deadlettered");
 		}
 		catch(MessageNotFoundException e)
@@ -510,7 +509,7 @@ public class TestCommons {
 		}
 	}
 		
-	public static void testGetMessageSessions(IMessageSender sender, IMessageSessionEntity sessionsClient) throws InterruptedException, ServiceBusException
+	public static void testGetMessageSessions(IMessageSender sender, Object sessionsClient) throws InterruptedException, ServiceBusException
 	{		
 		int numSessions = 110; // More than default page size
 		String[] sessionIds = new String[numSessions];
@@ -522,7 +521,12 @@ public class TestCommons {
 			sender.send(message);
 		}
 		
-		Collection<? extends IMessageSession> sessions = Utils.completeFuture(sessionsClient.getMessageSessionsAsync());
+		Collection<? extends IMessageSession> sessions;
+		if(sessionsClient instanceof QueueClient)
+		    sessions = Utils.completeFuture(((QueueClient)sessionsClient).getMessageSessionsAsync());
+		else
+		    sessions = Utils.completeFuture(((SubscriptionClient)sessionsClient).getMessageSessionsAsync());
+		
 		Assert.assertTrue("GetMessageSessions didnot return all sessions", numSessions <= sessions.size()); // There could be sessions left over from other tests
 		
 		IMessageSession anySession = (IMessageSession)sessions.toArray()[0];
@@ -568,7 +572,7 @@ public class TestCommons {
 		Collection<IMessage> messages = receiver.receiveBatch(batchSize, DRAIN_MESSAGES_WAIT_TIME);
 		while(messages !=null && messages.size() > 0)
 		{
-			if(receiver.getReceiveMode() == ReceiveMode.PeekLock)
+			if(receiver.getReceiveMode() == ReceiveMode.PEEKLOCK)
 			{
 				for(IMessage message: messages)
 				{
@@ -585,8 +589,8 @@ public class TestCommons {
 			{
 				try
 				{
-					IMessage message = receiver.receive(peekedMessage.getSequenceNumber());
-					if(receiver.getReceiveMode() == ReceiveMode.PeekLock)
+					IMessage message = receiver.receiveDeferredMessage(peekedMessage.getSequenceNumber());
+					if(receiver.getReceiveMode() == ReceiveMode.PEEKLOCK)
 					{
 						receiver.complete(message.getLockToken());
 					}
@@ -602,7 +606,7 @@ public class TestCommons {
 	
 	public static void drainAllMessages(ConnectionStringBuilder connectionStringBuilder) throws InterruptedException, ServiceBusException
 	{
-		IMessageReceiver receiver = ClientFactory.createMessageReceiverFromConnectionStringBuilder(connectionStringBuilder, ReceiveMode.ReceiveAndDelete);
+		IMessageReceiver receiver = ClientFactory.createMessageReceiverFromConnectionStringBuilder(connectionStringBuilder, ReceiveMode.RECEIVEANDDELETE);
 		TestCommons.drainAllMessagesFromReceiver(receiver);
 		receiver.close();
 	}
@@ -610,17 +614,18 @@ public class TestCommons {
 	public static void drainAllSessions(ConnectionStringBuilder connectionStringBuilder, boolean isQueue) throws InterruptedException, ServiceBusException
 	{
 		int numParallelSessionDrains = 5;
-		IMessageSessionEntity sessionsClient;
+		Collection<IMessageSession> browsableSessions;
 		if(isQueue)
 		{
-			sessionsClient = new QueueClient(connectionStringBuilder.toString(), ReceiveMode.ReceiveAndDelete);
+			QueueClient qc = new QueueClient(connectionStringBuilder, ReceiveMode.RECEIVEANDDELETE);
+			browsableSessions = qc.getMessageSessions();
 		}
 		else
 		{
-			sessionsClient = new SubscriptionClient(connectionStringBuilder.toString(), ReceiveMode.ReceiveAndDelete);
-		}
+			SubscriptionClient sc = new SubscriptionClient(connectionStringBuilder, ReceiveMode.RECEIVEANDDELETE);
+			browsableSessions = sc.getMessageSessions();
+		}		
 		
-		Collection<IMessageSession> browsableSessions = sessionsClient.getMessageSessions();
 		if(browsableSessions != null && browsableSessions.size() > 0)
 		{
 			CompletableFuture[] drainFutures = new CompletableFuture[numParallelSessionDrains];
@@ -628,7 +633,7 @@ public class TestCommons {
 			for(IMessageSession browsableSession : browsableSessions)
 			{				
 				CompletableFuture<Void> drainFuture = ClientFactory.acceptSessionFromConnectionStringBuilderAsync
-						(connectionStringBuilder, browsableSession.getSessionId(), ReceiveMode.ReceiveAndDelete).thenAcceptAsync((session) -> {
+						(connectionStringBuilder, browsableSession.getSessionId(), ReceiveMode.RECEIVEANDDELETE).thenAcceptAsync((session) -> {
 							try {
 								TestCommons.drainAllMessagesFromReceiver(session, false);
 								session.setState(null);
