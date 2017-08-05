@@ -67,6 +67,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private static final Duration RETURN_MESSAGES_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(10); // Wakes up every 10 milliseconds
 	private static final Duration UPDATE_STATE_REQUESTS_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(1000); // Wakes up every second
 	private static final Duration ZERO_TIMEOUT_APPROXIMATION = Duration.ofMillis(100);
+	private static final int CREDIT_FLOW_BATCH_SIZE = 50;// Arbitrarily chosen 50 to avoid sending too many flows in case prefetch count is large
 	
 	private final Object requestResonseLinkCreationLock = new Object();
 	private final ConcurrentLinkedQueue<ReceiveWorkItem> pendingReceives;
@@ -176,12 +177,19 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                     while(!CoreMessageReceiver.this.prefetchedMessages.isEmpty())
                     {
                         ReceiveWorkItem currentReceive = CoreMessageReceiver.this.pendingReceives.poll();
-                        if (currentReceive != null && !currentReceive.getWork().isDone())
+                        if (currentReceive != null)
                         {
-                            TRACE_LOGGER.debug("Returning the message received from '{}' to a pending receive request", CoreMessageReceiver.this.receivePath);
-                            currentReceive.cancelTimeoutTask(false);
-                            List<MessageWithDeliveryTag> messages = CoreMessageReceiver.this.receiveCore(currentReceive.getMaxMessageCount());
-                            AsyncUtil.completeFuture(currentReceive.getWork(), messages);
+                            if(!currentReceive.getWork().isDone())
+                            {
+                                TRACE_LOGGER.debug("Returning the message received from '{}' to a pending receive request", CoreMessageReceiver.this.receivePath);
+                                currentReceive.cancelTimeoutTask(false);
+                                List<MessageWithDeliveryTag> messages = CoreMessageReceiver.this.receiveCore(currentReceive.getMaxMessageCount());
+                                AsyncUtil.completeFuture(currentReceive.getWork(), messages);
+                            }
+                        }
+                        else
+                        {
+                            break;
                         }
                     }
                     TRACE_LOGGER.debug("'{}' core message receiver's internal loop to return messages to waiting clients stopped.", CoreMessageReceiver.this.receivePath);
@@ -823,7 +831,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private void addCredit(ReceiveWorkItem receiveWorkItem)
 	{
 	    int currentTotalCreditToSend = this.creditToFlow.addAndGet(receiveWorkItem.getMaxMessageCount());
-	    if(currentTotalCreditToSend > this.prefetchCount)
+	    if(currentTotalCreditToSend >= this.prefetchCount || currentTotalCreditToSend >= CREDIT_FLOW_BATCH_SIZE)
 	    {
 	        try
             {
@@ -832,7 +840,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                     @Override
                     public void onEvent()
                     {
-                        // Send credit accumulated so far to make it less chatty
+                        // Send credit accumulated so far to make it less chat-ty
                         int accumulatedCredit = CoreMessageReceiver.this.creditToFlow.getAndSet(0);
                         sendFlow(accumulatedCredit);
                     }
