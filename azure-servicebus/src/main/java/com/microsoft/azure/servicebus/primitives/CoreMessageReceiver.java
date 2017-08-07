@@ -66,7 +66,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private static final Duration LINK_REOPEN_TIMEOUT = Duration.ofMinutes(5); // service closes link long before this timeout expires
 	private static final Duration RETURN_MESSAGES_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(100); // Wakes up every 100 milliseconds
 	private static final Duration UPDATE_STATE_REQUESTS_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(1000); // Wakes up every second
-	private static final Duration ZERO_TIMEOUT_APPROXIMATION = Duration.ofMillis(100);
+	private static final Duration ZERO_TIMEOUT_APPROXIMATION = Duration.ofMillis(200);
 	private static final int CREDIT_FLOW_BATCH_SIZE = 50;// Arbitrarily chosen 50 to avoid sending too many flows in case prefetch count is large
 	
 	private final Object requestResonseLinkCreationLock = new Object();
@@ -1245,7 +1245,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				{
 					// error response
 				    Exception failureException = RequestResponseUtils.genereateExceptionFromResponse(responseMessage);
-				    TRACE_LOGGER.error("Renewing message locks on entity '{}' failed", this.receivePath, failureException);
+				    TRACE_LOGGER.error("Renewing message locks for lock tokens '{}' on entity '{}' failed", Arrays.toString(lockTokens), this.receivePath, failureException);
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
@@ -1311,7 +1311,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				{
 					// error response
 				    Exception failureException = RequestResponseUtils.genereateExceptionFromResponse(responseMessage);
-                    TRACE_LOGGER.error("Receiving messages by sequence number from entity '{}' failed", this.receivePath, failureException);
+                    TRACE_LOGGER.error("Receiving messages by sequence numbers '{}' from entity '{}' failed", Arrays.toString(sequenceNumbers), this.receivePath, failureException);
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
