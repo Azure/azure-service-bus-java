@@ -160,16 +160,9 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                                     }
                                 } else {
                                     // Abandon message
+                                    TRACE_LOGGER.debug("Abandoning message with sequence number '{}'", message.getSequenceNumber());
                                     dispositionPhase = ExceptionPhase.ABANDON;
-                                    if(this.messageHandlerOptions.isAutoComplete())
-                                    {
-                                        TRACE_LOGGER.debug("Abandoning message with sequence number '{}'", message.getSequenceNumber());
-                                        updateDispositionFuture = this.innerReceiver.abandonAsync(message.getLockToken());
-                                    }
-                                    else
-                                    {
-                                        updateDispositionFuture = CompletableFuture.completedFuture(null);
-                                    }
+                                    updateDispositionFuture = this.innerReceiver.abandonAsync(message.getLockToken());
                                 }
 
                                 updateDispositionFuture.handleAsync((u, updateDispositionEx) -> {
@@ -299,16 +292,9 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                                     }
                                 } else {
                                     // Abandon message
+                                    TRACE_LOGGER.debug("Abandoning message with sequence number '{}'", message.getSequenceNumber());
                                     dispositionPhase = ExceptionPhase.ABANDON;
-                                    if (this.sessionHandlerOptions.isAutoComplete())
-                                    {
-                                        TRACE_LOGGER.debug("Abandoning message with sequence number '{}'", message.getSequenceNumber());
-                                        updateDispositionFuture = session.abandonAsync(message.getLockToken());
-                                    }
-                                    else
-                                    {
-                                        updateDispositionFuture = CompletableFuture.completedFuture(null);
-                                    }
+                                    updateDispositionFuture = session.abandonAsync(message.getLockToken());
                                 }
 
                                 updateDispositionFuture.handleAsync((u, updateDispositionEx) -> {
@@ -466,16 +452,17 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
             }
         }
 
-        protected static Duration getNextRenewInterval(Instant lockedUntilUtc, String identifier) {
+        protected static Duration getNextRenewInterval(Instant lockedUntilUtc) {
             Duration remainingTime = Duration.between(Instant.now(), lockedUntilUtc);
             if (remainingTime.isNegative()) {
+
                 // Lock likely expired. May be there is clock skew. Assume some minimum time
                 remainingTime = MessageAndSessionPump.MINIMUM_MESSAGE_LOCK_VALIDITY;
-                TRACE_LOGGER.warn("Lock of '{}' already expired. May be there is clock skew. Still trying to renew lock", identifier);
+                TRACE_LOGGER.warn("Lock already expired. May be there is clock skew. Still trying to renew lock");
             }
 
             Duration buffer = remainingTime.dividedBy(2).compareTo(MAXIMUM_RENEW_LOCK_BUFFER) > 0 ? MAXIMUM_RENEW_LOCK_BUFFER : remainingTime.dividedBy(2);
-            TRACE_LOGGER.debug("Lock of '{}' is valid for '{}'. It will be renewed '{}' before it expires.", identifier, remainingTime, buffer);
+            TRACE_LOGGER.debug("Lock is valid for '{}'. It will be renewed '{}' before it expires.", remainingTime, buffer);
             return remainingTime.minus(buffer);
         }
     }
@@ -485,7 +472,6 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         private MessageAndSessionPump messageAndSessionPump;
         private IMessage message;
         private Instant stopRenewalAt;
-        private String messageIdentifier;
         ScheduledFuture<?> timerFuture;
 
         MessgeRenewLockLoop(IMessageReceiver innerReceiver, MessageAndSessionPump messageAndSessionPump, IMessage message, Instant stopRenewalAt) {
@@ -494,7 +480,6 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
             this.messageAndSessionPump = messageAndSessionPump;
             this.message = message;
             this.stopRenewalAt = stopRenewalAt;
-            this.messageIdentifier = String.format("message with locktoken : %s, sequence number : %s", this.message.getLockToken(), this.message.getSequenceNumber());
         }
 
         @Override
@@ -508,20 +493,21 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                 Duration renewInterval = this.getNextRenewInterval();
                 if (renewInterval != null && !renewInterval.isNegative()) {
                     this.timerFuture = Timer.schedule(() -> {
-                        TRACE_LOGGER.debug("Renewing lock on '{}'", this.messageIdentifier);
+                        TRACE_LOGGER.debug("Renewing lock on message with sequence number '{}'", this.message.getSequenceNumber());
                         this.innerReceiver.renewMessageLockAsync(message).handleAsync((v, renewLockEx) ->
                         {
                             if (renewLockEx != null) {
                                 renewLockEx = ExceptionUtil.extractAsyncCompletionCause(renewLockEx);
-                                TRACE_LOGGER.error("Renewing lock on '{}' failed", this.messageIdentifier, renewLockEx);
+                                TRACE_LOGGER.error("Renewing lock on message with sequence number '{}' failed", this.message.getSequenceNumber(), renewLockEx);
                                 this.messageAndSessionPump.notifyExceptionToMessageHandler(renewLockEx, ExceptionPhase.RENEWMESSAGELOCK);
                                 if (!(renewLockEx instanceof MessageLockLostException || renewLockEx instanceof OperationCancelledException)) {
                                     this.loop();
                                 }
                             } else {
-                                TRACE_LOGGER.debug("Renewed lock on '{}'", this.messageIdentifier);
+                                TRACE_LOGGER.debug("Renewed lock on message with sequence number '{}'", this.message.getSequenceNumber());
                                 this.loop();
                             }
+
 
                             return null;
                         });
@@ -532,7 +518,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
         private Duration getNextRenewInterval() {
             if (this.message.getLockedUntilUtc().isBefore(stopRenewalAt)) {
-                return RenewLockLoop.getNextRenewInterval(this.message.getLockedUntilUtc(), this.messageIdentifier);
+                return RenewLockLoop.getNextRenewInterval(this.message.getLockedUntilUtc());
             } else {
                 return null;
             }
@@ -542,14 +528,12 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
     private static class SessionRenewLockLoop extends RenewLockLoop {
         private IMessageSession session;
         private MessageAndSessionPump messageAndSessionPump;
-        private String sessionIdentifier;
         ScheduledFuture<?> timerFuture;
 
         SessionRenewLockLoop(IMessageSession session, MessageAndSessionPump messageAndSessionPump) {
             super();
             this.session = session;
             this.messageAndSessionPump = messageAndSessionPump;
-            this.sessionIdentifier = String.format("session with id:%s", this.session.getSessionId());
         }
 
         @Override
@@ -560,23 +544,24 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         @Override
         protected void loop() {
             if (!this.isCancelled()) {
-                Duration renewInterval = RenewLockLoop.getNextRenewInterval(this.session.getLockedUntilUtc(), this.sessionIdentifier);
+                Duration renewInterval = RenewLockLoop.getNextRenewInterval(this.session.getLockedUntilUtc());
                 if (renewInterval != null && !renewInterval.isNegative()) {
                     this.timerFuture = Timer.schedule(() -> {
-                        TRACE_LOGGER.debug("Renewing lock on '{}'", this.sessionIdentifier);
+                        TRACE_LOGGER.debug("Renewing lock on session '{}'", this.session.getSessionId());
                         this.session.renewSessionLockAsync().handleAsync((v, renewLockEx) ->
                         {
                             if (renewLockEx != null) {
                                 renewLockEx = ExceptionUtil.extractAsyncCompletionCause(renewLockEx);
-                                TRACE_LOGGER.error("Renewing lock on '{}' failed", this.sessionIdentifier, renewLockEx);
+                                TRACE_LOGGER.error("Renewing lock on session '{}' failed", this.session.getSessionId(), renewLockEx);
                                 this.messageAndSessionPump.notifyExceptionToSessionHandler(renewLockEx, ExceptionPhase.RENEWSESSIONLOCK);
                                 if (!(renewLockEx instanceof SessionLockLostException || renewLockEx instanceof OperationCancelledException)) {
                                     this.loop();
                                 }
                             } else {
-                                TRACE_LOGGER.debug("Renewed lock on '{}'", this.sessionIdentifier);
+                                TRACE_LOGGER.debug("Renewed lock on session '{}'", this.session.getSessionId());
                                 this.loop();
                             }
+
 
                             return null;
                         });
