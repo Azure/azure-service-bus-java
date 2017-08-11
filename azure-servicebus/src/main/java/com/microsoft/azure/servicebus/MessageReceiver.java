@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
 package com.microsoft.azure.servicebus;
 
 import java.time.Duration;
@@ -33,7 +36,9 @@ import com.microsoft.azure.servicebus.primitives.Util;
 // TODO As part of receive, don't return messages whose lock is already expired. Can happen because of delay between prefetch and actual receive from client.
 class MessageReceiver extends InitializableEntity implements IMessageReceiver, IMessageBrowser {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageReceiver.class);
-    private static final int DEFAULT_PREFETCH_COUNT_PEEKLOCK = 100;
+    // Using 0 pre-fetch count for both receive modes, to avoid message lock lost exceptions in application receiving messages at a slow rate.
+    // Applications can set it to a higher value if they need better performance.
+    private static final int DEFAULT_PREFETCH_COUNT_PEEKLOCK = 0;
     private static final int DEFAULT_PREFETCH_COUNT_RECEIVEANDDELETE = 0;
 
     private final ReceiveMode receiveMode;
@@ -228,7 +233,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
     }
 
 	/*
-	@Override
+    @Override
 	public CompletableFuture<Void> completeBatchAsync(Collection<? extends IMessage> messages) {
 		// TODO Auto-generated method stub
 		return null;
