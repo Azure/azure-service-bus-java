@@ -99,8 +99,7 @@ public interface ISubscriptionClient extends IMessageEntityClient, IMessageAndSe
     public String getTopicName();
 
     /**
-     * Gets the subscription name.
-     * @return The subscription name.
+     * @return
      */
     public String getSubscriptionName();
 }
