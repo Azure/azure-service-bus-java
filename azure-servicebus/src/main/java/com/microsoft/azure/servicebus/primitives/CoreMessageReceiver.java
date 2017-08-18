@@ -319,30 +319,17 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	
 	private void closeRequestResponseLink()
 	{
-	    if(this.requestResponseLink != null)
-	    {
-	        this.underlyingFactory.releaseRequestResponseLink(this.receivePath);
-	        this.requestResponseLink = null;
-	        synchronized (this.requestResonseLinkCreationLock)
-	        {
-	            this.requestResponseLinkCreationFuture = null;
-	        }
-	    }
-	    else
-	    {
-	        // Not yet created, may be creation is in progress
-	        synchronized (this.requestResonseLinkCreationLock)
-	        {
-	            if(this.requestResponseLinkCreationFuture != null)
-	            {
-	                this.requestResponseLinkCreationFuture.thenRun(() -> {
-	                    this.underlyingFactory.releaseRequestResponseLink(this.receivePath);
-	                    this.requestResponseLink = null;
-	                });
-	                this.requestResponseLinkCreationFuture = null;
-	            }
-	        }
-	    }
+	    synchronized (this.requestResonseLinkCreationLock)
+        {
+            if(this.requestResponseLinkCreationFuture != null)
+            {
+                this.requestResponseLinkCreationFuture.thenRun(() -> {
+                    this.underlyingFactory.releaseRequestResponseLink(this.receivePath);
+                    this.requestResponseLink = null;
+                });
+                this.requestResponseLinkCreationFuture = null;
+            }
+        }
 	}
 	
 	private void createReceiveLink()
