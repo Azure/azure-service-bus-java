@@ -323,6 +323,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	    {
 	        this.underlyingFactory.releaseRequestResponseLink(this.receivePath);
 	        this.requestResponseLink = null;
+	        synchronized (this.requestResonseLinkCreationLock)
+	        {
+	            this.requestResponseLinkCreationFuture = null;
+	        }
 	    }
 	    else
 	    {

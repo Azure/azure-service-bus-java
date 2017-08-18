@@ -161,24 +161,15 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	
 	private void closeRequestResponseLink()
     {
-        if(this.requestResponseLink != null)
+	    synchronized (this.requestResonseLinkCreationLock)
         {
-            this.underlyingFactory.releaseRequestResponseLink(this.sendPath);
-            this.requestResponseLink = null;
-        }
-        else
-        {
-            // Not yet created, may be creation is in progress
-            synchronized (this.requestResonseLinkCreationLock)
+            if(this.requestResponseLinkCreationFuture != null)
             {
-                if(this.requestResponseLinkCreationFuture != null)
-                {
-                    this.requestResponseLinkCreationFuture.thenRun(() -> {
-                        this.underlyingFactory.releaseRequestResponseLink(this.sendPath);
-                        this.requestResponseLink = null;
-                    });
-                    this.requestResponseLinkCreationFuture = null;
-                }
+                this.requestResponseLinkCreationFuture.thenRun(() -> {
+                    this.underlyingFactory.releaseRequestResponseLink(this.sendPath);
+                    this.requestResponseLink = null;
+                });
+                this.requestResponseLinkCreationFuture = null;
             }
         }
     }
