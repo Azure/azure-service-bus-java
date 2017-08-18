@@ -108,10 +108,11 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
         {
             if(this.senderCreationFuture != null)
             {
-                return this.senderCreationFuture.thenComposeAsync((v) -> {
-                    this.senderCreationFuture = null;
+                CompletableFuture<Void> senderCloseFuture = this.senderCreationFuture.thenComposeAsync((v) -> {
                     return this.sender.closeAsync();
                 });
+                this.senderCreationFuture = null;
+                return senderCloseFuture;
             }
             else
             {
