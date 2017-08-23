@@ -2,7 +2,17 @@ package com.microsoft.azure.servicebus.management;
 
 import java.time.Duration;
 
-public class SubscriptionDescription {
+public class SubscriptionDescription extends ResourceDescripton {
+    private static final String ATOM_XML_FORMAT = "<entry xmlns=\"http://www.w3.org/2005/Atom\">"
+            + "<content type=\"application/xml\">"
+                 + "<SubscriptionDescription xmlns=\"http://schemas.microsoft.com/netservices/2010/10/servicebus/connect\" xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\">"
+                      + "<LockDuration>%s</LockDuration>"
+                      + "<RequiresSession>%s</RequiresSession>"
+                      + "<DefaultMessageTimeToLive>%s</DefaultMessageTimeToLive>"
+                 + "</SubscriptionDescription>"
+            + "</content>"
+          + "</entry>";
+    
     private String topicPath;
     private String name;
     private String forwardTo;
@@ -19,6 +29,8 @@ public class SubscriptionDescription {
     {
         this.topicPath = topicPath;
         this.name = subscriptionName;
+        this.defaultMessageTimeToLive = Duration.ofDays(7);
+        this.lockDuration = Duration.ofMinutes(1);
     }
 
     public String getTopicPath() {
@@ -40,13 +52,28 @@ public class SubscriptionDescription {
     public boolean isRequiresSession() {
         return requiresSession;
     }
+    
+    public Duration getLockDuration() {
+        return lockDuration;
+    }
+
+    public void setLockDuration(Duration lockDuration) {
+        this.lockDuration = lockDuration;
+    }
 
     public void setRequiresSession(boolean requiresSession) {
         this.requiresSession = requiresSession;
     }
     
-    public String getEntityPath()
+    @Override
+    public String getPath()
     {
         return this.topicPath + "/subscriptions/" + this.name;
+    }
+    
+    @Override
+    String getAtomXml()
+    {
+        return String.format(ATOM_XML_FORMAT, SerializerUtil.serializeDuration(this.lockDuration), this.requiresSession, SerializerUtil.serializeDuration(this.defaultMessageTimeToLive));
     }
 }

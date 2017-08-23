@@ -2,7 +2,7 @@ package com.microsoft.azure.servicebus.management;
 
 import java.time.Duration;
 
-public class QueueDescription {
+public class QueueDescription extends ResourceDescripton{
     // Supports only a limited set of properties, just for unit tests.. There are some quirks too. Order of xml elements also matters
     private static final String ATOM_XML_FORMAT = "<entry xmlns=\"http://www.w3.org/2005/Atom\">"
        + "<content type=\"application/xml\">"
@@ -35,8 +35,11 @@ public class QueueDescription {
     {
         this.path = path;
         this.defaultMessageTimeToLive = Duration.ofDays(7);
+        this.maxSizeInMegaBytes = 1024;
+        this.lockDuration = Duration.ofMinutes(1);
     }
 
+    @Override
     public String getPath() {
         return path;
     }
@@ -85,7 +88,8 @@ public class QueueDescription {
         this.defaultMessageTimeToLive = defaultMessageTimeToLive;
     }
 
-    String getAtomXml(String queueURI)
+    @Override
+    String getAtomXml()
     {
         return String.format(ATOM_XML_FORMAT, SerializerUtil.serializeDuration(this.lockDuration), this.maxSizeInMegaBytes, this.requiresSession, SerializerUtil.serializeEnablePartitioning(this.enablePartitioning), SerializerUtil.serializeDuration(this.defaultMessageTimeToLive));
     }

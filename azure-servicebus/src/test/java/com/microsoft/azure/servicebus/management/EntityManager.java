@@ -3,7 +3,6 @@ package com.microsoft.azure.servicebus.management;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -11,22 +10,11 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.KeyManagementException;
-import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.UUID;
 
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
@@ -45,18 +33,18 @@ public class EntityManager {
     private static final int SAS_TOKEN_VALIDITY_IN_MINUTES = 5;
     private static final String USER_AGENT = String.format("%s/%s(%s)", ClientConstants.PRODUCT_NAME, ClientConstants.CURRENT_JAVACLIENT_VERSION, ClientConstants.PLATFORM_INFO);
     
-    public static void createQueue(ConnectionStringBuilder namespaceConnectionStringBuilder, QueueDescription queueDescription) throws URISyntaxException, InvalidKeyException, IOException, ManagementException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException
+    public static void createEntity(ConnectionStringBuilder namespaceConnectionStringBuilder, ResourceDescripton resourceDescription) throws URISyntaxException, InvalidKeyException, IOException, ManagementException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException
     {
-        URL queueURL = getManagementURL(namespaceConnectionStringBuilder, queueDescription.getPath());
-        String sasToken = getSASToken(namespaceConnectionStringBuilder, queueURL);
-        sendManagementHttpRequest(PUT_METHOD, queueURL, sasToken, queueDescription.getAtomXml(queueURL.toString()));
+        URL entityURL = getManagementURL(namespaceConnectionStringBuilder, resourceDescription.getPath());
+        String sasToken = getSASToken(namespaceConnectionStringBuilder, entityURL);
+        sendManagementHttpRequest(PUT_METHOD, entityURL, sasToken, resourceDescription.getAtomXml());
     }
     
-    public static void deleteQueue(ConnectionStringBuilder namespaceConnectionStringBuilder, String queuePath) throws URISyntaxException, InvalidKeyException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException, IOException, ManagementException
+    public static void deleteEntity(ConnectionStringBuilder namespaceConnectionStringBuilder, String entityPath) throws URISyntaxException, InvalidKeyException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException, IOException, ManagementException
     {
-        URL queueURL = getManagementURL(namespaceConnectionStringBuilder, queuePath);
-        String sasToken = getSASToken(namespaceConnectionStringBuilder, queueURL);
-        sendManagementHttpRequest(DELETE_METHOD, queueURL, sasToken, null);
+        URL entityURL = getManagementURL(namespaceConnectionStringBuilder, entityPath);
+        String sasToken = getSASToken(namespaceConnectionStringBuilder, entityURL);
+        sendManagementHttpRequest(DELETE_METHOD, entityURL, sasToken, null);
     }
     
     private static URL getManagementURL(ConnectionStringBuilder namespaceConnectionStringBuilder, String entityPath) throws URISyntaxException, MalformedURLException
@@ -68,9 +56,7 @@ public class EntityManager {
     
     private static void sendManagementHttpRequest(String httpMethod, URL url, String sasToken, String atomEntryString) throws IOException, ManagementException, NoSuchAlgorithmException, KeyManagementException, KeyStoreException
     {
-
         HttpsURLConnection httpConnection = (HttpsURLConnection)url.openConnection();
-
         httpConnection.setConnectTimeout((int)CONNECTION_TIMEOUT.toMillis());
         httpConnection.setReadTimeout((int)READ_TIMEOUT.toMillis());
         httpConnection.setDoOutput(true);
@@ -88,7 +74,7 @@ public class EntityManager {
         }
         
         int responseCode = httpConnection.getResponseCode();
-        System.out.println("Reponse code : " + responseCode);
+        //System.out.println("Reponse code : " + responseCode);
         if(responseCode == HttpsURLConnection.HTTP_CREATED || responseCode == HttpsURLConnection.HTTP_ACCEPTED || responseCode == HttpsURLConnection.HTTP_OK)
         {
             try(BufferedInputStream bis = new BufferedInputStream(httpConnection.getInputStream()))
@@ -105,22 +91,6 @@ public class EntityManager {
         {
             throw new ManagementException("Entity creation failed with response code:" + responseCode);
         }
-    }
-    
-    public static void main(String a[]) throws Exception
-    {
-        System.out.println("Testing management part - Begin");
-        ConnectionStringBuilder builder = new ConnectionStringBuilder("Endpoint=sb://samples.servicebus.onebox.windows-int.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=0r0uEdjf5joNo5zCfiDs0SuyvSdgSqNxSf4lLvQC76Q=");
-        //ConnectionStringBuilder builder = new ConnectionStringBuilder("Endpoint=sb://vijayjavaclienttests.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=DYnTjWvyHU4O5orFlYI8Sd/Frls/kdNsN5w6HjxFrtE=");
-        
-        
-        QueueDescription qd = new QueueDescription("vijaymgmttestqueue7");
-        qd.setMaxSizeInMegaBytes(1024);
-        qd.setLockDuration(Duration.ofSeconds(30));
-        //deleteQueue(builder, qd.getPath());
-        createQueue(builder, qd);
-        //deleteQueue(builder, "test2");
-        System.out.println("Testing management part - End");
     }
     
     private static String getSASToken(ConnectionStringBuilder namespaceConnectionStringBuilder, URL url ) throws InvalidKeyException
@@ -144,5 +114,29 @@ public class EntityManager {
         {
             return -1;
         }
+    }
+    
+    public static void main(String a[]) throws Exception
+    {
+        System.out.println("Testing management part - Begin");
+        ConnectionStringBuilder builder = new ConnectionStringBuilder("Endpoint=sb://samples.servicebus.onebox.windows-int.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=0r0uEdjf5joNo5zCfiDs0SuyvSdgSqNxSf4lLvQC76Q=");
+        //ConnectionStringBuilder builder = new ConnectionStringBuilder("Endpoint=sb://vijayjavaclienttests.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=DYnTjWvyHU4O5orFlYI8Sd/Frls/kdNsN5w6HjxFrtE=");
+        
+        //deleteEntity(builder, "vijaymgmttesttopic5");
+//        TopicDescription td = new TopicDescription("vijaymgmttesttopic5");
+//        td.setEnablePartitioning(true);
+//        td.setMaxSizeInMegaBytes(1024);
+//        createEntity(builder, td);
+//        
+//        SubscriptionDescription sd = new SubscriptionDescription(td.getPath(), "sub1");
+//        sd.setLockDuration(Duration.ofSeconds(30));
+//        
+//        createEntity(builder, sd);
+        
+        QueueDescription qd = new QueueDescription("vijaymgmtqueue2");
+        qd.setMaxSizeInMegaBytes(1024);
+        qd.setEnablePartitioning(true);
+        createEntity(builder, qd);
+        System.out.println("Testing management part - End");
     }
 }
