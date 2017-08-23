@@ -230,6 +230,14 @@ public abstract class SessionTests {
 		Assert.assertArrayEquals("Session state not updated properly", customState, updatedState);
 	}
 	
+//	Write this test after adding create, delete entities in setup and teardown
+//	@Test
+//	public void testAcceptSessionTimeoutShouldNotLockSession() throws InterruptedException, ServiceBusException
+//	{
+//	    String sessionId = getRandomString();
+//	    
+//	}
+	
 	private void drainSession() throws InterruptedException, ServiceBusException
 	{
 		if(this.session != null)
