@@ -7,7 +7,7 @@ public class SubscriptionDescription extends ResourceDescripton {
             + "<content type=\"application/xml\">"
                  + "<SubscriptionDescription xmlns=\"http://schemas.microsoft.com/netservices/2010/10/servicebus/connect\" xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\">"
                       + "<LockDuration>%s</LockDuration>"
-                      + "<RequiresSession>%s</RequiresSession>"
+                      + "<RequiresSession>%b</RequiresSession>"
                       + "<DefaultMessageTimeToLive>%s</DefaultMessageTimeToLive>"
                  + "</SubscriptionDescription>"
             + "</content>"

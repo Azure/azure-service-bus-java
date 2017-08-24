@@ -4,10 +4,6 @@ import java.time.Duration;
 
 // Fields that require special serializations
 public class SerializerUtil {
-    public static String serializeEnablePartitioning(boolean enablePartitioning)
-    {
-        return enablePartitioning ? "MessagePartitioning" : "NoPartitioning";
-    }
     
     public static String serializeDuration(Duration duration)
     {

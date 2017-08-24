@@ -22,6 +22,7 @@ import com.microsoft.azure.servicebus.primitives.SASUtil;
 
 public class EntityManager {
     private static final int ONE_BOX_HTTPS_PORT = 4446;
+    private static final String API_VERSION_QUERY = "api-version=2017-04";
     private static final String PUT_METHOD = "PUT";
     private static final String DELETE_METHOD = "DELETE";
     private static final String USER_AGENT_HEADER_NAME = "User-Agent";
@@ -50,12 +51,13 @@ public class EntityManager {
     private static URL getManagementURL(ConnectionStringBuilder namespaceConnectionStringBuilder, String entityPath) throws URISyntaxException, MalformedURLException
     {
         URI endPointURI = namespaceConnectionStringBuilder.getEndpoint();
-        URI httpURI = new URI("https", null, endPointURI.getHost(), getPortNumberFromHost(endPointURI.getHost()), "/"+entityPath, null, null);
+        URI httpURI = new URI("https", null, endPointURI.getHost(), getPortNumberFromHost(endPointURI.getHost()), "/"+entityPath, API_VERSION_QUERY, null);
         return httpURI.toURL();
     }
     
     private static void sendManagementHttpRequest(String httpMethod, URL url, String sasToken, String atomEntryString) throws IOException, ManagementException, NoSuchAlgorithmException, KeyManagementException, KeyStoreException
     {
+        // No special handling of TLS here. Assuming the server cert is already trusted
         HttpsURLConnection httpConnection = (HttpsURLConnection)url.openConnection();
         httpConnection.setConnectTimeout((int)CONNECTION_TIMEOUT.toMillis());
         httpConnection.setReadTimeout((int)READ_TIMEOUT.toMillis());
@@ -77,15 +79,19 @@ public class EntityManager {
         //System.out.println("Reponse code : " + responseCode);
         if(responseCode == HttpsURLConnection.HTTP_CREATED || responseCode == HttpsURLConnection.HTTP_ACCEPTED || responseCode == HttpsURLConnection.HTTP_OK)
         {
-            try(BufferedInputStream bis = new BufferedInputStream(httpConnection.getInputStream()))
-            {
-                    byte[] readBytes = new byte[1024];
-                    int numRead = bis.read(readBytes);
-                    if(numRead != -1)
-                    {
-                        System.out.println("response is :" + new String(readBytes, 0, numRead));
-                    }
-            }
+//            try(BufferedInputStream bis = new BufferedInputStream(httpConnection.getInputStream()))
+//            {
+//                    StringBuffer response = new StringBuffer();
+//                    byte[] readBytes = new byte[1024];
+//                    int numRead = bis.read(readBytes);
+//                    while(numRead != -1)
+//                    {
+//                        response.append(new String(readBytes, 0, numRead));
+//                        numRead = bis.read(readBytes);
+//                    }
+//                    
+//                    System.out.println("response is :" + response.toString());
+//            }
         }
         else
         {
@@ -114,29 +120,5 @@ public class EntityManager {
         {
             return -1;
         }
-    }
-    
-    public static void main(String a[]) throws Exception
-    {
-        System.out.println("Testing management part - Begin");
-        ConnectionStringBuilder builder = new ConnectionStringBuilder("Endpoint=sb://samples.servicebus.onebox.windows-int.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=0r0uEdjf5joNo5zCfiDs0SuyvSdgSqNxSf4lLvQC76Q=");
-        //ConnectionStringBuilder builder = new ConnectionStringBuilder("Endpoint=sb://vijayjavaclienttests.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=DYnTjWvyHU4O5orFlYI8Sd/Frls/kdNsN5w6HjxFrtE=");
-        
-        //deleteEntity(builder, "vijaymgmttesttopic5");
-//        TopicDescription td = new TopicDescription("vijaymgmttesttopic5");
-//        td.setEnablePartitioning(true);
-//        td.setMaxSizeInMegaBytes(1024);
-//        createEntity(builder, td);
-//        
-//        SubscriptionDescription sd = new SubscriptionDescription(td.getPath(), "sub1");
-//        sd.setLockDuration(Duration.ofSeconds(30));
-//        
-//        createEntity(builder, sd);
-        
-        QueueDescription qd = new QueueDescription("vijaymgmtqueue2");
-        qd.setMaxSizeInMegaBytes(1024);
-        qd.setEnablePartitioning(true);
-        createEntity(builder, qd);
-        System.out.println("Testing management part - End");
     }
 }

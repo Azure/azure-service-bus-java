@@ -8,10 +8,10 @@ public class QueueDescription extends ResourceDescripton{
        + "<content type=\"application/xml\">"
             + "<QueueDescription xmlns=\"http://schemas.microsoft.com/netservices/2010/10/servicebus/connect\" xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\">"
                  + "<LockDuration>%s</LockDuration>"
-                 + "<MaxSizeInMegabytes>%s</MaxSizeInMegabytes>"
-                 + "<RequiresSession>%s</RequiresSession>"
-                 + "<PartitioningPolicy>%s</PartitioningPolicy>"
+                 + "<MaxSizeInMegabytes>%d</MaxSizeInMegabytes>"
+                 + "<RequiresSession>%b</RequiresSession>"
                  + "<DefaultMessageTimeToLive>%s</DefaultMessageTimeToLive>"
+                 + "<EnablePartitioning>%b</EnablePartitioning>"
             + "</QueueDescription>"
        + "</content>"
      + "</entry>";
@@ -91,6 +91,7 @@ public class QueueDescription extends ResourceDescripton{
     @Override
     String getAtomXml()
     {
-        return String.format(ATOM_XML_FORMAT, SerializerUtil.serializeDuration(this.lockDuration), this.maxSizeInMegaBytes, this.requiresSession, SerializerUtil.serializeEnablePartitioning(this.enablePartitioning), SerializerUtil.serializeDuration(this.defaultMessageTimeToLive));
+        //return String.format(ATOM_XML_FORMAT, SerializerUtil.serializeDuration(this.lockDuration), this.maxSizeInMegaBytes, this.requiresSession, SerializerUtil.serializeDuration(this.defaultMessageTimeToLive), SerializerUtil.serializeEnablePartitioning(this.enablePartitioning));
+        return String.format(ATOM_XML_FORMAT, SerializerUtil.serializeDuration(this.lockDuration), this.maxSizeInMegaBytes, this.requiresSession, SerializerUtil.serializeDuration(this.defaultMessageTimeToLive), this.enablePartitioning);
     }
 }
