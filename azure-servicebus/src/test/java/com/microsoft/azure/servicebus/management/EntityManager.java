@@ -34,18 +34,40 @@ public class EntityManager {
     private static final int SAS_TOKEN_VALIDITY_IN_MINUTES = 5;
     private static final String USER_AGENT = String.format("%s/%s(%s)", ClientConstants.PRODUCT_NAME, ClientConstants.CURRENT_JAVACLIENT_VERSION, ClientConstants.PLATFORM_INFO);
     
-    public static void createEntity(ConnectionStringBuilder namespaceConnectionStringBuilder, ResourceDescripton resourceDescription) throws URISyntaxException, InvalidKeyException, IOException, ManagementException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException
+    public static void createEntity(ConnectionStringBuilder namespaceConnectionStringBuilder, ResourceDescripton resourceDescription) throws ManagementException
     {
-        URL entityURL = getManagementURL(namespaceConnectionStringBuilder, resourceDescription.getPath());
-        String sasToken = getSASToken(namespaceConnectionStringBuilder, entityURL);
-        sendManagementHttpRequest(PUT_METHOD, entityURL, sasToken, resourceDescription.getAtomXml());
+        try
+        {
+            URL entityURL = getManagementURL(namespaceConnectionStringBuilder, resourceDescription.getPath());
+            String sasToken = getSASToken(namespaceConnectionStringBuilder, entityURL);
+            sendManagementHttpRequest(PUT_METHOD, entityURL, sasToken, resourceDescription.getAtomXml());
+        }
+        catch(ManagementException me)
+        {
+            throw me;
+        }
+        catch(Exception e)
+        {
+            throw new ManagementException("EntityCreation failed.", e);
+        }
     }
     
-    public static void deleteEntity(ConnectionStringBuilder namespaceConnectionStringBuilder, String entityPath) throws URISyntaxException, InvalidKeyException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException, IOException, ManagementException
+    public static void deleteEntity(ConnectionStringBuilder namespaceConnectionStringBuilder, String entityPath) throws ManagementException
     {
-        URL entityURL = getManagementURL(namespaceConnectionStringBuilder, entityPath);
-        String sasToken = getSASToken(namespaceConnectionStringBuilder, entityURL);
-        sendManagementHttpRequest(DELETE_METHOD, entityURL, sasToken, null);
+        try
+        {
+            URL entityURL = getManagementURL(namespaceConnectionStringBuilder, entityPath);
+            String sasToken = getSASToken(namespaceConnectionStringBuilder, entityURL);
+            sendManagementHttpRequest(DELETE_METHOD, entityURL, sasToken, null);
+        }
+        catch(ManagementException me)
+        {
+            throw me;
+        }
+        catch(Exception e)
+        {
+            throw new ManagementException("EntityCreation failed.", e);
+        }
     }
     
     private static URL getManagementURL(ConnectionStringBuilder namespaceConnectionStringBuilder, String entityPath) throws URISyntaxException, MalformedURLException
