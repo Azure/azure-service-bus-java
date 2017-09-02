@@ -1,6 +1,5 @@
 package com.microsoft.azure.servicebus;
 
-import java.security.InvalidKeyException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
@@ -325,7 +324,7 @@ public abstract class SessionTests extends Tests {
 	}
 	
 	@Test
-    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException, InvalidKeyException, ExecutionException
+    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException
     {	    
 	    int limitToTest = 5000;
 	    String sessionId = TestUtils.getRandomString();	    
