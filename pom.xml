@@ -10,7 +10,7 @@
 	<url>https://github.com/Azure/azure-service-bus-java</url>
 	
 	<properties>
-		<proton-j-version>0.13.1</proton-j-version>
+		<proton-j-version>0.18.0</proton-j-version>
 	  	<junit-version>4.12</junit-version>
 		<slf4j-version>1.8.0-alpha2</slf4j-version>
 		<client-current-version>1.0.0</client-current-version>		

@@ -4,8 +4,10 @@
  */
 package com.microsoft.azure.servicebus.amqp;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
@@ -17,12 +19,16 @@ import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.Transport;
+import org.apache.qpid.proton.engine.impl.TransportInternal;
 import org.apache.qpid.proton.reactor.Handshaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.eclipse.jetty.websocket.client.WebSocketClient;
+import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
+import com.microsoft.azure.deps.ws.impl.WebSocketImpl;
 
 // ServiceBus <-> ProtonReactor interaction handles all
 // amqp_connection/transport related events from reactor
@@ -61,11 +67,44 @@ public final class ConnectionHandler extends BaseHandler
 	    TRACE_LOGGER.debug("onConnectionBound: hostname:{}", event.getConnection().getHostname());
 		Transport transport = event.getTransport();
 
+
+		Connection connection = event.getConnection();
+
+
+/*
+		WebSocketClient client = new WebSocketClient();
+		try
+		{
+			client.start();
+
+			URI echoUri = new URI("wss://" + event.getReactor().getConnectionAddress(connection) + ":443/$servicebus/websocket");
+			ClientUpgradeRequest request = new ClientUpgradeRequest();
+			client.connect(socket,echoUri,request);
+			System.out.printf("Connecting to : %s%n",echoUri);
+
+			client.
+
+			// wait for closed socket connection.
+			socket.awaitClose(5, TimeUnit.SECONDS);
+		}
+		catch (Throwable t)
+		{
+
+		}
+*/
+
+		WebSocketImpl webSocket = new WebSocketImpl();
+		webSocket.configure(event.getReactor().getConnectionAddress(connection), "/$servicebus/websocket", 443, "AMQPWSB10", null, null);
+
+		((TransportInternal)transport).addTransportLayer(webSocket);
+
+
 		SslDomain domain = makeDomain(SslDomain.Mode.CLIENT);
 		transport.ssl(domain);
 
 		Sasl sasl = transport.sasl();
 		sasl.setMechanisms("ANONYMOUS");
+
 	}
 
 	@Override

@@ -51,7 +51,7 @@
 	 	<dependency>
 	 	    <groupId>org.apache.qpid</groupId>
 	 	    <artifactId>proton-j</artifactId>
-	 	    <version>0.13.1</version>
+	 	    <version>[0.18.0,)</version>
 	 	</dependency>
 	 	<dependency>
 	 	    <groupId>org.bouncycastle</groupId> 
@@ -69,5 +69,10 @@
 	 	    <artifactId>slf4j-api</artifactId> 
 	 	    <version>1.8.0-alpha2</version>
 	  	</dependency>
+		 <dependency>
+			 <groupId>org.eclipse.jetty.websocket</groupId>
+			 <artifactId>websocket-client</artifactId>
+			 <version>9.4.6.v20170531</version>
+		 </dependency>
 	</dependencies>	 
 </project>

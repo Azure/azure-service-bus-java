@@ -95,7 +95,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 
 				final Reactor r = e.getReactor();
 				TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
-				connection = r.connectionToHost(hostName, ClientConstants.AMQPS_PORT, connectionHandler);
+				//connection = r.connectionToHost(hostName, ClientConstants.AMQPS_PORT, connectionHandler);
+				connection = r.connectionToHost(hostName, 443, connectionHandler);
 			}
 		};
 	}
@@ -142,7 +143,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
 		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
-			this.connection = this.getReactor().connectionToHost(this.hostName, ClientConstants.AMQPS_PORT, this.connectionHandler);
+			//this.connection = this.getReactor().connectionToHost(this.hostName, ClientConstants.AMQPS_PORT, this.connectionHandler);
+			this.connection = this.getReactor().connectionToHost(this.hostName, 443, this.connectionHandler);
 		}
 
 		return this.connection;

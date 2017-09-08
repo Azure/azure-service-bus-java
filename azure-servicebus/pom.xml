@@ -67,5 +67,15 @@
 	 	    <artifactId>slf4j-jdk14</artifactId> 
 	 	    <version>${slf4j-version}</version>
 	  	</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.websocket</groupId>
+			<artifactId>websocket-client</artifactId>
+			<version>9.4.6.v20170531</version>
+		</dependency>
+		 <dependency>
+			 <groupId>org.eclipse.jetty.websocket</groupId>
+			 <artifactId>javax-websocket-client-impl</artifactId>
+			 <version>9.4.6.v20170531</version>
+		 </dependency>
 	</dependencies>	 
 </project>
