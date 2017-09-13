@@ -313,7 +313,14 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     CompletableFuture<Instant> renewMessageLockAsync(IMessage message);
 
-    //CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(Collection<? extends IBrokeredMessage> messages);
+    /**
+     * Asynchronously renews the lock on the message. The lock will be renewed based on the setting specified on the entity.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @return a CompletableFuture representing the pending renew.
+     * @apiNote calling this will not update {@link Message#getLockedUntilUtc()} and updated lockedUntilUtc must be tracked by the application.
+     */
+    CompletableFuture<Instant> renewMessageLockAsync(UUID lockToken);
 
     /**
      * Renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.
@@ -329,7 +336,20 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     Instant renewMessageLock(IMessage message) throws InterruptedException, ServiceBusException;
 
-    //Collection<Instant> renewMessageLockBatch(Collection<? extends IBrokeredMessage> messages) throws InterruptedException, ServiceBusException;    
+    /**
+     * Renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.
+     * When a message is received in {@link ReceiveMode#PEEKLOCK} mode, the message is locked on the server for this
+     * receiver instance for a duration as specified during the Queue/Subscription creation (LockDuration).
+     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is renewed by
+     * the entity's LockDuration.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @return The new locked until UTC time.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if renew failed
+     * @apiNote calling this will not update {@link Message#getLockedUntilUtc()} and updated lockedUntilUtc must be tracked by the application.
+     */
+    Instant renewMessageLock(UUID lockToken) throws InterruptedException, ServiceBusException;
 
     /**
      * Get the prefetch value set.
