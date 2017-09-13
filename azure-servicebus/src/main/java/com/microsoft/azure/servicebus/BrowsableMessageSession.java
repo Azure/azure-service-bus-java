@@ -129,7 +129,7 @@ final class BrowsableMessageSession extends MessageSession {
     }
 
     @Override
-    public CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(Collection<? extends IMessage> messages) {
+    public CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(UUID[] lockTokens) {
         throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
     }
 }
