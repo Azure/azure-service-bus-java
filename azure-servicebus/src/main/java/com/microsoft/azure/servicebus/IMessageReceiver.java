@@ -307,14 +307,23 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
 
     /**
      * Asynchronously renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.
+     * When a message is received in {@link ReceiveMode#PEEKLOCK} mode, the message is locked on the server for this
+     * receiver instance for a duration as specified during the Queue/Subscription creation (LockDuration).
+     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is reset to
+     * the entity's LockDuration value.
      *
      * @param message The {@link Message} to be renewed
      * @return a CompletableFuture representing the pending renew.
      */
     CompletableFuture<Instant> renewMessageLockAsync(IMessage message);
 
+
     /**
-     * Asynchronously renews the lock on the message. The lock will be renewed based on the setting specified on the entity.
+     * Renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.
+     * When a message is received in {@link ReceiveMode#PEEKLOCK} mode, the message is locked on the server for this
+     * receiver instance for a duration as specified during the Queue/Subscription creation (LockDuration).
+     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is reset to
+     * the entity's LockDuration value.
      *
      * @param lockToken Message lock token {@link Message#getLockToken()}
      * @return a CompletableFuture representing the pending renew.
@@ -326,8 +335,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * Renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.
      * When a message is received in {@link ReceiveMode#PEEKLOCK} mode, the message is locked on the server for this
      * receiver instance for a duration as specified during the Queue/Subscription creation (LockDuration).
-     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is renewed by
-     * the entity's LockDuration.
+     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is reset to
+     * the entity's LockDuration value.
      *
      * @param message The {@link Message} to be renewed
      * @return The new locked until UTC time.
@@ -340,8 +349,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * Renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.
      * When a message is received in {@link ReceiveMode#PEEKLOCK} mode, the message is locked on the server for this
      * receiver instance for a duration as specified during the Queue/Subscription creation (LockDuration).
-     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is renewed by
-     * the entity's LockDuration.
+     * If processing of the message requires longer than this duration, the lock needs to be renewed. For each renewal, the lock is reset to
+     * the entity's LockDuration value.
      *
      * @param lockToken Message lock token {@link Message#getLockToken()}
      * @return The new locked until UTC time.

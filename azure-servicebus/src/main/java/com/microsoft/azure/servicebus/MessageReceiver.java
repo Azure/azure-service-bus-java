@@ -685,9 +685,14 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
 
     //	@Override
     public Collection<Instant> renewMessageLockBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException {
-        Collection<Instant> newLockedUntilUtcTimes = new ArrayList<>(messages.size());
+        UUID[] lockTokens = messages.toArray(new UUID[0]);
+        Collection<Instant> newLockedUntilUtcTimes = Utils.completeFuture(this.renewMessageLockBatchAsync(lockTokens));
+
+        Iterator<Instant> lockTimeIterator = newLockedUntilUtcTimes.iterator();
         for(IMessage message : messages) {
-            newLockedUntilUtcTimes.add(this.renewMessageLock(message));
+            if (lockTimeIterator.hasNext()) {
+                ((Message) message).setLockedUntilUtc(lockTimeIterator.next());
+            }
         }
 
         return newLockedUntilUtcTimes;
