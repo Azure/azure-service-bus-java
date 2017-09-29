@@ -662,9 +662,9 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	                receiveLink.advance();
 	            }
 	            
-	            this.prefetchedMessages.add(new MessageWithDeliveryTag(message, delivery.getTag()));
 	            // Accuracy of count is not that important. So not making those two operations atomic
-	            this.currentPrefetechedMessagesCount.incrementAndGet();
+                this.currentPrefetechedMessagesCount.incrementAndGet();
+	            this.prefetchedMessages.add(new MessageWithDeliveryTag(message, delivery.getTag()));
 		    }
 		    catch(Exception e)
 		    {
