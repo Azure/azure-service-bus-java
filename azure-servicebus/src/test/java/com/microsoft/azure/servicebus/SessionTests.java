@@ -1,61 +1,130 @@
 package com.microsoft.azure.servicebus;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.microsoft.azure.servicebus.management.EntityManager;
+import com.microsoft.azure.servicebus.management.ManagementException;
+import com.microsoft.azure.servicebus.management.QueueDescription;
+import com.microsoft.azure.servicebus.management.SubscriptionDescription;
+import com.microsoft.azure.servicebus.management.TopicDescription;
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.TimeoutException;
 
-public abstract class SessionTests {
+public abstract class SessionTests extends Tests {
+    private static String entityNameCreatedForAllTests = null;
+    private static String receiveEntityPathForAllTest = null;
+    
 	protected ConnectionStringBuilder sendBuilder;
 	protected ConnectionStringBuilder receiveBuilder;
 	protected MessagingFactory factory;
 	private IMessageSender sender;
-	private IMessageSession session;	
+	private IMessageSession session;
+	private String entityName;
 	
-	@Before
-	public void setup() throws InterruptedException, ExecutionException, ServiceBusException
+	@BeforeClass
+	public static void init()
 	{
-	    this.sendBuilder = this.getSenderConnectionStringBuilder();
-	    this.receiveBuilder = this.getReceiverConnectionStringBuilder();
-	    this.factory = MessagingFactory.createFromConnectionStringBuilder(sendBuilder);		
-		this.sender = ClientFactory.createMessageSenderFromConnectionStringBuilder(sendBuilder);
+	    Logger.getLogger("com.microsoft.azure.servicebus").setLevel(Level.OFF);
+	    SessionTests.entityNameCreatedForAllTests = null;
+	    SessionTests.receiveEntityPathForAllTest = null;
 	}
 	
-	private static String getRandomString()
+	@Before
+	public void setup() throws InterruptedException, ExecutionException, ServiceBusException, ManagementException
 	{
-		return UUID.randomUUID().toString();
+	    if(this.shouldCreateEntityForEveryTest() || SessionTests.entityNameCreatedForAllTests == null)
+        {
+             // Create entity
+            this.entityName = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
+            ConnectionStringBuilder managementConnectionStringBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString());
+            if(this.isEntityQueue())
+            {
+                QueueDescription queueDescription = new QueueDescription(this.entityName);
+                queueDescription.setEnablePartitioning(this.isEntityPartitioned());
+                queueDescription.setRequiresSession(true);
+                EntityManager.createEntity(managementConnectionStringBuilder, queueDescription);
+                this.sendBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString(), this.entityName);
+                this.receiveBuilder = this.sendBuilder;
+                if(!this.shouldCreateEntityForEveryTest())
+                {
+                    SessionTests.entityNameCreatedForAllTests = entityName;
+                    SessionTests.receiveEntityPathForAllTest = entityName;
+                }
+            }
+            else
+            {
+                TopicDescription topicDescription = new TopicDescription(this.entityName);
+                topicDescription.setEnablePartitioning(this.isEntityPartitioned());
+                EntityManager.createEntity(managementConnectionStringBuilder, topicDescription);
+                this.sendBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString(), this.entityName);
+                SubscriptionDescription subDescription = new SubscriptionDescription(this.entityName, TestUtils.FIRST_SUBSCRIPTION_NAME);
+                subDescription.setRequiresSession(true);
+                EntityManager.createEntity(managementConnectionStringBuilder, subDescription);
+                this.receiveBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString(), subDescription.getPath());
+                if(!this.shouldCreateEntityForEveryTest())
+                {
+                    SessionTests.entityNameCreatedForAllTests = entityName;
+                    SessionTests.receiveEntityPathForAllTest = subDescription.getPath();
+                }
+            }
+        }
+        else
+        {
+            this.sendBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString(), SessionTests.entityNameCreatedForAllTests);
+            this.receiveBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString(), SessionTests.receiveEntityPathForAllTest);
+        }
+        
+        this.factory = MessagingFactory.createFromConnectionStringBuilder(this.sendBuilder);
+        this.sender = ClientFactory.createMessageSenderFromConnectionStringBuilder(this.sendBuilder);
 	}
 	
 	@After
-	public void tearDown() throws ServiceBusException, InterruptedException
+	public void tearDown() throws ServiceBusException, InterruptedException, ManagementException
 	{
-		this.drainSession();
+		if(!this.shouldCreateEntityForEveryTest())
+        {
+		    this.drainSession();
+        }
 		
 		this.sender.close();
-		if(this.session != null)
-			this.session.close();
-		this.factory.close();
+        if(this.session != null)
+            this.session.close();
+        this.factory.close();
+        
+        if(this.shouldCreateEntityForEveryTest())
+        {
+            ConnectionStringBuilder managementConnectionStringBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString());
+            EntityManager.deleteEntity(managementConnectionStringBuilder, this.entityName);
+        }
 	}
 	
-	public abstract ConnectionStringBuilder getSenderConnectionStringBuilder();
-	
-	public abstract ConnectionStringBuilder getReceiverConnectionStringBuilder();
-	
+    @AfterClass
+    public static void cleanupAfterAllTest() throws ManagementException
+    {
+        if(SessionTests.entityNameCreatedForAllTests != null)
+        {
+            ConnectionStringBuilder managementConnectionStringBuilder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString());
+            EntityManager.deleteEntity(managementConnectionStringBuilder, SessionTests.entityNameCreatedForAllTests);
+        }
+    }
+    
 	@Test
 	public void testBasicReceiveAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.RECEIVEANDDELETE);
 		TestCommons.testBasicReceiveAndDelete(this.sender, sessionId, this.session);
 	}
@@ -63,7 +132,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveBatchAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.RECEIVEANDDELETE);
 		TestCommons.testBasicReceiveBatchAndDelete(this.sender, sessionId, this.session);
 	}
@@ -71,7 +140,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveAndComplete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testBasicReceiveAndComplete(this.sender, sessionId, this.session);
 	}
@@ -79,7 +148,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveAndAbandon() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testBasicReceiveAndAbandon(this.sender, sessionId, this.session);
 	}
@@ -87,7 +156,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveAndDeadLetter() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testBasicReceiveAndDeadLetter(this.sender, sessionId, this.session);
 	}
@@ -95,7 +164,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveAndRenewLock() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testBasicReceiveAndRenewLock(this.sender, sessionId, this.session);
 	}
@@ -103,7 +172,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveAndRenewLockBatch() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testBasicReceiveAndRenewLockBatch(this.sender, sessionId, this.session);
 	}
@@ -111,7 +180,7 @@ public abstract class SessionTests {
 	@Test
 	public void testBasicReceiveBatchAndComplete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testBasicReceiveBatchAndComplete(this.sender, sessionId, this.session);
 	}
@@ -119,7 +188,7 @@ public abstract class SessionTests {
 	@Test
 	public void testSendSceduledMessageAndReceive() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.RECEIVEANDDELETE);
 		TestCommons.testSendSceduledMessageAndReceive(this.sender, sessionId, this.session);
 	}
@@ -127,7 +196,7 @@ public abstract class SessionTests {
 	@Test
 	public void testSendSceduledMessageAndCancel() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.RECEIVEANDDELETE);
 		TestCommons.testSendSceduledMessageAndCancel(this.sender, sessionId, this.session);
 	}
@@ -135,7 +204,7 @@ public abstract class SessionTests {
 	@Test
 	public void testPeekMessage() throws InterruptedException, ServiceBusException
 	{		
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testPeekMessage(this.sender, sessionId, this.session);
 	}
@@ -143,7 +212,7 @@ public abstract class SessionTests {
 	@Test
 	public void testPeekMessageBatch() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testPeekMessageBatch(this.sender, sessionId, this.session);
 	}
@@ -151,7 +220,7 @@ public abstract class SessionTests {
 	@Test
 	public void testReceiveBySequenceNumberAndComplete() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testReceiveBySequenceNumberAndComplete(this.sender, sessionId, this.session);
 	}
@@ -159,7 +228,7 @@ public abstract class SessionTests {
 	@Test
 	public void testReceiveBySequenceNumberAndAbandon() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testReceiveBySequenceNumberAndAbandon(this.sender, sessionId, this.session);
 	}
@@ -167,7 +236,7 @@ public abstract class SessionTests {
 	@Test
 	public void testReceiveBySequenceNumberAndDefer() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testReceiveBySequenceNumberAndDefer(this.sender, sessionId, this.session);
 	}
@@ -175,7 +244,7 @@ public abstract class SessionTests {
 	@Test
 	public void testReceiveBySequenceNumberAndDeadletter() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		TestCommons.testReceiveBySequenceNumberAndDeadletter(this.sender, sessionId, this.session);
 	}
@@ -183,8 +252,8 @@ public abstract class SessionTests {
 	@Test
 	public void testAcceptAnySession() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
-		String messageId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
+		String messageId = TestUtils.getRandomString();
 		Message message = new Message("AMQP message");
 		message.setMessageId(messageId);
 		if(sessionId != null)
@@ -200,7 +269,7 @@ public abstract class SessionTests {
 	@Test
 	public void testRenewSessionLock() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		Instant initialValidity = this.session.getLockedUntilUtc();
 		this.session.renewSessionLock();
@@ -214,7 +283,7 @@ public abstract class SessionTests {
 	@Test
 	public void testGetAndSetState() throws InterruptedException, ServiceBusException
 	{
-		String sessionId = getRandomString();
+		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, receiveBuilder.getEntityPath(), sessionId, ReceiveMode.PEEKLOCK);
 		byte[] initialState = this.session.getState();
 		Assert.assertNull("Session state is not null for a new session", initialState);
@@ -229,6 +298,44 @@ public abstract class SessionTests {
 		updatedState = this.session.getState();
 		Assert.assertArrayEquals("Session state not updated properly", customState, updatedState);
 	}
+
+	@Test
+	public void testAcceptSessionTimeoutShouldNotLockSession() throws InterruptedException, ServiceBusException
+	{
+	    ConnectionStringBuilder shortTimeoutBuilder = new ConnectionStringBuilder(this.receiveBuilder.getEndpoint(), this.receiveBuilder.getEntityPath(), this.receiveBuilder.getSasKeyName(), this.receiveBuilder.getSasKey());
+	    shortTimeoutBuilder.setOperationTimeout(Duration.ofSeconds(10));// Should be less than default session wait timeout on the service
+	    try
+	    {
+	        this.session = ClientFactory.acceptSessionFromConnectionStringBuilder(shortTimeoutBuilder, null, ReceiveMode.PEEKLOCK);
+	        Assert.fail("Session " + this.session.getSessionId() + " accepted even though there is no such session on the entity.");
+	    }
+	    catch(TimeoutException te)
+	    {
+	        // Expected..
+	    }
+	    
+	    // Create session now
+	    String sessionId = TestUtils.getRandomString();
+	    Message message = new Message("AMQP message");
+        message.setSessionId(sessionId);
+        this.sender.send(message);
+        this.session = ClientFactory.acceptSessionFromConnectionStringBuilder(shortTimeoutBuilder, null, ReceiveMode.PEEKLOCK);
+        Assert.assertEquals("Accepted an unexpceted session.", sessionId, this.session.getSessionId());
+	}
+	
+	@Test
+    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException
+    {	    
+	    int limitToTest = 5000;
+	    String sessionId = TestUtils.getRandomString();	    
+	    this.session = ClientFactory.acceptSessionFromConnectionStringBuilder(this.receiveBuilder, sessionId, ReceiveMode.PEEKLOCK);
+	    for(int i=0; i<limitToTest; i++)
+	    {
+	        this.session.renewSessionLock();
+	    }
+	    
+	    this.session.renewSessionLock();
+    }
 	
 	private void drainSession() throws InterruptedException, ServiceBusException
 	{

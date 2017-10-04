@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.amqp.messaging.Released;
 import org.apache.qpid.proton.amqp.messaging.Source;
@@ -43,14 +45,17 @@ import com.microsoft.azure.servicebus.amqp.SessionHandler;
 class RequestResponseLink extends ClientEntity{
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(RequestResponseLink.class);
 	
-	private MessagingFactory underlyingFactory;
-	private String linkPath;
+	private final Object recreateLinksLock;
+	private final MessagingFactory underlyingFactory;
+	private final String linkPath;
+	private final CompletableFuture<RequestResponseLink> createFuture;
+	private final ConcurrentHashMap<String, RequestResponseWorkItem> pendingRequests;
+    private final AtomicInteger requestCounter;
+    private final String replyTo;
+    
 	private InternalReceiver amqpReceiver;
 	private InternalSender amqpSender;
-	private CompletableFuture<RequestResponseLink> createFuture;
-	private String replyTo;
-	private ConcurrentHashMap<String, RequestResponseWorkItem> pendingRequests;
-	private AtomicInteger requestCounter;
+	private boolean isRecreateLinksInProgress;
 	
 	public static CompletableFuture<RequestResponseLink> createAsync(MessagingFactory messagingFactory, String linkName, String linkPath)
 	{
@@ -63,9 +68,13 @@ class RequestResponseLink extends ClientEntity{
 					{
 						if (!requestReponseLink.createFuture.isDone())
 						{
+						    requestReponseLink.amqpSender.closeInternals(false);
+						    requestReponseLink.amqpSender.setClosed();
+						    requestReponseLink.amqpReceiver.closeInternals(false);
+						    requestReponseLink.amqpReceiver.setClosed();
+						    
 							Exception operationTimedout = new TimeoutException(
-									String.format(Locale.US, "Open operation on RequestResponseLink(%s) on Entity(%s) timed out at %s.", requestReponseLink.getClientId(), requestReponseLink.linkPath, ZonedDateTime.now().toString()));							
-							
+									String.format(Locale.US, "Open operation on RequestResponseLink(%s) on Entity(%s) timed out at %s.", requestReponseLink.getClientId(), requestReponseLink.linkPath, ZonedDateTime.now().toString()));
 							TRACE_LOGGER.error("RequestResponseLink open timed out.", operationTimedout);
 							requestReponseLink.createFuture.completeExceptionally(operationTimedout);
 						}
@@ -112,13 +121,15 @@ class RequestResponseLink extends ClientEntity{
 	{
 		super(linkName, null);
 		
+		this.recreateLinksLock = new Object();
+		this.isRecreateLinksInProgress = false;
 		this.underlyingFactory = messagingFactory;
 		this.linkPath = linkPath;
-		this.amqpSender = new InternalSender(linkName + ":internalSender", this);
+		this.amqpSender = new InternalSender(linkName + ":internalSender", this, null);
 		this.amqpReceiver = new InternalReceiver(linkName + ":interalReceiver", this);
 		this.pendingRequests = new ConcurrentHashMap<>();
 		this.requestCounter = new AtomicInteger();
-		
+		this.replyTo = UUID.randomUUID().toString();
 		this.createFuture = new CompletableFuture<RequestResponseLink>();
 	}
 	
@@ -129,10 +140,9 @@ class RequestResponseLink extends ClientEntity{
 	
 	private void createInternalLinks()
 	{
-		this.replyTo = UUID.randomUUID().toString();
-		
-		Map commonLinkProperties = new HashMap();
-		commonLinkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()).toMillis());
+		Map<Symbol, Object> commonLinkProperties = new HashMap<>();
+		// ServiceBus expects timeout to be of type unsignedint
+		commonLinkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()).toMillis()));
 		
 		// Create send link
 		final Connection connection = this.underlyingFactory.getConnection();
@@ -142,7 +152,7 @@ class RequestResponseLink extends ClientEntity{
 		session.open();
 		BaseHandler.setHandler(session, new SessionHandler(this.linkPath));
 
-		String sendLinkNamePrefix = StringUtil.getShortRandomString();
+		String sendLinkNamePrefix = "RequestResponseLink-Sender".concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(StringUtil.getShortRandomString());
 		String sendLinkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ?
 				sendLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
 				sendLinkNamePrefix;
@@ -163,7 +173,7 @@ class RequestResponseLink extends ClientEntity{
 		sender.open();
 		
 		// Create receive link
-		String receiveLinkNamePrefix = StringUtil.getShortRandomString();
+		String receiveLinkNamePrefix = "RequestResponseLink-Receiver".concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(StringUtil.getShortRandomString());
 		String receiveLinkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ? 
 				receiveLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
 				receiveLinkNamePrefix;
@@ -190,13 +200,52 @@ class RequestResponseLink extends ClientEntity{
 	private CompletableFuture<Void> recreateInternalLinks()
 	{
 	    TRACE_LOGGER.info("RequestResponseLink - recreating internal send and receive links to {}", this.linkPath);
-		CompletableFuture<Void> closeFuture = CompletableFuture.allOf(this.amqpSender.closeAsync(), this.amqpReceiver.closeAsync());
-		return closeFuture.handleAsync((closeResult, closeEx) -> 
-		{
-		    // Ignore exception in closing
-		    this.createInternalLinks();
-		    return null;
-		}).thenCompose((v) -> CompletableFuture.allOf(this.amqpSender.openFuture, this.amqpReceiver.openFuture));
+		this.amqpSender.closeInternals(false);
+		this.amqpSender.setClosed();
+		this.amqpReceiver.closeInternals(false);
+		this.amqpReceiver.setClosed();
+		
+		// Create new internal sender and receiver objects, as old ones are closed
+        this.amqpSender = new InternalSender(this.getClientId() + ":internalSender", this, this.amqpSender);
+        this.amqpReceiver = new InternalReceiver(this.getClientId() + ":interalReceiver", this);
+        try
+        {
+            this.underlyingFactory.scheduleOnReactorThread(new DispatchHandler()
+            {
+                @Override
+                public void onEvent()
+                {
+                    RequestResponseLink.this.createInternalLinks();
+                }
+            });
+        }
+        catch (IOException ioException)
+        {
+            CompletableFuture<Void> exceptionFuture = new CompletableFuture<Void>();
+            exceptionFuture.completeExceptionally(ioException);
+            return exceptionFuture;
+        }
+        
+        CompletableFuture<Void> recreateInternalLinksFuture = CompletableFuture.allOf(this.amqpSender.openFuture, this.amqpReceiver.openFuture);
+		
+		Timer.schedule(
+            new Runnable()
+            {
+                public void run()
+                {
+                    if (!recreateInternalLinksFuture.isDone())
+                    {
+                        Exception operationTimedout = new TimeoutException(
+                                String.format(Locale.US, "Recreating internal links of requestresponselink to %s.", RequestResponseLink.this.linkPath));
+                        TRACE_LOGGER.error("Recreating internal links of requestresponselink timed out.", operationTimedout);
+                        recreateInternalLinksFuture.completeExceptionally(operationTimedout);
+                    }
+                }
+            }
+            , this.underlyingFactory.getOperationTimeout()
+            , TimerType.OneTimeRun);
+		
+		return recreateInternalLinksFuture;
 	}
 	
 	private void completeAllPendingRequestsWithException(Exception exception)
@@ -218,15 +267,26 @@ class RequestResponseLink extends ClientEntity{
         if((this.amqpSender.sendLink.getLocalState() == EndpointState.CLOSED || this.amqpSender.sendLink.getRemoteState() == EndpointState.CLOSED)
                 || (this.amqpReceiver.receiveLink.getLocalState() == EndpointState.CLOSED || this.amqpReceiver.receiveLink.getRemoteState() == EndpointState.CLOSED))
         {
-            this.recreateInternalLinks().handleAsync((v, recreationEx) ->
-            {
-                if(recreationEx != null)
+            synchronized (this.recreateLinksLock) {
+                if(!this.isRecreateLinksInProgress)
                 {
-                    this.closeAsync();
+                    this.isRecreateLinksInProgress = true;
+                    this.recreateInternalLinks().handleAsync((v, recreationEx) ->
+                    {
+                        if(recreationEx != null)
+                        {
+                            TRACE_LOGGER.error("Recreating internal links of reqestresponselink '{}' failed.", this.linkPath, ExceptionUtil.extractAsyncCompletionCause(recreationEx));
+                        }
+                        
+                        synchronized (this.recreateLinksLock)
+                        {
+                            this.isRecreateLinksInProgress = false;
+                        }
+                        
+                        return null;
+                    });
                 }
-                
-                return null;
-            });
+            }
         }
         
 		CompletableFuture<Message> responseFuture = new CompletableFuture<Message>();
@@ -373,35 +433,46 @@ class RequestResponseLink extends ClientEntity{
 
 		@Override		
 		protected CompletableFuture<Void> onClose() {
-			if (!this.getIsClosed())
-			{				
-				if (this.receiveLink != null && this.receiveLink.getLocalState() != EndpointState.CLOSED)
-				{
-					try {
-						this.parent.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
-							
-							@Override
-							public void onEvent() {
-								if (InternalReceiver.this.receiveLink != null && InternalReceiver.this.receiveLink.getLocalState() != EndpointState.CLOSED)
-								{
-								    TRACE_LOGGER.debug("Closing internal receive link of requestresponselink to {}", RequestResponseLink.this.linkPath);
-									InternalReceiver.this.receiveLink.close();
-									InternalReceiver.this.parent.underlyingFactory.deregisterForConnectionError(InternalReceiver.this.receiveLink);
-									RequestResponseLink.scheduleLinkCloseTimeout(InternalReceiver.this.closeFuture, InternalReceiver.this.parent.underlyingFactory.getOperationTimeout(), InternalReceiver.this.receiveLink.getName());
-								}
-							}
-						});
-					} catch (IOException e) {
-						this.closeFuture.completeExceptionally(e);
-					}
-				}
-				else
-				{
-					this.closeFuture.complete(null);
-				}
-			}
-			
+			this.closeInternals(true);
 			return this.closeFuture;
+		}
+		
+		void closeInternals(boolean waitForCloseCompletion)
+		{
+		    if (!this.getIsClosed())
+            {
+                if (this.receiveLink != null && this.receiveLink.getLocalState() != EndpointState.CLOSED)
+                {
+                    try {
+                        this.parent.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
+                            
+                            @Override
+                            public void onEvent() {
+                                if (InternalReceiver.this.receiveLink != null && InternalReceiver.this.receiveLink.getLocalState() != EndpointState.CLOSED)
+                                {
+                                    TRACE_LOGGER.debug("Closing internal receive link of requestresponselink to {}", RequestResponseLink.this.linkPath);
+                                    InternalReceiver.this.receiveLink.close();
+                                    InternalReceiver.this.parent.underlyingFactory.deregisterForConnectionError(InternalReceiver.this.receiveLink);
+                                    if(waitForCloseCompletion)
+                                    {
+                                        RequestResponseLink.scheduleLinkCloseTimeout(InternalReceiver.this.closeFuture, InternalReceiver.this.parent.underlyingFactory.getOperationTimeout(), InternalReceiver.this.receiveLink.getName());
+                                    }
+                                    else
+                                    {
+                                        InternalReceiver.this.closeFuture.complete(null);
+                                    }
+                                }
+                            }
+                        });
+                    } catch (IOException e) {
+                        this.closeFuture.completeExceptionally(e);
+                    }
+                }
+                else
+                {
+                    this.closeFuture.complete(null);
+                }
+            }
 		}
 
 		@Override
@@ -417,16 +488,17 @@ class RequestResponseLink extends ClientEntity{
 			else
 			{
 			    TRACE_LOGGER.error("Opening internal receive link of requestresponselink to {} failed.", parent.linkPath, completionException);
+			    this.setClosed();
+			    this.closeFuture.complete(null);
 				this.openFuture.completeExceptionally(completionException);
-			}			
+			}
 		}
 
 		@Override
 		public void onError(Exception exception) {
 			if(!this.openFuture.isDone())
 			{
-			    TRACE_LOGGER.error("Opening internal receive link of requestresponselink to {} failed.", parent.linkPath, exception);
-				this.openFuture.completeExceptionally(exception);
+			    this.onOpenComplete(exception);
 			}
 			
 			if(this.getIsClosingOrClosed())
@@ -438,6 +510,9 @@ class RequestResponseLink extends ClientEntity{
 				}
 			}
 			
+			TRACE_LOGGER.error("Internal receive link of requestresponselink to '{}' encountered error.", this.parent.linkPath, exception);
+			this.parent.amqpSender.closeInternals(false);
+            this.parent.amqpSender.setClosed();
 			this.parent.completeAllPendingRequestsWithException(exception);
 		}
 
@@ -467,11 +542,13 @@ class RequestResponseLink extends ClientEntity{
 					Exception exception = ExceptionUtil.toException(condition);
 					if(!this.openFuture.isDone())
 					{
-					    TRACE_LOGGER.error("Opening internal receive link of requestresponselink to {} failed.", parent.linkPath, exception);
-						this.openFuture.completeExceptionally(exception);
+					    this.onOpenComplete(exception);
 					}
 					else
 					{
+					    TRACE_LOGGER.error("Internal receive link of requestresponselink to '{}' closed with error.", this.parent.linkPath, exception);
+					    this.parent.amqpSender.closeInternals(false);
+					    this.parent.amqpSender.setClosed();
 					    this.parent.completeAllPendingRequestsWithException(exception);
 					}
 				}
@@ -498,16 +575,20 @@ class RequestResponseLink extends ClientEntity{
 			    return;
 		    }
 			
-			String requestMessageId = (String)responseMessage.getCorrelationId();
-			if(requestMessageId != null)
-			{
-			    TRACE_LOGGER.debug("RequestRespnseLink received response for request with id :{}", requestMessageId);
-				this.parent.completeRequestWithResponse(requestMessageId, responseMessage);
-			}
-			else
-			{
-				TRACE_LOGGER.warn("RequestRespnseLink received a message with null correlationId");
-			}
+		    // Return response in a separate thread so reactor thread is free to handle reactor events
+		    final Message finalResponseMessage = responseMessage;
+		    AsyncUtil.executorService.submit(() -> {
+		        String requestMessageId = (String)finalResponseMessage.getCorrelationId();
+		        if(requestMessageId != null)
+	            {
+	                TRACE_LOGGER.debug("RequestRespnseLink received response for request with id :{}", requestMessageId);
+	                this.parent.completeRequestWithResponse(requestMessageId, finalResponseMessage);
+	            }
+	            else
+	            {
+	                TRACE_LOGGER.warn("RequestRespnseLink received a message with null correlationId");
+	            }
+		    });
 		}
 
 		public void setReceiveLink(Receiver receiveLink) {
@@ -534,49 +615,69 @@ class RequestResponseLink extends ClientEntity{
 		private Object pendingSendsSyncLock;
 		private boolean isSendLoopRunning;
 
-		protected InternalSender(String clientId, RequestResponseLink parent) {
+		protected InternalSender(String clientId, RequestResponseLink parent, InternalSender senderToBeCopied) {
 			super(clientId, parent);			
 			this.parent = parent;
 			this.availableCredit = new AtomicInteger(0);
 			this.pendingSendsSyncLock = new Object();
 			this.isSendLoopRunning = false;
-			this.pendingFreshSends = new LinkedList<>();
-			this.pendingRetrySends = new LinkedList<>();
 			this.openFuture = new CompletableFuture<Void>();
 			this.closeFuture = new CompletableFuture<Void>();
+			
+			if(senderToBeCopied == null)
+			{
+			    this.pendingFreshSends = new LinkedList<>();
+	            this.pendingRetrySends = new LinkedList<>();
+			}
+			else
+			{
+			    this.pendingFreshSends = senderToBeCopied.pendingFreshSends;
+                this.pendingRetrySends = senderToBeCopied.pendingRetrySends;
+			}
 		}		
 
 		@Override
 		protected CompletableFuture<Void> onClose() {
-			if (!this.getIsClosed())
-			{
-				if (this.sendLink != null && this.sendLink.getLocalState() != EndpointState.CLOSED)
-				{
-					try {
-						this.parent.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
-							
-							@Override
-							public void onEvent() {
-								if (InternalSender.this.sendLink != null && InternalSender.this.sendLink.getLocalState() != EndpointState.CLOSED)
-								{
-								    TRACE_LOGGER.debug("Closing internal send link of requestresponselink to {}", RequestResponseLink.this.linkPath);
-									InternalSender.this.sendLink.close();
-									InternalSender.this.parent.underlyingFactory.deregisterForConnectionError(InternalSender.this.sendLink);
-									RequestResponseLink.scheduleLinkCloseTimeout(InternalSender.this.closeFuture, InternalSender.this.parent.underlyingFactory.getOperationTimeout(), InternalSender.this.sendLink.getName());
-								}
-							}
-						});
-					} catch (IOException e) {
-						this.closeFuture.completeExceptionally(e);
-					}
-				}				
-				else
-				{
-					this.closeFuture.complete(null);
-				}
-			}
-			
+			this.closeInternals(true);
 			return this.closeFuture;
+		}
+		
+		void closeInternals(boolean waitForCloseCompletion)
+		{
+		    if (!this.getIsClosed())
+            {
+                if (this.sendLink != null && this.sendLink.getLocalState() != EndpointState.CLOSED)
+                {
+                    try {
+                        this.parent.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
+                            
+                            @Override
+                            public void onEvent() {
+                                if (InternalSender.this.sendLink != null && InternalSender.this.sendLink.getLocalState() != EndpointState.CLOSED)
+                                {
+                                    TRACE_LOGGER.debug("Closing internal send link of requestresponselink to {}", RequestResponseLink.this.linkPath);
+                                    InternalSender.this.sendLink.close();
+                                    InternalSender.this.parent.underlyingFactory.deregisterForConnectionError(InternalSender.this.sendLink);
+                                    if(waitForCloseCompletion)
+                                    {
+                                        RequestResponseLink.scheduleLinkCloseTimeout(InternalSender.this.closeFuture, InternalSender.this.parent.underlyingFactory.getOperationTimeout(), InternalSender.this.sendLink.getName());
+                                    }
+                                    else
+                                    {
+                                        InternalSender.this.closeFuture.complete(null);
+                                    }
+                                }
+                            }
+                        });
+                    } catch (IOException e) {
+                        this.closeFuture.completeExceptionally(e);
+                    }
+                }
+                else
+                {
+                    this.closeFuture.complete(null);
+                }
+            }
 		}
 
 		@Override
@@ -590,6 +691,8 @@ class RequestResponseLink extends ClientEntity{
 			else
 			{
 			    TRACE_LOGGER.error("Opening internal send link of requestresponselink to {} failed.", parent.linkPath, completionException);
+			    this.setClosed();
+			    this.closeFuture.complete(null);
 				this.openFuture.completeExceptionally(completionException);
 			}
 		}
@@ -598,8 +701,7 @@ class RequestResponseLink extends ClientEntity{
 		public void onError(Exception exception) {
 			if(!this.openFuture.isDone())
 			{
-			    TRACE_LOGGER.error("Opening internal send link of requestresponselink to {} failed.", parent.linkPath, exception);
-				this.openFuture.completeExceptionally(exception);
+			    this.onOpenComplete(exception);
 			}
 			
 			if(this.getIsClosingOrClosed())
@@ -611,6 +713,9 @@ class RequestResponseLink extends ClientEntity{
 				}
 			}
 			
+			TRACE_LOGGER.error("Internal send link of requestresponselink to '{}' encountered error.", this.parent.linkPath, exception);
+			this.parent.amqpReceiver.closeInternals(false);
+            this.parent.amqpReceiver.setClosed();
 			this.parent.completeAllPendingRequestsWithException(exception);
 		}
 
@@ -640,11 +745,13 @@ class RequestResponseLink extends ClientEntity{
 					Exception exception = ExceptionUtil.toException(condition);
 					if(!this.openFuture.isDone())
 					{
-					    TRACE_LOGGER.error("Opening internal send link of requestresponselink to {} failed.", parent.linkPath, exception);
-						this.openFuture.completeExceptionally(exception);
+					    this.onOpenComplete(exception);
 					}
 					else
 					{
+					    TRACE_LOGGER.error("Internal send link of requestresponselink to '{}' closed with error.", this.parent.linkPath, exception);
+					    this.parent.amqpReceiver.closeInternals(false);
+                        this.parent.amqpReceiver.setClosed();
 					    this.parent.completeAllPendingRequestsWithException(exception);
 					}
 				}
@@ -738,11 +845,11 @@ class RequestResponseLink extends ClientEntity{
 		        }
 		    }
 		    
-		    TRACE_LOGGER.debug("Staring requestResponseLink {} internal sender send loop", this.parent.linkPath);
+		    TRACE_LOGGER.debug("Starting requestResponseLink {} internal sender send loop", this.parent.linkPath);
 		    
 		    try
             {
-                while(this.sendLink.getLocalState() == EndpointState.ACTIVE && this.sendLink.getRemoteState() == EndpointState.ACTIVE && this.availableCredit.get() > 0)
+                while(this.sendLink != null && this.sendLink.getLocalState() == EndpointState.ACTIVE && this.sendLink.getRemoteState() == EndpointState.ACTIVE && this.availableCredit.get() > 0)
                 {
                     Message requestToBeSent = null;
                     synchronized(pendingSendsSyncLock)
