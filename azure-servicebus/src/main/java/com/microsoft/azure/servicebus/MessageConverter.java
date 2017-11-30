@@ -6,12 +6,15 @@ package com.microsoft.azure.servicebus;
 import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.messaging.AmqpSequence;
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.apache.qpid.proton.amqp.messaging.Data;
 import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
@@ -28,9 +31,21 @@ class MessageConverter
 	public static org.apache.qpid.proton.message.Message convertBrokeredMessageToAmqpMessage(Message brokeredMessage)	
 	{
 		org.apache.qpid.proton.message.Message amqpMessage = Proton.message();
-		if(brokeredMessage.getBody() != null)
+		MessageBody body = brokeredMessage.getBody();
+		if( body != null)
 		{
-			amqpMessage.setBody(new Data(new Binary(brokeredMessage.getBody())));
+		    if (body.getBodyType() == MessageBodyType.VALUE)
+		    {
+		        amqpMessage.setBody(new AmqpValue(body.getValue()));
+		    }
+		    else if (body.getBodyType() == MessageBodyType.SEQUENCE)
+		    {
+		        amqpMessage.setBody(new AmqpSequence(body.getSequence()));
+		    }
+		    else
+		    {
+		        amqpMessage.setBody(new Data(new Binary(body.getBinaryData())));
+		    }
 		}
 		
 		if(brokeredMessage.getProperties() != null)
@@ -96,12 +111,23 @@ class MessageConverter
 			if(body instanceof Data)
 			{
 				Binary messageData = ((Data)body).getValue();
-				brokeredMessage = new Message(messageData.getArray());
+				brokeredMessage = new Message(new MessageBody(messageData.getArray()));
+			}
+			else if (body instanceof AmqpValue)
+			{
+			    Object messageData = ((AmqpValue)body).getValue();
+			    brokeredMessage = new Message(new MessageBody(messageData));
+				
+			}
+			else if (body instanceof AmqpSequence)
+			{
+			    List<Object> messageData = ((AmqpSequence)body).getValue();
+			    brokeredMessage = new Message(new MessageBody(messageData));
 			}
 			else
 			{
-				// TODO: handle other types of message body
-				brokeredMessage = new Message();
+			    // Should never happen
+			    brokeredMessage = new Message();
 			}
 		}
 		else

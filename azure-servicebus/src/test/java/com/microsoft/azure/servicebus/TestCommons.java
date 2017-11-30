@@ -43,7 +43,8 @@ public class TestCommons {
 	public static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{	
 		String messageId = UUID.randomUUID().toString();
-		Message message = new Message("AMQP message");
+		String messageBody = "AMQP message";
+		Message message = new Message(messageBody);
 		message.setMessageId(messageId);
 		if(sessionId != null)
 		{
@@ -54,9 +55,36 @@ public class TestCommons {
 		IMessage receivedMessage = receiver.receive();
 		Assert.assertNotNull("Message not received", receivedMessage);
 		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+		Assert.assertEquals("Message Body Type did not match", MessageBodyType.VALUE, receivedMessage.getBody().getBodyType());
+		Assert.assertEquals("Message content did not match", messageBody, receivedMessage.getBody().getValue());
 		receivedMessage = receiver.receive(SHORT_WAIT_TIME);
 		Assert.assertNull("Message received again", receivedMessage);
 	}
+	
+	public static void testBasicReceiveAndDeleteWithBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+    {   
+        String messageId = UUID.randomUUID().toString();
+        byte[] binaryData = new byte[200];
+        for(int i=0; i< binaryData.length; i++)
+        {
+            binaryData[i] = (byte)i;
+        }
+        Message message = new Message(new MessageBody(binaryData));
+        message.setMessageId(messageId);
+        if(sessionId != null)
+        {
+            message.setSessionId(sessionId);
+        }
+        sender.send(message);
+                
+        IMessage receivedMessage = receiver.receive();
+        Assert.assertNotNull("Message not received", receivedMessage);
+        Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+        Assert.assertEquals("Message Body Type did not match", MessageBodyType.BINARY, receivedMessage.getBody().getBodyType());
+        Assert.assertArrayEquals("Message content did not match", binaryData, receivedMessage.getBody().getBinaryData());
+        receivedMessage = receiver.receive(SHORT_WAIT_TIME);
+        Assert.assertNull("Message received again", receivedMessage);
+    }
 	
 	public static void testBasicReceiveBatchAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{

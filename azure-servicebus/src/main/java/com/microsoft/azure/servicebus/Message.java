@@ -4,7 +4,6 @@
 package com.microsoft.azure.servicebus;
 
 import java.io.Serializable;
-import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -19,11 +18,9 @@ import java.util.UUID;
 final public class Message implements Serializable, IMessage {
 	private static final long serialVersionUID = 7849508139219590863L;
 	
-	private static final Charset DEFAULT_CHAR_SET = Charset.forName("UTF-8");
-	
 	private static final String DEFAULT_CONTENT_TYPE = null;
 	
-	private static final byte[] DEFAULT_CONTENT = new byte[0];
+	private static final MessageBody DEFAULT_CONTENT = new MessageBody(new byte[0]);
 
 	private long deliveryCount;
 	
@@ -31,7 +28,7 @@ final public class Message implements Serializable, IMessage {
 	
 	private Duration timeToLive;
 	
-	private byte[] content;
+	private MessageBody body;
 	
 	private String contentType;
 	
@@ -72,33 +69,33 @@ final public class Message implements Serializable, IMessage {
 	
 	public Message(String content)
 	{
-		this(content.getBytes(DEFAULT_CHAR_SET));
+		this(new MessageBody(content));
 	}
 	
-	public Message(byte[] content)
+	public Message(MessageBody body)
 	{
-		this(content, DEFAULT_CONTENT_TYPE);
+		this(body, DEFAULT_CONTENT_TYPE);
 	}
 	
 	public Message(String content, String contentType)
 	{
-		this(content.getBytes(DEFAULT_CHAR_SET), contentType);
+		this(new MessageBody(content), contentType);
 	}
 	
-	public Message(byte[] content, String contentType)
+	public Message(MessageBody body, String contentType)
 	{
-		this(UUID.randomUUID().toString(), content, contentType);
+		this(UUID.randomUUID().toString(), body, contentType);
 	}
 	
 	public Message(String messageId, String content, String contentType)
 	{
-		this(messageId, content.getBytes(DEFAULT_CHAR_SET), contentType);
+		this(messageId, new MessageBody(content), contentType);
 	}
 
-	public Message(String messageId, byte[] content, String contentType)
+	public Message(String messageId, MessageBody body, String contentType)
 	{
 		this.messageId = messageId;
-		this.content = content;
+		this.body = body;
 		this.contentType = contentType;
 		this.properties = new HashMap<>();
 	}
@@ -185,13 +182,13 @@ final public class Message implements Serializable, IMessage {
 	}
 	
 	@Override
-	public byte[] getBody() {
-		return this.content;
+	public MessageBody getBody() {
+		return this.body;
 	}
 
 	@Override
-	public void setBody(byte[] content) {
-		this.content = content;
+	public void setBody(MessageBody body) {
+		this.body = body;
 	}
 	
 	@Override

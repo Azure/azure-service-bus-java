@@ -75,7 +75,7 @@ public interface IMessage {
      * Gets the content type of this message.
      *
      * Optionally describes the payload of the message, with a descriptor following the format of 
-     * RFC2045, Section 5, for example "application/json".
+     * RFC2045, Section 5, for example "application/json". Note that content type is not same as message body type.
      * 
      * @return content type of this message
      */
@@ -183,21 +183,20 @@ public interface IMessage {
     public void setSessionId(String sessionId);
 
     /**
-     * Gets the body of this message as a byte array. It is up to client applications 
-     * to decode the bytes.
+     * Gets the body of this message. Client applications should extract message content based on body type.
      *
      * @return body of this message
      * @see <a href="https://docs.microsoft.com/azure/service-bus-messaging/service-bus-messages-payloads">Messages, payloads, and serialization</a>
      */
-    public byte[] getBody();
+    public MessageBody getBody();
 
     /**
-     * Sets the body of this message as a byte array.
+     * Sets the body of this message.
      *
      * @param body body of this message
      * @see #getBody()
      */
-    public void setBody(byte[] body);
+    public void setBody(MessageBody body);
 
     /**
      * Gets the map of user application properties of this message. Client 
