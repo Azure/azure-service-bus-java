@@ -158,7 +158,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
 
     @Override
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
-        message.setScheduledEnqueuedTimeUtc(scheduledEnqueueTimeUtc);
+        message.setScheduledEnqueueTimeUtc(scheduledEnqueueTimeUtc);
         org.apache.qpid.proton.message.Message amqpMessage = MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message);
         return this.internalSender.scheduleMessageAsync(new org.apache.qpid.proton.message.Message[]{amqpMessage}, this.messagingFactory.getOperationTimeout()).thenApply(sequenceNumbers -> sequenceNumbers[0]);
     }
