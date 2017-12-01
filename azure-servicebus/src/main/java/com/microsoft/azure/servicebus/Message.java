@@ -44,7 +44,7 @@ final public class Message implements Serializable, IMessage {
 	
 	private Instant lockedUntilUtc;
 	
-	private Map<String, Object> properties;
+	private Map<String, String> properties;
 	
 	private String correlationId;
 	
@@ -193,12 +193,12 @@ final public class Message implements Serializable, IMessage {
 	}
 	
 	@Override
-	public Map<String, Object> getProperties() {
+	public Map<String, String> getProperties() {
 		return this.properties;
 	}
 
 	@Override
-	public void setProperties(Map<String, Object> properties) {
+	public void setProperties(Map<String, String> properties) {
 		this.properties = properties;				
 	}
 
