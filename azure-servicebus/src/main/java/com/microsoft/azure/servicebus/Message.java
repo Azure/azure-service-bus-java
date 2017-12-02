@@ -8,6 +8,7 @@ import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,6 +33,10 @@ final public class Message implements Serializable, IMessage {
 	private Duration timeToLive;
 	
 	private byte[] content;
+	
+	private Object bodyAsValue;
+	
+	private List<Object> bodyAsSequence;
 	
 	private String contentType;
 	
@@ -101,7 +106,49 @@ final public class Message implements Serializable, IMessage {
 		this.content = content;
 		this.contentType = contentType;
 		this.properties = new HashMap<>();
+		this.bodyAsSequence = null;
+		this.bodyAsValue = null;
 	}
+	
+	public Message(Object bodyAsValue)
+	{
+	    this(bodyAsValue, DEFAULT_CONTENT_TYPE);
+	}
+	
+	public Message(Object bodyAsValue, String contentType)
+	{
+	    this(UUID.randomUUID().toString(), bodyAsValue, DEFAULT_CONTENT_TYPE);
+	}
+	
+	public Message(String messageId, Object bodyAsValue, String contentType)
+	{
+	    this.messageId = messageId;
+        this.content = null;
+        this.contentType = contentType;
+        this.properties = new HashMap<>();
+        this.bodyAsSequence = null;
+        this.bodyAsValue = bodyAsValue;
+	}
+	
+	public Message(List<Object> bodyAsSequence)
+    {
+        this(bodyAsSequence, DEFAULT_CONTENT_TYPE);
+    }
+    
+    public Message(List<Object> bodyAsSequence, String contentType)
+    {
+        this(UUID.randomUUID().toString(), bodyAsSequence, DEFAULT_CONTENT_TYPE);
+    }
+    
+    public Message(String messageId, List<Object> bodyAsSequence, String contentType)
+    {
+        this.messageId = messageId;
+        this.content = null;
+        this.contentType = contentType;
+        this.properties = new HashMap<>();
+        this.bodyAsSequence = bodyAsSequence;
+        this.bodyAsValue = null;
+    }
 
 	@Override
 	public long getDeliveryCount() {
@@ -302,4 +349,25 @@ final public class Message implements Serializable, IMessage {
 		this.deliveryTag = deliveryTag;
 	}
 	
+	@Override
+	public Object getBodyAsValue()
+    {
+        return null;
+    }
+    
+	@Override
+    public List<Object> getBodyAsSequence()
+    {
+        return null;
+    }
+	
+	void setBodyAsValue(Object bodyAsValue)
+	{
+	    this.bodyAsValue = bodyAsValue;
+	}
+	
+	void setBodyAsSequence(List<Object> bodyAsSequence)
+    {
+        this.bodyAsSequence = bodyAsSequence;
+    }
 }

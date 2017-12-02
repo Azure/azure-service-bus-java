@@ -6,12 +6,15 @@ package com.microsoft.azure.servicebus;
 import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.messaging.AmqpSequence;
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.apache.qpid.proton.amqp.messaging.Data;
 import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
@@ -31,6 +34,14 @@ class MessageConverter
 		if(brokeredMessage.getBody() != null)
 		{
 			amqpMessage.setBody(new Data(new Binary(brokeredMessage.getBody())));
+		}
+		else if(brokeredMessage.getBodyAsValue() != null)
+		{
+		    amqpMessage.setBody(new AmqpValue(brokeredMessage.getBodyAsValue()));
+		}
+		else if(brokeredMessage.getBodyAsSequence() != null)
+		{
+		    amqpMessage.setBody(new AmqpSequence(brokeredMessage.getBodyAsSequence()));
 		}
 		
 		if(brokeredMessage.getProperties() != null)
@@ -98,9 +109,19 @@ class MessageConverter
 				Binary messageData = ((Data)body).getValue();
 				brokeredMessage = new Message(messageData.getArray());
 			}
+			else if (body instanceof AmqpValue)
+			{
+			    Object messageData = ((AmqpValue)body).getValue();
+                brokeredMessage = new Message(messageData);
+			}
+			else if (body instanceof AmqpSequence)
+			{
+			    List<Object> messageData = ((AmqpSequence)body).getValue();
+                brokeredMessage = new Message(messageData);
+			}
 			else
 			{
-				// TODO: handle other types of message body
+				// Shoule never happen
 				brokeredMessage = new Message();
 			}
 		}

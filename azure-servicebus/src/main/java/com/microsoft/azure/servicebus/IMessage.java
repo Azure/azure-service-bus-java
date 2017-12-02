@@ -5,6 +5,7 @@ package com.microsoft.azure.servicebus;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -355,4 +356,14 @@ public interface IMessage {
      * @see <a href="https://docs.microsoft.com/azure/service-bus-messaging/message-transfers-locks-settlement">Message transfers, locks, and settlement</a>
      */
     public UUID getLockToken();
+    
+    public default Object getBodyAsValue()
+    {
+        return null;
+    }
+    
+    public default List<Object> getBodyAsSequence()
+    {
+        return null;
+    }
 }
