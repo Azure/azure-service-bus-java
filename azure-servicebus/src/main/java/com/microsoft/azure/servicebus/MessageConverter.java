@@ -121,7 +121,7 @@ class MessageConverter
 			}
 			else
 			{
-				// Shoule never happen
+				// Should never happen
 				brokeredMessage = new Message();
 			}
 		}
