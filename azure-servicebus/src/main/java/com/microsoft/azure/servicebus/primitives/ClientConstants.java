@@ -22,7 +22,7 @@ public final class ClientConstants
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ClientConstants.class);
 
 	public static final String FATAL_MARKER = "FATAL";
-	public final static String PRODUCT_NAME = "MSJavaClient";
+	public final static String PRODUCT_NAME = "Microsoft.Azure.ServiceBusJ";
     public final static String CURRENT_JAVACLIENT_VERSION =  getClientVersion();
     public static final String PLATFORM_INFO = getPlatformInfo();
     
