@@ -24,11 +24,6 @@ public class TestUtils {
 		namespaceConnectionStringBuilder = new ConnectionStringBuilder(namespaceConnectionString);
 	}
 	
-	public static String getNamespaceConnectionString()
-	{
-	    return namespaceConnectionString;
-	}
-	
 	public static URI getNamespaceEndpointURI()
 	{
 	    return namespaceConnectionStringBuilder.getEndpoint();
