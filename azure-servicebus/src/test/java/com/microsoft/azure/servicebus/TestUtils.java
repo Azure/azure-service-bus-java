@@ -25,14 +25,20 @@ public class TestUtils {
 	}
 	
 	public static URI getNamespaceEndpointURI()
-	{
-	    return namespaceConnectionStringBuilder.getEndpoint();
-	}
-	
-	public static ClientSettings getClientSettings()
-	{
-	    return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
-	}
+    {
+        return namespaceConnectionStringBuilder.getEndpoint();
+    }
+    
+    public static ClientSettings getClientSettings()
+    {
+        return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+    }
+    
+    // AADTokens cannot yet be used for management operations, sent directly to gateway
+    public static ClientSettings getManagementClientSettings()
+    {
+        return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+    }
 	
 	public static String randomizeEntityName(String entityName)
 	{
