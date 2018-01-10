@@ -1,4 +1,4 @@
-package com.microsoft.azure.sevicebus.security;
+package com.microsoft.azure.servicebus.security;
 
 import java.io.IOException;
 import java.io.InputStreamReader;

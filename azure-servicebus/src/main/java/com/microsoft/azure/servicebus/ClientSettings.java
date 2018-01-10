@@ -4,7 +4,7 @@ import java.time.Duration;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
 import com.microsoft.azure.servicebus.primitives.RetryPolicy;
-import com.microsoft.azure.sevicebus.security.TokenProvider;
+import com.microsoft.azure.servicebus.security.TokenProvider;
 
 /**
  * Class encapsulating common client level settings like TokenProvider, RetryPolicy, OperationTimeout.

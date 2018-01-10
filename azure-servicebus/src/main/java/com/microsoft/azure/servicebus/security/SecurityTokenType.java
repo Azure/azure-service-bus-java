@@ -1,4 +1,4 @@
-package com.microsoft.azure.sevicebus.security;
+package com.microsoft.azure.servicebus.security;
 
 /**
  * Enumeration representing security token types supported by Azure Service Bus.

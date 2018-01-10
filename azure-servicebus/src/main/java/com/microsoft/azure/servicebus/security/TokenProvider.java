@@ -1,4 +1,4 @@
-package com.microsoft.azure.sevicebus.security;
+package com.microsoft.azure.servicebus.security;
 
 import java.net.MalformedURLException;
 import java.time.Instant;
@@ -17,7 +17,7 @@ import com.microsoft.aad.adal4j.ClientCredential;
 public abstract class TokenProvider
 {
     /**
-     * Asynchronously ets a security token for the given audience. Implementations of this method may choose to create a new token for every call
+     * Asynchronously gets a security token for the given audience. Implementations of this method may choose to create a new token for every call
      * or return a cached token. But the token returned must be valid.
      * @param audience path of the entity for which this security token is to be presented
      * @return an instance of CompletableFuture which returns a {@link SecurityToken} on completion.

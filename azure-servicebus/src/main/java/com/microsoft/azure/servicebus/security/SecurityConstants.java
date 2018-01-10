@@ -1,4 +1,4 @@
-package com.microsoft.azure.sevicebus.security;
+package com.microsoft.azure.servicebus.security;
 
 /**
  * This class contains all security related constants.
