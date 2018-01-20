@@ -381,15 +381,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 
 		final ReceiveLinkHandler handler = new ReceiveLinkHandler(this);
 		BaseHandler.setHandler(receiver, handler);
-		this.underlyingFactory.registerForConnectionError(receiver);
-
 		receiver.open();
-
-		if (this.receiveLink != null)
-		{			
-			this.underlyingFactory.deregisterForConnectionError(this.receiveLink);
-		}
-
 		this.receiveLink = receiver;
 	}
 	
@@ -587,7 +579,9 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		
 		if (exception == null)
-		{			
+		{
+		    this.underlyingFactory.registerForConnectionError(this.receiveLink);
+		    
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
 			{
 				AsyncUtil.completeFuture(this.linkOpen.getWork(), this);
@@ -631,7 +625,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                     this.closeAsync();
                 }
             }
-
+			
 			this.lastKnownLinkError = exception;
 		}
 	}
@@ -800,6 +794,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			}
 			else
 			{
+			    this.underlyingFactory.deregisterForConnectionError(this.receiveLink);
+			    
 			    if (exception != null &&
 	                    (!(exception instanceof ServiceBusException) || !((ServiceBusException) exception).getIsTransient()))
 	            {
