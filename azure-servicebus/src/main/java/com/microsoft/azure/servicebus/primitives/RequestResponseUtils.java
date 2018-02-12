@@ -38,7 +38,7 @@ public class RequestResponseUtils {
         applicationPropertiesMap.put(ClientConstants.REQUEST_RESPONSE_TIMEOUT, timeout.toMillis());
         if(!StringUtil.isNullOrEmpty(associatedLinkName))
         {
-            applicationPropertiesMap.put(ClientConstants.REQUEST_RESPONSE_ASSOCAITED_LINK_NAME, associatedLinkName);
+            applicationPropertiesMap.put(ClientConstants.REQUEST_RESPONSE_ASSOCIATED_LINK_NAME, associatedLinkName);
         }
         requestMessage.setApplicationProperties(new ApplicationProperties(applicationPropertiesMap));
         return requestMessage;

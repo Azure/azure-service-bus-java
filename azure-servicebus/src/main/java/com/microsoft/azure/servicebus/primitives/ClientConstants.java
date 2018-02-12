@@ -123,7 +123,7 @@ public final class ClientConstants
 	public static final String REQUEST_RESPONSE_STATUS_CODE = "statusCode";
     public static final String REQUEST_RESPONSE_STATUS_DESCRIPTION = "statusDescription";
     public static final String REQUEST_RESPONSE_ERROR_CONDITION = "errorCondition";
-    public static final String REQUEST_RESPONSE_ASSOCAITED_LINK_NAME = "associated-link-name";
+    public static final String REQUEST_RESPONSE_ASSOCIATED_LINK_NAME = "associated-link-name";
     
     // Legacy property names are used in CBS responses
     public static final String REQUEST_RESPONSE_LEGACY_STATUS_CODE = "status-code";
