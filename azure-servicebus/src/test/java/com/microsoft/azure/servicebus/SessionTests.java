@@ -26,10 +26,10 @@ public abstract class SessionTests extends Tests {
     private static String receiveEntityPathForAllTest = null;
 	
 	protected MessagingFactory factory;
-	private IMessageSender sender;
-	private IMessageSession session;
-	private String entityName;
-	private String receiveEntityPath;
+	protected IMessageSender sender;
+	protected IMessageSession session;
+	protected String entityName;
+	protected String receiveEntityPath;
 	
 	@BeforeClass
 	public static void init()
@@ -84,7 +84,7 @@ public abstract class SessionTests extends Tests {
         }
         
         this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceEndpointURI, TestUtils.getClientSettings());
-        this.sender = ClientFactory.createMessageSenderFromEntityPath(namespaceEndpointURI, this.entityName, TestUtils.getClientSettings());
+        this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
 	}
 	
 	@After

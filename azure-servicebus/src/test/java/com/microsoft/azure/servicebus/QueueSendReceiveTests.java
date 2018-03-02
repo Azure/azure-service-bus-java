@@ -1,10 +1,14 @@
 package com.microsoft.azure.servicebus;
 
+import com.microsoft.azure.servicebus.management.EntityManager;
+import com.microsoft.azure.servicebus.management.ManagementException;
+import com.microsoft.azure.servicebus.management.QueueDescription;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -127,39 +131,111 @@ public class QueueSendReceiveTests extends SendReceiveTests
         Assert.assertNull(receivedMessage);
     }
 
+    @Ignore("Takes a long time.")
     @Test
-    public void transactionalSendRollbackTest2() throws ServiceBusException, InterruptedException, ExecutionException {
-        this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
+    public void transactionalRequestResponseDispositionRollbackTest() throws ServiceBusException, InterruptedException, ExecutionException {
         this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
+
+        Message message = new Message("AMQP message");
+        this.sender.send(message);
+        IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
+        this.receiver.defer(receivedMessage.getLockToken());
+        receivedMessage = this.receiver.receiveDeferredMessage(receivedMessage.getSequenceNumber());
+        Assert.assertNotNull(receivedMessage);
 
         ByteBuffer txnId = this.factory.startTransaction().get();
         Assert.assertNotNull(txnId);
-
-        String messageId = UUID.randomUUID().toString();
-        Message message = new Message("AMQP message");
-        message.setMessageId(messageId);
-        this.sender.send(message, txnId);
-
-        this.factory.endTransaction(txnId, true).get();
-
-        IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
-
-        //Assert.assertNull(receivedMessage);
-        Assert.assertNotNull("Message not received", receivedMessage);
-        Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
-
-        txnId = this.factory.startTransaction().get();
-        Assert.assertNotNull(txnId);
-        System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
-
-        System.out.println("Completing");
         this.receiver.complete(receivedMessage.getLockToken(), txnId);
-        //this.receiver.complete(receivedMessage.getLockToken());
+        this.factory.endTransaction(txnId, false).get();
 
-        System.out.println("Discharging");
+        Thread.sleep(1000 * 65);    // Waiting for lock to expire. TODO: Find a better way to handle this.
+
+        receivedMessage = this.receiver.receiveDeferredMessage(receivedMessage.getSequenceNumber());
+        Assert.assertNotNull(txnId);
+        this.receiver.complete(receivedMessage.getLockToken());
+    }
+
+    @Test
+    public void transactionThrowsWhenOperationsOfDifferentPartitionAreInSameTransaction() throws ManagementException, ServiceBusException, InterruptedException, ExecutionException {
+        // Need a partitioned entity for this test. Creating one manually.
+        String partitionedEntityName = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
+        QueueDescription queueDescription = new QueueDescription(partitionedEntityName);
+        queueDescription.setEnablePartitioning(true);
+
+        URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
+        ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
+        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+
+        try {
+            IMessageSender pSender = ClientFactory.createMessageSenderFromEntityPath(factory, partitionedEntityName);
+            IMessageReceiver pReceiver = ClientFactory.createMessageReceiverFromEntityPath(factory, partitionedEntityName, ReceiveMode.PEEKLOCK);
+
+            ByteBuffer txnId = this.factory.startTransaction().get();
+            Message message1 = new Message("AMQP message");
+            message1.setPartitionKey("1");
+            Message message2 = new Message("AMQP message 2");
+            message2.setPartitionKey("2");
+
+            pSender.send(message1, txnId);
+            boolean caught = false;
+            try {
+                pSender.send(message2, txnId);
+            } catch (ServiceBusException ex) {
+                caught = true;
+                Assert.assertTrue(ex.getCause() instanceof UnsupportedOperationException);
+            }
+
+            Assert.assertTrue(caught);
+            this.factory.endTransaction(txnId, false).get();
+
+            pSender.send(message1);
+            pSender.send(message2);
+
+            IMessage receivedMessage1 = pReceiver.receive();
+            IMessage receivedMessage2 = pReceiver.receive();
+            Assert.assertNotNull("Message not received", receivedMessage1);
+            Assert.assertNotNull("Message not received", receivedMessage2);
+
+            txnId = this.factory.startTransaction().get();
+            pReceiver.complete(receivedMessage1.getLockToken(), txnId);
+            try {
+                caught = false;
+                pReceiver.complete(receivedMessage2.getLockToken(), txnId);
+            } catch (ServiceBusException ex) {
+                caught = true;
+                Assert.assertTrue(ex.getCause() instanceof UnsupportedOperationException);
+            }
+
+            Assert.assertTrue(caught);
+
+            this.factory.endTransaction(txnId, false);
+        }
+        finally {
+            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, partitionedEntityName);
+        }
+    }
+
+    @Test
+    public void transactionCommitWorksAcrossClientsUsingSameFactoryToSameEntity() throws ServiceBusException, InterruptedException, ExecutionException {
+        this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
+
+        Message message1 = new Message("AMQP message");
+        message1.setMessageId("1");
+        Message message2 = new Message("AMQP message 2");
+        message2.setMessageId("2");
+        this.sender.send(message1);
+        IMessage receivedMessage = this.receiver.receive();
+
+        ByteBuffer txnId = this.factory.startTransaction().get();
+        this.receiver.complete(receivedMessage.getLockToken(), txnId);
+        this.sender.send(message2, txnId);
         this.factory.endTransaction(txnId, true).get();
 
-        //receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
-        //Assert.assertNull(receivedMessage);
+        receivedMessage = this.receiver.receive();
+        Assert.assertNotNull(receivedMessage);
+        Assert.assertEquals("2", receivedMessage.getMessageId());
+
+        receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
+        Assert.assertNull(receivedMessage);
     }
 }
