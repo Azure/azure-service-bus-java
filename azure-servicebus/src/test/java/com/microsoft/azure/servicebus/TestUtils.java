@@ -8,7 +8,7 @@ import com.microsoft.azure.servicebus.primitives.Util;
 
 public class TestUtils {
 	
-	private static final String NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME = "AZURE_SERVICEBUS_JAVA_CLIENT_TEST_CONNECTION_STRING";	
+	private static final String NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME = "Endpoint=sb://contoso.servicebus.onebox.windows-int.net/;SharedAccessKeyName=DefaultNamespaceSasAllKeyName;SharedAccessKey=8864/auVd3qDC75iTjBL1GJ4D2oXC6bIttRd0jzDZ+g=";
 	public static final String FIRST_SUBSCRIPTION_NAME = "subscription1";	
 	private static String namespaceConnectionString;
 	private static ConnectionStringBuilder namespaceConnectionStringBuilder;
@@ -16,7 +16,7 @@ public class TestUtils {
 	static
 	{
 		// Read connection string
-		namespaceConnectionString = System.getenv(NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME);
+		namespaceConnectionString = "Endpoint=sb://contoso.servicebus.onebox.windows-int.net/;SharedAccessKeyName=DefaultNamespaceSasAllKeyName;SharedAccessKey=8864/auVd3qDC75iTjBL1GJ4D2oXC6bIttRd0jzDZ+g=";
 		if(namespaceConnectionString == null || namespaceConnectionString.isEmpty())
 		{			
 			System.err.println(NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME + " environment variable not set. Tests will not be able to connecto to any service bus entity.");

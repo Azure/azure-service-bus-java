@@ -4,6 +4,7 @@
 package com.microsoft.azure.servicebus;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -107,7 +108,12 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
 
     @Override
     public void send(IMessage message) throws InterruptedException, ServiceBusException {
-        Utils.completeFuture(this.sendAsync(message));
+        this.send(message, MessagingFactory.NULL_TXN_ID);
+    }
+
+    @Override
+    public void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.sendAsync(message, txnId));
     }
 
     @Override
@@ -117,8 +123,13 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
 
     @Override
     public CompletableFuture<Void> sendAsync(IMessage message) {
+        return this.sendAsync(message, MessagingFactory.NULL_TXN_ID);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId) {
         org.apache.qpid.proton.message.Message amqpMessage = MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message);
-        return this.internalSender.sendAsync(amqpMessage);
+        return this.internalSender.sendAsync(amqpMessage, txnId);
     }
 
     @Override
@@ -162,12 +173,18 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
         message.setScheduledEnqueuedTimeUtc(scheduledEnqueueTimeUtc);
         org.apache.qpid.proton.message.Message amqpMessage = MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message);
-        return this.internalSender.scheduleMessageAsync(new org.apache.qpid.proton.message.Message[]{amqpMessage}, this.messagingFactory.getClientSetttings().getOperationTimeout()).thenApply(sequenceNumbers -> sequenceNumbers[0]);
+        return this.internalSender.scheduleMessageAsync(
+                new org.apache.qpid.proton.message.Message[]{amqpMessage},
+                MessagingFactory.NULL_TXN_ID,
+                this.messagingFactory.getClientSetttings().getOperationTimeout()).thenApply(sequenceNumbers -> sequenceNumbers[0]);
     }
 
     @Override
     public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber) {
-        return this.internalSender.cancelScheduledMessageAsync(new Long[]{sequenceNumber}, this.messagingFactory.getClientSetttings().getOperationTimeout());
+        return this.internalSender.cancelScheduledMessageAsync(
+                new Long[]{sequenceNumber},
+                MessagingFactory.NULL_TXN_ID,
+                this.messagingFactory.getClientSetttings().getOperationTimeout());
     }
 
     @Override

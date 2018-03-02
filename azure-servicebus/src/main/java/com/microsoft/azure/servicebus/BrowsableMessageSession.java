@@ -3,6 +3,7 @@
 
 package com.microsoft.azure.servicebus;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -84,7 +85,7 @@ final class BrowsableMessageSession extends MessageSession {
     }
 
     @Override
-    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, ByteBuffer txnId) {
         throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
     }
 
@@ -104,7 +105,7 @@ final class BrowsableMessageSession extends MessageSession {
     }
 
     @Override
-    public CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber) {
+    public CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber, ByteBuffer txnId) {
         throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
     }
 
@@ -119,7 +120,7 @@ final class BrowsableMessageSession extends MessageSession {
     }
 
     @Override
-    public CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers) {
+    public CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers, ByteBuffer txnId) {
         throw new UnsupportedOperationException(INVALID_OPERATION_ERROR_MESSAGE);
     }
 

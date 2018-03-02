@@ -1,6 +1,7 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
@@ -13,12 +14,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.amqp.messaging.Released;
 import org.apache.qpid.proton.amqp.messaging.Source;
 import org.apache.qpid.proton.amqp.messaging.Target;
+import org.apache.qpid.proton.amqp.transaction.TransactionalState;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
@@ -269,7 +272,7 @@ class RequestResponseLink extends ClientEntity{
 		this.pendingRequests.clear();
 	}
 	
-	public CompletableFuture<Message> requestAysnc(Message requestMessage, Duration timeout)
+	public CompletableFuture<Message> requestAysnc(Message requestMessage, ByteBuffer txnId, Duration timeout)
 	{	    
 		this.throwIfClosed(null);
 		// Check and recreate links if necessary
@@ -299,14 +302,14 @@ class RequestResponseLink extends ClientEntity{
         }
         
 		CompletableFuture<Message> responseFuture = new CompletableFuture<Message>();
-		RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, responseFuture, timeout);
+		RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, txnId, responseFuture, timeout);
 		String requestId = "request:" +  this.requestCounter.incrementAndGet();
 		requestMessage.setMessageId(requestId);
 		requestMessage.setReplyTo(this.replyTo);
 		this.pendingRequests.put(requestId, workItem);
 		workItem.setTimeoutTask(this.scheduleRequestTimeout(requestId, timeout));
 		TRACE_LOGGER.debug("Sending request with id:{}", requestId);
-		this.amqpSender.sendRequest(requestMessage, false);		
+		this.amqpSender.sendRequest(requestMessage, txnId, false);
 		return responseFuture;
 	}
 	
@@ -375,7 +378,7 @@ class RequestResponseLink extends ClientEntity{
 									@Override
 									public void onEvent()
 									{
-										RequestResponseLink.this.amqpSender.sendRequest(workItem.getRequest(), true);
+										RequestResponseLink.this.amqpSender.sendRequest(workItem.getRequest(), workItem.getTxnId(), true);
 									}
 								});
 					} catch (IOException e) {
@@ -615,8 +618,8 @@ class RequestResponseLink extends ClientEntity{
 		private CompletableFuture<Void> openFuture;
 		private CompletableFuture<Void> closeFuture;
 		private AtomicInteger availableCredit;
-		private LinkedList<Message> pendingFreshSends;
-		private LinkedList<Message> pendingRetrySends;
+		private LinkedList<InternalSenderWorkItem> pendingFreshSends;
+		private LinkedList<InternalSenderWorkItem> pendingRetrySends;
 		private Object pendingSendsSyncLock;
 		private boolean isSendLoopRunning;
 
@@ -766,17 +769,17 @@ class RequestResponseLink extends ClientEntity{
 			}
 		}
 		
-		public void sendRequest(Message requestMessage, boolean isRetry)
+		public void sendRequest(Message requestMessage, ByteBuffer txnId, boolean isRetry)
 		{
 			synchronized(this.pendingSendsSyncLock)
 			{
 				if(isRetry)
 				{
-					this.pendingRetrySends.add(requestMessage);
+					this.pendingRetrySends.add(new InternalSenderWorkItem(requestMessage, txnId));
 				}
 				else
 				{
-					this.pendingFreshSends.add(requestMessage);
+					this.pendingFreshSends.add(new InternalSenderWorkItem(requestMessage, txnId));
 				}
 				
 				// This check must be done inside lock
@@ -852,7 +855,7 @@ class RequestResponseLink extends ClientEntity{
             {
                 while(this.sendLink != null && this.sendLink.getLocalState() == EndpointState.ACTIVE && this.sendLink.getRemoteState() == EndpointState.ACTIVE && this.availableCredit.get() > 0)
                 {
-                    Message requestToBeSent = null;
+					InternalSenderWorkItem requestToBeSent = null;
                     synchronized(pendingSendsSyncLock)
                     {
                         // First send retries and then fresh ones
@@ -872,15 +875,21 @@ class RequestResponseLink extends ClientEntity{
                     
                     Delivery delivery = this.sendLink.delivery(UUID.randomUUID().toString().getBytes());
                     delivery.setMessageFormat(DeliveryImpl.DEFAULT_MESSAGE_FORMAT);
-                    
+					ByteBuffer txnId = requestToBeSent.getTxnId();
+					if (txnId != MessagingFactory.NULL_TXN_ID) {
+						TransactionalState transactionalState = new TransactionalState();
+						transactionalState.setTxnId(new Binary(txnId.array()));
+						delivery.disposition(transactionalState);
+					}
+
                     Pair<byte[], Integer> encodedPair = null;
                     try
                     {
-                        encodedPair = Util.encodeMessageToOptimalSizeArray(requestToBeSent);
+                        encodedPair = Util.encodeMessageToOptimalSizeArray(requestToBeSent.getMessage());
                     }
                     catch(PayloadSizeExceededException exception)
                     {
-                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessageId(), new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", ClientConstants.MAX_MESSAGE_LENGTH_BYTES / 1024), exception), false);
+                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessage().getMessageId(), new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", ClientConstants.MAX_MESSAGE_LENGTH_BYTES / 1024), exception), false);
                     }
                     
                     try
@@ -893,8 +902,8 @@ class RequestResponseLink extends ClientEntity{
                     }
                     catch(Exception e)
                     {
-                        TRACE_LOGGER.error("RequestResonseLink {} failed to send request with request id:{}.", this.parent.linkPath, requestToBeSent.getMessageId(), e);
-                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessageId(), e, false);
+                        TRACE_LOGGER.error("RequestResonseLink {} failed to send request with request id:{}.", this.parent.linkPath, requestToBeSent.getMessage().getMessageId(), e);
+                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessage().getMessageId(), e, false);
                     }
                 }
             }
@@ -910,5 +919,19 @@ class RequestResponseLink extends ClientEntity{
                 TRACE_LOGGER.debug("RequestResponseLink {} internal sender send loop stopped.", this.parent.linkPath);
             }
 		}
+	}
+
+	class InternalSenderWorkItem {
+		private Message message;
+		private ByteBuffer txnId;
+
+		public InternalSenderWorkItem(Message message, ByteBuffer txnId) {
+			this.message = message;
+			this.txnId = txnId;
+		}
+
+		public Message getMessage() { return this.message; }
+
+		public ByteBuffer getTxnId() { return this.txnId; }
 	}
 }

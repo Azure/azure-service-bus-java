@@ -6,6 +6,7 @@ package com.microsoft.azure.servicebus.primitives;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.UnresolvedAddressException;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 
+import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Connection;
@@ -40,6 +42,9 @@ import com.microsoft.azure.servicebus.amqp.ReactorDispatcher;
 import com.microsoft.azure.servicebus.amqp.ReactorHandler;
 import com.microsoft.azure.servicebus.security.SecurityToken;
 
+import javax.naming.NamingException;
+import javax.persistence.*;
+
 /**
  * Abstracts all AMQP related details and encapsulates an AMQP connection and manages its life cycle. Each instance of this class represent one AMQP connection to the namespace.
  * If an application creates multiple senders, receivers or clients using the same MessagingFacotry instance, all those senders, receivers or clients will share the same connection to the namespace.
@@ -47,6 +52,7 @@ import com.microsoft.azure.servicebus.security.SecurityToken;
  */
 public class MessagingFactory extends ClientEntity implements IAmqpConnection
 {
+    public static ByteBuffer NULL_TXN_ID = null;
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessagingFactory.class);
 	
     private static final String REACTOR_THREAD_NAME_PREFIX = "ReactorThread";
@@ -57,11 +63,12 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	private final ReactorHandler reactorHandler;
 	private final LinkedList<Link> registeredLinks;
 	private final Object reactorLock;
-	private final RequestResponseLinkcache managementLinksCache;
+	private final RequestResponseLinkCache managementLinksCache;
 	
 	private Reactor reactor;
 	private ReactorDispatcher reactorScheduler;
 	private Connection connection;
+    private Controller controller;
 
 	private CompletableFuture<MessagingFactory> factoryOpenFuture;
 	private CompletableFuture<Void> cbsLinkCreationFuture;
@@ -71,6 +78,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	
 	private final ClientSettings clientSettings;
 	private final URI namespaceEndpointUri;
+	EntityManagerFactory entityManagerFactory;
 	
 	private MessagingFactory(URI namespaceEndpointUri, ClientSettings clientSettings)
 	{
@@ -85,7 +93,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         this.connectionHandler = new ConnectionHandler(this);
         this.factoryOpenFuture = new CompletableFuture<MessagingFactory>();
         this.cbsLinkCreationFuture = new CompletableFuture<Void>();
-        this.managementLinksCache = new RequestResponseLinkcache(this);
+        this.managementLinksCache = new RequestResponseLinkCache(this);
         this.reactorHandler = new ReactorHandler()
         {
             @Override
@@ -100,6 +108,57 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         };
         Timer.register(this.getClientId());
 	}
+
+	public CompletableFuture<ByteBuffer> startTransaction() {
+        return this.getController()
+                .thenCompose(controller -> controller.declareAsync()
+                        .thenApply(Binary::asByteBuffer));
+    }
+/*
+    public Binary getTransactionId() {
+        return TransactionManager.getTransactionId();
+    }
+*/
+    public CompletableFuture<Void> endTransaction(ByteBuffer txnId, boolean commit) {
+	    return this.getController()
+                .thenCompose(controller -> controller.dischargeAsync(new Binary(txnId.array()), commit));
+    }
+
+	private CompletableFuture<Controller> getController() {
+	    if (this.controller != null) {
+	        return CompletableFuture.completedFuture(this.controller);
+        }
+
+        return createController();
+    }
+
+	private synchronized CompletableFuture<Controller> createController() {
+	    if (this.controller != null) {
+	        return CompletableFuture.completedFuture(this.controller);
+        }
+        /*
+        ClientSettings newClientSettings = new ClientSettings(
+                this.clientSettings.getTokenProvider(),
+                RetryPolicy.getNoRetry(),
+                this.clientSettings.getOperationTimeout());
+        */
+	    Controller controller = new Controller(this.namespaceEndpointUri, this, this.clientSettings);
+	    return controller.initializeAsync().thenApply(v -> {
+	        this.controller = controller;
+	        return controller;
+        });
+    }
+
+    void trial() throws NamingException {
+        //InitialContext ic = new InitialContext();
+        //UserTransaction utx = (UserTransaction) ic.lookup("java:comp/UserTransaction");
+
+        entityManagerFactory = Persistence.createEntityManagerFactory("asbpu");
+        EntityManager entityManager = entityManagerFactory.createEntityManager();
+        EntityTransaction transaction = entityManager.getTransaction();
+
+
+    }
 
 	String getHostName()
 	{
@@ -137,7 +196,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		reactorThread.start();
 		TRACE_LOGGER.info("Started reactor");
 	}
-	
+
 	Connection getConnection()
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)

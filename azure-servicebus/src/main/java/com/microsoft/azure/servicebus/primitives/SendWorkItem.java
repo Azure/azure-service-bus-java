@@ -4,6 +4,7 @@
  */
 package com.microsoft.azure.servicebus.primitives;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
@@ -14,25 +15,27 @@ class SendWorkItem<T> extends WorkItem<T>
 	private int encodedMessageSize;
 	private boolean waitingForAck;
 	private String deliveryTag;
+	private ByteBuffer txnId;
 	
-	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, CompletableFuture<T> completableFuture, Duration timeout)
+	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, ByteBuffer txnId, CompletableFuture<T> completableFuture, Duration timeout)
 	{
 		super(completableFuture, timeout);
-		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag);
+		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag, txnId);
 	}
 
-	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, CompletableFuture<T> completableFuture, TimeoutTracker timeout)
+	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, ByteBuffer txnId, CompletableFuture<T> completableFuture, TimeoutTracker timeout)
 	{
 		super(completableFuture, timeout);
-		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag);
+		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag, txnId);
 	}
 
-	private void initialize(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag)
+	private void initialize(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, ByteBuffer txnId)
 	{
 		this.amqpMessage = amqpMessage;
 		this.messageFormat = messageFormat;
 		this.encodedMessageSize = encodedMessageSize;
 		this.deliveryTag = deliveryTag;
+		this.txnId = txnId;
 	}
 
 	public byte[] getMessage()
@@ -69,4 +72,8 @@ class SendWorkItem<T> extends WorkItem<T>
 	{
 	    this.deliveryTag = deliveryTag;
 	}
+
+	public ByteBuffer getTxnId() { return this.txnId; }
+
+	public void setTxnId(ByteBuffer txnId) { this.txnId = txnId; }
 }

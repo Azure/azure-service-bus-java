@@ -3,6 +3,7 @@
 
 package com.microsoft.azure.servicebus;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -69,6 +70,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void complete(UUID lockToken) throws InterruptedException, ServiceBusException;
 
+    void complete(UUID lockToken, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
+
     //void completeBatch(Collection<? extends IMessage> messages);
 
     /**
@@ -78,6 +81,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @return a CompletableFuture representing the pending complete.
      */
     CompletableFuture<Void> completeAsync(UUID lockToken);
+
+    CompletableFuture<Void> completeAsync(UUID lockToken, ByteBuffer txnId);
 
     // CompletableFuture<Void> completeBatchAsync(Collection<? extends IMessage> messages);
 
@@ -195,7 +200,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @param propertiesToModify         Message properties to modify.
      * @return a CompletableFuture representing the pending deadletter.
      */
-    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify);
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, ByteBuffer txnId);
 
     /**
      * Receives a {@link Message} with default server wait time.
@@ -216,6 +221,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     IMessage receive(Duration serverWaitTime) throws InterruptedException, ServiceBusException;
 
+    IMessage receiveDeferredMessage(long sequenceNumber) throws InterruptedException, ServiceBusException;
+
     /**
      * Receives a deferred {@link Message}. Deferred messages can only be received by using sequence number.
      *
@@ -224,7 +231,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if receive failed
      */
-    IMessage receiveDeferredMessage(long sequenceNumber) throws InterruptedException, ServiceBusException;
+    IMessage receiveDeferredMessage(long sequenceNumber, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
 
     /**
      * Receives a maximum of  maxMessageCount {@link Message} from Azure Service Bus.
@@ -255,7 +262,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if receive failed
      */
-    Collection<IMessage> receiveDeferredMessageBatch(Collection<Long> sequenceNumbers) throws InterruptedException, ServiceBusException;
+    Collection<IMessage> receiveDeferredMessageBatch(Collection<Long> sequenceNumbers, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
 
     /**
      * Receives a {@link Message} from Azure Service Bus.
@@ -278,7 +285,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @param sequenceNumber The sequence number of the message that will be received.
      * @return a CompletableFuture representing the pending receive.
      */
-    CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber);
+    CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber, ByteBuffer txnId);
 
     /**
      * Asynchronously receives a maximum of maxMessageCount {@link Message} from the entity.
@@ -303,7 +310,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @param sequenceNumbers The sequence numbers of the message that will be received.
      * @return a CompletableFuture representing the pending receive.
      */
-    CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers);
+    CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers, ByteBuffer txnId);
 
     /**
      * Asynchronously renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.

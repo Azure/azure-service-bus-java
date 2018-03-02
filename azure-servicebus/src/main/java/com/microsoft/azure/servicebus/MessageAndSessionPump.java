@@ -704,7 +704,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, MessagingFactory.NULL_TXN_ID);
     }
 
     private void checkInnerReceiveCreated() {

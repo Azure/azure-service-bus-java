@@ -29,7 +29,7 @@ final class CommonRequestResponseOperations {
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, sessionId);
 		}
 		Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_PEEK_OPERATION, requestBodyMap, Util.adjustServerTimeout(operationTimeout), associatedLinkName);
-		CompletableFuture<Message> responseFuture = requestResponseLink.requestAysnc(requestMessage, operationTimeout);
+		CompletableFuture<Message> responseFuture = requestResponseLink.requestAysnc(requestMessage, MessagingFactory.NULL_TXN_ID, operationTimeout);
 		return responseFuture.thenComposeAsync((responseMessage) -> {
 			CompletableFuture<Collection<Message>> returningFuture = new CompletableFuture<Collection<Message>>();
 			int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -81,7 +81,7 @@ final class CommonRequestResponseOperations {
         requestMessage.getApplicationProperties().getValue().put(ClientConstants.REQUEST_RESPONSE_PUT_TOKEN_TYPE, securityToken.getTokenType().toString());
         requestMessage.getApplicationProperties().getValue().put(ClientConstants.REQUEST_RESPONSE_PUT_TOKEN_AUDIENCE, securityToken.getTokenAudience());
         requestMessage.getApplicationProperties().getValue().put(ClientConstants.REQUEST_RESPONSE_PUT_TOKEN_EXPIRATION, securityToken.getValidUntil().toEpochMilli());
-        CompletableFuture<Message> responseFuture = requestResponseLink.requestAysnc(requestMessage, operationTimeout);
+        CompletableFuture<Message> responseFuture = requestResponseLink.requestAysnc(requestMessage, MessagingFactory.NULL_TXN_ID, operationTimeout);
         return responseFuture.thenComposeAsync((responseMessage) -> {
             CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
             int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);

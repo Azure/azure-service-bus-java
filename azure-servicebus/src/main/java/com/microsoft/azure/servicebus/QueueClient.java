@@ -4,6 +4,7 @@
 package com.microsoft.azure.servicebus;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.Collection;
@@ -149,6 +150,11 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.sendAsync(message, txnId));
+    }
+
+    @Override
     public void sendBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException {
         Utils.completeFuture(this.sendBatchAsync(messages));
     }
@@ -158,6 +164,14 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
         return this.createSenderAsync().thenComposeAsync((v) -> 
         {
             return this.sender.sendAsync(message);
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId) {
+        return this.createSenderAsync().thenComposeAsync((v) ->
+        {
+            return this.sender.sendAsync(message, txnId);
         });
     }
 

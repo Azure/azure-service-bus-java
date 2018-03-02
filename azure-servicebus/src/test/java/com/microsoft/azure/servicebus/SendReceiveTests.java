@@ -1,13 +1,16 @@
 package com.microsoft.azure.servicebus;
 
+import java.io.Console;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
+import org.apache.qpid.proton.amqp.transaction.Discharge;
+import org.junit.*;
 
 import com.microsoft.azure.servicebus.management.EntityManager;
 import com.microsoft.azure.servicebus.management.ManagementException;
@@ -21,12 +24,12 @@ public abstract class SendReceiveTests extends Tests {
     private static String entityNameCreatedForAllTests = null;
     private static String receiveEntityPathForAllTest = null;
     
-	private MessagingFactory factory;
-	private IMessageSender sender;
-	private IMessageReceiver receiver;
-	private String entityName;
-	private final String sessionId = null;
-	private String receiveEntityPath;
+	protected MessagingFactory factory;
+	protected IMessageSender sender;
+	protected IMessageReceiver receiver;
+	protected String entityName;
+	protected final String sessionId = null;
+	protected String receiveEntityPath;
 	
 	@BeforeClass
     public static void init()
@@ -79,7 +82,7 @@ public abstract class SendReceiveTests extends Tests {
 	    }
 	    
 	    this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceEndpointURI, TestUtils.getClientSettings());
-        this.sender = ClientFactory.createMessageSenderFromEntityPath(namespaceEndpointURI, this.entityName, TestUtils.getClientSettings());
+        this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
 	}
 	
 	@After
@@ -109,7 +112,96 @@ public abstract class SendReceiveTests extends Tests {
 	        EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
 	    }
 	}
-	
+
+	@Test
+	public void temp()
+	{
+		org.apache.qpid.proton.message.Message message = org.apache.qpid.proton.message.Message.Factory.create();
+		Discharge discharge = new Discharge();
+		discharge.setFail(true);
+		discharge.setTxnId(Binary.create(ByteBuffer.wrap(new byte[] {50, 51, 52})));
+		message.setBody(new AmqpValue(discharge));
+
+		byte[] a = new byte[100];
+		int len = message.encode(a, 0, 100);
+		System.out.println("true: " + len);
+		System.out.println(new String(a, 0, len));
+
+		message = org.apache.qpid.proton.message.Message.Factory.create();
+		discharge = new Discharge();
+		discharge.setFail(false);
+		discharge.setTxnId(Binary.create(ByteBuffer.wrap(new byte[] {50, 51, 52})));
+		message.setBody(new AmqpValue(discharge));
+
+		a = new byte[100];
+		len = message.encode(a, 0, 100);
+		System.out.println("false: " + len);
+		System.out.println(new String(a, 0, len));
+	}
+
+	@Test
+	public void dummyTest() throws ExecutionException, InterruptedException, ServiceBusException {
+		this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
+
+		for (int i = 0; i< 10; i++) {
+			ByteBuffer txnId = this.factory.startTransaction().get();
+			System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
+
+			String messageId = UUID.randomUUID().toString();
+			Message message = new Message("AMQP message");
+			message.setMessageId(messageId);
+			System.out.println("Sending");
+			this.sender.send(message, txnId);
+
+			System.out.println("Discharging");
+			this.factory.endTransaction(txnId, true).get();
+		}
+	}
+
+	@Test
+	public void transactionTest() throws ExecutionException, InterruptedException, ServiceBusException {
+		this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
+		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
+
+		for (int i = 0; i < 1; i++) {
+			System.out.println("Starting iteration: " + i);
+			ByteBuffer txnId = this.factory.startTransaction().get();
+			Assert.assertNotNull(txnId);
+			System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
+
+			String messageId = UUID.randomUUID().toString();
+			Message message = new Message("AMQP message");
+			message.setMessageId(messageId);
+			System.out.println("Sending");
+			this.sender.send(message, txnId);
+
+			System.out.println("Discharging");
+			this.factory.endTransaction(txnId, true).get();
+
+			IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
+
+			//Assert.assertNull(receivedMessage);
+			Assert.assertNotNull("Message not received", receivedMessage);
+			Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+
+			txnId = this.factory.startTransaction().get();
+			Assert.assertNotNull(txnId);
+			System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
+
+			System.out.println("Completing");
+			this.receiver.complete(receivedMessage.getLockToken(), txnId);
+			//this.receiver.complete(receivedMessage.getLockToken());
+
+			System.out.println("Discharging");
+			this.factory.endTransaction(txnId, true).get();
+
+			//receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
+			//Assert.assertNull(receivedMessage);
+		}
+
+		System.out.println("finished");
+	}
+
 	@Test
 	public void testBasicReceiveAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
 	{

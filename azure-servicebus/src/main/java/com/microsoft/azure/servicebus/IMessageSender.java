@@ -3,6 +3,7 @@
 
 package com.microsoft.azure.servicebus;
 
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -25,6 +26,8 @@ public interface IMessageSender extends IMessageEntityClient {
      */
     void send(IMessage message) throws InterruptedException, ServiceBusException;
 
+    void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
+
     /**
      * Sends a batch of messages to the Azure Service Bus entity this sender is connected to. This method blocks until the batch is sent to the entity. Calling this method is equivalent to calling
      * <code>sendBatchAsync(messages).get()</code>. For better performance, use async methods.
@@ -42,6 +45,8 @@ public interface IMessageSender extends IMessageEntityClient {
      * @return a CompletableFuture representing the pending send
      */
     CompletableFuture<Void> sendAsync(IMessage message);
+
+    CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId);
 
     /**
      * Sends a batch of messages to the Azure Service Bus entity this sender is connected to. This is an asynchronous method returning a CompletableFuture which completes when the batch is sent to the entity.

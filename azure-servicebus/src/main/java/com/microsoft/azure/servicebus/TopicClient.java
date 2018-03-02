@@ -4,6 +4,7 @@
 package com.microsoft.azure.servicebus;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -66,6 +67,11 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
+    public void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException {
+        this.sender.send(message, txnId);
+    }
+
+    @Override
     public void sendBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException {
         this.sender.sendBatch(messages);
     }
@@ -73,6 +79,11 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     @Override
     public CompletableFuture<Void> sendAsync(IMessage message) {
         return this.sender.sendAsync(message);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId) {
+        return this.sender.sendAsync(message, txnId);
     }
 
     @Override
