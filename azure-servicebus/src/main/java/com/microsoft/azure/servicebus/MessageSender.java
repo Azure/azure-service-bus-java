@@ -28,7 +28,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     private boolean isInitialized = false;
 
     private MessageSender() {
-        super(StringUtil.getShortRandomString(), null);
+        super(StringUtil.getShortRandomString());
     }
 
     MessageSender(ConnectionStringBuilder amqpConnectionStringBuilder) {
