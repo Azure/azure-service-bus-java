@@ -1166,8 +1166,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                     {
                         @Override
                         public void onEvent()
-                        { 
-                            delivery.disposition(state);
+                        {
+                        	delivery.disposition(state);
                         }
                     });
                 }
@@ -1245,7 +1245,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	
 	private void completePendingUpdateStateWorkItem(Delivery delivery, String deliveryTagAsString, UpdateStateWorkItem workItem, Exception exception)
 	{
-		if (delivery.remotelySettled()) {
+		boolean isSettled = delivery.remotelySettled();
+		if (isSettled) {
 			delivery.settle();
 		}
 
@@ -1256,10 +1257,12 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		else
 		{
 			ExceptionUtil.completeExceptionally(workItem.getWork(), exception, this, true);
-		}	
-		
-		this.tagsToDeliveriesMap.remove(deliveryTagAsString);
-		this.pendingUpdateStateRequests.remove(deliveryTagAsString);
+		}
+
+		if (isSettled) {
+			this.tagsToDeliveriesMap.remove(deliveryTagAsString);
+			this.pendingUpdateStateRequests.remove(deliveryTagAsString);
+		}
 	}
 	
 	private void clearAllPendingWorkItems(Exception exception)

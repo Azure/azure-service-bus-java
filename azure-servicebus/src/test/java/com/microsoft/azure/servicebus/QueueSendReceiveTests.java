@@ -85,12 +85,10 @@ public class QueueSendReceiveTests extends SendReceiveTests
         ByteBuffer txnId = this.factory.startTransaction().get();
         this.receiver.complete(receivedMessage.getLockToken(), txnId);
         this.factory.endTransaction(txnId, true).get();
-
         receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
         Assert.assertNull(receivedMessage);
     }
 
-    @Ignore("Takes a long time")
     @Test
     public void transactionalCompleteRollbackTest() throws ServiceBusException, InterruptedException, ExecutionException {
         this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
@@ -99,16 +97,10 @@ public class QueueSendReceiveTests extends SendReceiveTests
         this.sender.send(message);
 
         IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
-
         ByteBuffer txnId = this.factory.startTransaction().get();
         Assert.assertNotNull(txnId);
         this.receiver.complete(receivedMessage.getLockToken(), txnId);
         this.factory.endTransaction(txnId, false).get();
-
-        Thread.sleep(1000 * 40);    // Waiting for lock to expire. TODO: Find a better way to handle this.
-
-        receivedMessage = this.receiver.receive();
-        Assert.assertNotNull(txnId);
         this.receiver.complete(receivedMessage.getLockToken());
     }
 
@@ -131,7 +123,6 @@ public class QueueSendReceiveTests extends SendReceiveTests
         Assert.assertNull(receivedMessage);
     }
 
-    @Ignore("Takes a long time.")
     @Test
     public void transactionalRequestResponseDispositionRollbackTest() throws ServiceBusException, InterruptedException, ExecutionException {
         this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
@@ -148,10 +139,6 @@ public class QueueSendReceiveTests extends SendReceiveTests
         this.receiver.complete(receivedMessage.getLockToken(), txnId);
         this.factory.endTransaction(txnId, false).get();
 
-        Thread.sleep(1000 * 65);    // Waiting for lock to expire. TODO: Find a better way to handle this.
-
-        receivedMessage = this.receiver.receiveDeferredMessage(receivedMessage.getSequenceNumber());
-        Assert.assertNotNull(txnId);
         this.receiver.complete(receivedMessage.getLockToken());
     }
 
