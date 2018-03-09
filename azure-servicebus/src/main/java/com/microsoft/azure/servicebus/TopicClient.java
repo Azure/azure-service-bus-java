@@ -4,11 +4,11 @@
 package com.microsoft.azure.servicebus;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,8 +67,8 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
-    public void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException {
-        this.sender.send(message, txnId);
+    public void send(IMessage message, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.sender.send(message, transaction);
     }
 
     @Override
@@ -77,13 +77,18 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
+    public void sendBatch(Collection<? extends IMessage> messages, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.sender.sendBatch(messages, transaction);
+    }
+
+    @Override
     public CompletableFuture<Void> sendAsync(IMessage message) {
         return this.sender.sendAsync(message);
     }
 
     @Override
-    public CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId) {
-        return this.sender.sendAsync(message, txnId);
+    public CompletableFuture<Void> sendAsync(IMessage message, TransactionContext transaction) {
+        return this.sender.sendAsync(message, transaction);
     }
 
     @Override
@@ -92,8 +97,18 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
+    public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages, TransactionContext transaction) {
+        return this.sender.sendBatchAsync(messages, transaction);
+    }
+
+    @Override
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
         return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc);
+    }
+
+    @Override
+    public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) {
+        return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, transaction);
     }
 
     @Override
@@ -102,13 +117,28 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
+    public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber, TransactionContext transaction) {
+        return this.sender.cancelScheduledMessageAsync(sequenceNumber, transaction);
+    }
+
+    @Override
     public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc) throws InterruptedException, ServiceBusException {
         return this.sender.scheduleMessage(message, scheduledEnqueueTimeUtc);
     }
 
     @Override
+    public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        return this.sender.scheduleMessage(message, scheduledEnqueueTimeUtc, transaction);
+    }
+
+    @Override
     public void cancelScheduledMessage(long sequenceNumber) throws InterruptedException, ServiceBusException {
         this.sender.cancelScheduledMessage(sequenceNumber);
+    }
+
+    @Override
+    public void cancelScheduledMessage(long sequenceNumber, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.sender.cancelScheduledMessage(sequenceNumber, transaction);
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.microsoft.azure.servicebus;
 
 import com.microsoft.azure.servicebus.primitives.MessageNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -48,10 +49,10 @@ public class QueueSessionTests extends SessionTests
         Assert.assertNotNull("Message not received", receivedMessage);
         Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 
-        ByteBuffer txnId = this.factory.startTransaction().get();
-        Assert.assertNotNull(txnId);
-        this.session.complete(receivedMessage.getLockToken(), txnId);
-        this.factory.endTransaction(txnId, true).get();
+        TransactionContext transaction = this.factory.startTransaction().get();
+        Assert.assertNotNull(transaction);
+        this.session.complete(receivedMessage.getLockToken(), transaction);
+        this.factory.endTransaction(transaction, true).get();
 
         receivedMessage = this.session.receive(SHORT_WAIT_TIME);
         Assert.assertNull("Message received again", receivedMessage);
@@ -72,10 +73,10 @@ public class QueueSessionTests extends SessionTests
         Assert.assertNotNull("Message not received", receivedMessage);
         Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 
-        ByteBuffer txnId = this.factory.startTransaction().get();
-        Assert.assertNotNull(txnId);
-        this.session.complete(receivedMessage.getLockToken(), txnId);
-        this.factory.endTransaction(txnId, false).get();
+        TransactionContext transaction = this.factory.startTransaction().get();
+        Assert.assertNotNull(transaction);
+        this.session.complete(receivedMessage.getLockToken(), transaction);
+        this.factory.endTransaction(transaction, false).get();
         this.session.close();
 
         this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
@@ -98,10 +99,10 @@ public class QueueSessionTests extends SessionTests
         this.session.defer(receivedMessage.getLockToken());
         receivedMessage = this.session.receiveDeferredMessage(receivedMessage.getSequenceNumber());
 
-        ByteBuffer txnId = this.factory.startTransaction().get();
-        Assert.assertNotNull(txnId);
-        this.session.complete(receivedMessage.getLockToken(), txnId);
-        this.factory.endTransaction(txnId, true).get();
+        TransactionContext transaction = this.factory.startTransaction().get();
+        Assert.assertNotNull(transaction);
+        this.session.complete(receivedMessage.getLockToken(), transaction);
+        this.factory.endTransaction(transaction, true).get();
 
         receivedMessage = this.session.receiveDeferredMessage(receivedMessage.getSequenceNumber());
     }

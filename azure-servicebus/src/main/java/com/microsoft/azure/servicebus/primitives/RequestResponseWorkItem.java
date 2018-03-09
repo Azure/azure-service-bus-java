@@ -4,23 +4,24 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.message.Message;
 
 public class RequestResponseWorkItem extends WorkItem<Message>
 {
 	Message request;
-	ByteBuffer txnId;
+	TransactionContext transaction;
 	
-	public RequestResponseWorkItem(Message request, ByteBuffer txnId, CompletableFuture<Message> completableFuture, TimeoutTracker tracker) {
+	public RequestResponseWorkItem(Message request, TransactionContext transaction, CompletableFuture<Message> completableFuture, TimeoutTracker tracker) {
 		super(completableFuture, tracker);
 		this.request = request;
-		this.txnId = txnId;
+		this.transaction = transaction;
 	}
 	
-	public RequestResponseWorkItem(Message request, ByteBuffer txnId, CompletableFuture<Message> completableFuture, Duration timeout) {
+	public RequestResponseWorkItem(Message request, TransactionContext transaction, CompletableFuture<Message> completableFuture, Duration timeout) {
 		super(completableFuture, timeout);
 		this.request = request;
-		this.txnId = txnId;
+		this.transaction = transaction;
 	}
 	
 	public Message getRequest()
@@ -28,5 +29,5 @@ public class RequestResponseWorkItem extends WorkItem<Message>
 		return this.request;
 	}
 
-	public ByteBuffer getTxnId() { return this.txnId; }
+	public TransactionContext getTransaction() { return this.transaction; }
 }

@@ -3,7 +3,6 @@
 
 package com.microsoft.azure.servicebus;
 
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -12,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import com.microsoft.azure.servicebus.security.TransactionContext;
 
 /**
  * Defines message receiver interface. The MessageReceiver can be used to receive messages from Queues and Subscriptions and acknowledge them.
@@ -34,6 +34,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void abandon(UUID lockToken) throws InterruptedException, ServiceBusException;
 
+    void abandon(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Abandon {@link Message} with lock token and updated message property. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message
      *
@@ -44,6 +46,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void abandon(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
+    void abandon(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Asynchronously abandon {@link Message} with lock token. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message.
      *
@@ -51,6 +55,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @return a CompletableFuture representing the pending abandon.
      */
     CompletableFuture<Void> abandonAsync(UUID lockToken);
+
+    CompletableFuture<Void> abandonAsync(UUID lockToken, TransactionContext transaction);
 
     /**
      * Asynchronously abandon {@link Message} with lock token and updated message property. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message.
@@ -61,6 +67,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify);
 
+    CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction);
+
     /**
      * Completes a {@link Message} using its lock token. This will delete the message from the service.
      *
@@ -70,7 +78,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void complete(UUID lockToken) throws InterruptedException, ServiceBusException;
 
-    void complete(UUID lockToken, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
+    void complete(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     //void completeBatch(Collection<? extends IMessage> messages);
 
@@ -82,7 +90,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     CompletableFuture<Void> completeAsync(UUID lockToken);
 
-    CompletableFuture<Void> completeAsync(UUID lockToken, ByteBuffer txnId);
+    CompletableFuture<Void> completeAsync(UUID lockToken, TransactionContext transaction);
 
     // CompletableFuture<Void> completeBatchAsync(Collection<? extends IMessage> messages);
 
@@ -95,6 +103,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void defer(UUID lockToken) throws InterruptedException, ServiceBusException;
 
+    void defer(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Defers a {@link Message} using its lock token with modified message property. This will move message into deferred subqueue.
      *
@@ -105,6 +115,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void defer(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
+    void defer(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Asynchronously defers a {@link Message} using its lock token. This will move message into deferred subqueue.
      *
@@ -112,6 +124,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @return a CompletableFuture representing the pending defer.
      */
     CompletableFuture<Void> deferAsync(UUID lockToken);
+
+    CompletableFuture<Void> deferAsync(UUID lockToken, TransactionContext transaction);
 
     /**
      * Asynchronously defers a {@link Message} using its lock token with modified message propert. This will move message into deferred subqueue.
@@ -122,6 +136,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     CompletableFuture<Void> deferAsync(UUID lockToken, Map<String, Object> propertiesToModify);
 
+    CompletableFuture<Void> deferAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction);
+
     /**
      * Moves a {@link Message} to the deadletter sub-queue.
      *
@@ -130,6 +146,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @throws ServiceBusException  if deadletter failed
      */
     void deadLetter(UUID lockToken) throws InterruptedException, ServiceBusException;
+
+    void deadLetter(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     /**
      * Moves a {@link Message} to the deadletter sub-queue with modified message properties.
@@ -141,6 +159,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
+    void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description.
      *
@@ -151,6 +171,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @throws ServiceBusException  if deadletter failed
      */
     void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription) throws InterruptedException, ServiceBusException;
+
+    void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     /**
      * Moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description and modified properties.
@@ -164,6 +186,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
+    void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter.
      *
@@ -171,6 +195,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @return a CompletableFuture representing the pending deadletter.
      */
     CompletableFuture<Void> deadLetterAsync(UUID lockToken);
+
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, TransactionContext transaction);
 
     /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with modified properties.
@@ -180,6 +206,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @return a CompletableFuture representing the pending deadletter.
      */
     CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify);
+
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction);
 
     /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description.
@@ -191,6 +219,8 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription);
 
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction);
+
     /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description and modified properties.
      *
@@ -200,7 +230,9 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @param propertiesToModify         Message properties to modify.
      * @return a CompletableFuture representing the pending deadletter.
      */
-    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, ByteBuffer txnId);
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify);
+
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction);
 
     /**
      * Receives a {@link Message} with default server wait time.
@@ -221,8 +253,6 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      */
     IMessage receive(Duration serverWaitTime) throws InterruptedException, ServiceBusException;
 
-    IMessage receiveDeferredMessage(long sequenceNumber) throws InterruptedException, ServiceBusException;
-
     /**
      * Receives a deferred {@link Message}. Deferred messages can only be received by using sequence number.
      *
@@ -231,7 +261,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if receive failed
      */
-    IMessage receiveDeferredMessage(long sequenceNumber, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
+    IMessage receiveDeferredMessage(long sequenceNumber) throws InterruptedException, ServiceBusException;
 
     /**
      * Receives a maximum of  maxMessageCount {@link Message} from Azure Service Bus.
@@ -262,7 +292,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if receive failed
      */
-    Collection<IMessage> receiveDeferredMessageBatch(Collection<Long> sequenceNumbers, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
+    Collection<IMessage> receiveDeferredMessageBatch(Collection<Long> sequenceNumbers) throws InterruptedException, ServiceBusException;
 
     /**
      * Receives a {@link Message} from Azure Service Bus.
@@ -285,7 +315,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @param sequenceNumber The sequence number of the message that will be received.
      * @return a CompletableFuture representing the pending receive.
      */
-    CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber, ByteBuffer txnId);
+    CompletableFuture<IMessage> receiveDeferredMessageAsync(long sequenceNumber);
 
     /**
      * Asynchronously receives a maximum of maxMessageCount {@link Message} from the entity.
@@ -310,7 +340,7 @@ public interface IMessageReceiver extends IMessageEntityClient, IMessageBrowser 
      * @param sequenceNumbers The sequence numbers of the message that will be received.
      * @return a CompletableFuture representing the pending receive.
      */
-    CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers, ByteBuffer txnId);
+    CompletableFuture<Collection<IMessage>> receiveDeferredMessageBatchAsync(Collection<Long> sequenceNumbers);
 
     /**
      * Asynchronously renews the lock on the message specified by the lock token. The lock will be renewed based on the setting specified on the entity.

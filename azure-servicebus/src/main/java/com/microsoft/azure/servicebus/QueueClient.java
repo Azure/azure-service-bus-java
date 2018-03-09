@@ -4,7 +4,6 @@
 package com.microsoft.azure.servicebus;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.Collection;
@@ -12,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,8 +150,8 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
-    public void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException {
-        Utils.completeFuture(this.sendAsync(message, txnId));
+    public void send(IMessage message, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.sendAsync(message, transaction));
     }
 
     @Override
@@ -160,42 +160,62 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public void sendBatch(Collection<? extends IMessage> messages, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.sendBatchAsync(messages, transaction));
+    }
+
+    @Override
     public CompletableFuture<Void> sendAsync(IMessage message) {
-        return this.createSenderAsync().thenComposeAsync((v) -> 
+        return this.createSenderAsync().thenComposeAsync((v) ->
         {
             return this.sender.sendAsync(message);
         });
     }
 
     @Override
-    public CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId) {
+    public CompletableFuture<Void> sendAsync(IMessage message, TransactionContext transaction) {
         return this.createSenderAsync().thenComposeAsync((v) ->
         {
-            return this.sender.sendAsync(message, txnId);
+            return this.sender.sendAsync(message, transaction);
         });
     }
 
     @Override
     public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages) {
-        return this.createSenderAsync().thenComposeAsync((v) -> 
+        return this.sendBatchAsync(messages, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages, TransactionContext transaction) {
+        return this.createSenderAsync().thenComposeAsync((v) ->
         {
-            return this.sender.sendBatchAsync(messages);
+            return this.sender.sendBatchAsync(messages, transaction);
         });
     }
 
     @Override
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
-        return this.createSenderAsync().thenComposeAsync((v) -> 
+        return this.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) {
+        return this.createSenderAsync().thenComposeAsync((v) ->
         {
-            return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc);
+            return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, transaction);
         });
     }
 
     @Override
     public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber) {
-        return this.createSenderAsync().thenComposeAsync((v) -> 
+        return this.cancelScheduledMessageAsync(sequenceNumber, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber, TransactionContext transaction) {
+        return this.createSenderAsync().thenComposeAsync((v) ->
         {
-            return this.sender.cancelScheduledMessageAsync(sequenceNumber);
+            return this.sender.cancelScheduledMessageAsync(sequenceNumber, transaction);
         });
     }
 
@@ -205,8 +225,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        return Utils.completeFuture(this.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, transaction));
+    }
+
+    @Override
     public void cancelScheduledMessage(long sequenceNumber) throws InterruptedException, ServiceBusException {
         Utils.completeFuture(this.cancelScheduledMessageAsync(sequenceNumber));
+    }
+
+    @Override
+    public void cancelScheduledMessage(long sequenceNumber, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.cancelScheduledMessageAsync(sequenceNumber, transaction));
     }
 
     @Override
@@ -271,8 +301,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public void abandon(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.abandon(lockToken, transaction);
+    }
+
+    @Override
     public void abandon(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.abandon(lockToken, propertiesToModify);
+    }
+
+    @Override
+    public void abandon(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.abandon(lockToken, propertiesToModify, transaction);
     }
 
     @Override
@@ -281,8 +321,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public CompletableFuture<Void> abandonAsync(UUID lockToken, TransactionContext transaction) {
+        return this.messageAndSessionPump.abandonAsync(lockToken, transaction);
+    }
+
+    @Override
     public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
         return this.messageAndSessionPump.abandonAsync(lockToken, propertiesToModify);
+    }
+
+    @Override
+    public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
+        return this.messageAndSessionPump.abandonAsync(lockToken, propertiesToModify, transaction);
     }
 
     @Override
@@ -291,8 +341,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public void complete(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.complete(lockToken, transaction);
+    }
+
+    @Override
     public CompletableFuture<Void> completeAsync(UUID lockToken) {
         return this.messageAndSessionPump.completeAsync(lockToken);
+    }
+
+    @Override
+    public CompletableFuture<Void> completeAsync(UUID lockToken, TransactionContext transaction) {
+        return this.messageAndSessionPump.completeAsync(lockToken, transaction);
     }
 
     //	@Override
@@ -321,8 +381,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public void deadLetter(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.deadLetter(lockToken, transaction);
+    }
+
+    @Override
     public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.deadLetter(lockToken, propertiesToModify);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.deadLetter(lockToken, propertiesToModify, transaction);
     }
 
     @Override
@@ -331,8 +401,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
+    }
+
+    @Override
     public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
     }
 
     @Override
@@ -341,8 +421,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, TransactionContext transaction) {
+        return this.messageAndSessionPump.deadLetterAsync(lockToken, transaction);
+    }
+
+    @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
         return this.messageAndSessionPump.deadLetterAsync(lockToken, propertiesToModify);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
+        return this.messageAndSessionPump.deadLetterAsync(lockToken, propertiesToModify, transaction);
     }
 
     @Override
@@ -351,8 +441,18 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
     }
 
     @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) {
+        return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
+    }
+
+    @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
         return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) {
+        return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
     }
 
     @Override

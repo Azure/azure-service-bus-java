@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
@@ -52,7 +53,6 @@ import javax.persistence.*;
  */
 public class MessagingFactory extends ClientEntity implements IAmqpConnection
 {
-    public static ByteBuffer NULL_TXN_ID = null;
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessagingFactory.class);
 	
     private static final String REACTOR_THREAD_NAME_PREFIX = "ReactorThread";
@@ -109,19 +109,19 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         Timer.register(this.getClientId());
 	}
 
-	public CompletableFuture<ByteBuffer> startTransaction() {
+	public CompletableFuture<TransactionContext> startTransaction() {
         return this.getController()
                 .thenCompose(controller -> controller.declareAsync()
-                        .thenApply(Binary::asByteBuffer));
+                        .thenApply(binary -> new TransactionContext(binary.asByteBuffer())));
     }
 /*
     public Binary getTransactionId() {
         return TransactionManager.getTransactionId();
     }
 */
-    public CompletableFuture<Void> endTransaction(ByteBuffer txnId, boolean commit) {
+    public CompletableFuture<Void> endTransaction(TransactionContext transaction, boolean commit) {
 	    return this.getController()
-                .thenCompose(controller -> controller.dischargeAsync(new Binary(txnId.array()), commit));
+                .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit));
     }
 
 	private CompletableFuture<Controller> getController() {

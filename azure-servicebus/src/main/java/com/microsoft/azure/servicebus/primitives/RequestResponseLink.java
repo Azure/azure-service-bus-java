@@ -1,7 +1,6 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
@@ -14,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
@@ -272,7 +272,7 @@ class RequestResponseLink extends ClientEntity{
 		this.pendingRequests.clear();
 	}
 	
-	public CompletableFuture<Message> requestAysnc(Message requestMessage, ByteBuffer txnId, Duration timeout)
+	public CompletableFuture<Message> requestAysnc(Message requestMessage, TransactionContext transaction, Duration timeout)
 	{	    
 		this.throwIfClosed(null);
 		// Check and recreate links if necessary
@@ -302,14 +302,14 @@ class RequestResponseLink extends ClientEntity{
         }
         
 		CompletableFuture<Message> responseFuture = new CompletableFuture<Message>();
-		RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, txnId, responseFuture, timeout);
+		RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, transaction, responseFuture, timeout);
 		String requestId = "request:" +  this.requestCounter.incrementAndGet();
 		requestMessage.setMessageId(requestId);
 		requestMessage.setReplyTo(this.replyTo);
 		this.pendingRequests.put(requestId, workItem);
 		workItem.setTimeoutTask(this.scheduleRequestTimeout(requestId, timeout));
 		TRACE_LOGGER.debug("Sending request with id:{}", requestId);
-		this.amqpSender.sendRequest(requestMessage, txnId, false);
+		this.amqpSender.sendRequest(requestMessage, transaction, false);
 		return responseFuture;
 	}
 	
@@ -378,7 +378,7 @@ class RequestResponseLink extends ClientEntity{
 									@Override
 									public void onEvent()
 									{
-										RequestResponseLink.this.amqpSender.sendRequest(workItem.getRequest(), workItem.getTxnId(), true);
+										RequestResponseLink.this.amqpSender.sendRequest(workItem.getRequest(), workItem.getTransaction(), true);
 									}
 								});
 					} catch (IOException e) {
@@ -769,17 +769,17 @@ class RequestResponseLink extends ClientEntity{
 			}
 		}
 		
-		public void sendRequest(Message requestMessage, ByteBuffer txnId, boolean isRetry)
+		public void sendRequest(Message requestMessage, TransactionContext transaction, boolean isRetry)
 		{
 			synchronized(this.pendingSendsSyncLock)
 			{
 				if(isRetry)
 				{
-					this.pendingRetrySends.add(new InternalSenderWorkItem(requestMessage, txnId));
+					this.pendingRetrySends.add(new InternalSenderWorkItem(requestMessage, transaction));
 				}
 				else
 				{
-					this.pendingFreshSends.add(new InternalSenderWorkItem(requestMessage, txnId));
+					this.pendingFreshSends.add(new InternalSenderWorkItem(requestMessage, transaction));
 				}
 				
 				// This check must be done inside lock
@@ -875,10 +875,10 @@ class RequestResponseLink extends ClientEntity{
                     
                     Delivery delivery = this.sendLink.delivery(UUID.randomUUID().toString().getBytes());
                     delivery.setMessageFormat(DeliveryImpl.DEFAULT_MESSAGE_FORMAT);
-					ByteBuffer txnId = requestToBeSent.getTxnId();
-					if (txnId != MessagingFactory.NULL_TXN_ID) {
+					TransactionContext transaction = requestToBeSent.getTransaction();
+					if (transaction != TransactionContext.NULL_TXN) {
 						TransactionalState transactionalState = new TransactionalState();
-						transactionalState.setTxnId(new Binary(txnId.array()));
+						transactionalState.setTxnId(new Binary(transaction.getTransactionId().array()));
 						delivery.disposition(transactionalState);
 					}
 
@@ -923,15 +923,15 @@ class RequestResponseLink extends ClientEntity{
 
 	class InternalSenderWorkItem {
 		private Message message;
-		private ByteBuffer txnId;
+		private TransactionContext transaction;
 
-		public InternalSenderWorkItem(Message message, ByteBuffer txnId) {
+		public InternalSenderWorkItem(Message message, TransactionContext transaction) {
 			this.message = message;
-			this.txnId = txnId;
+			this.transaction = transaction;
 		}
 
 		public Message getMessage() { return this.message; }
 
-		public ByteBuffer getTxnId() { return this.txnId; }
+		public TransactionContext getTransaction() { return this.transaction; }
 	}
 }

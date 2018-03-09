@@ -3,12 +3,12 @@
 
 package com.microsoft.azure.servicebus;
 
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import com.microsoft.azure.servicebus.security.TransactionContext;
 
 /**
  * Represents a message sender that sends messages to Azure Service Bus.
@@ -26,7 +26,7 @@ public interface IMessageSender extends IMessageEntityClient {
      */
     void send(IMessage message) throws InterruptedException, ServiceBusException;
 
-    void send(IMessage message, ByteBuffer txnId) throws InterruptedException, ServiceBusException;
+    void send(IMessage message, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     /**
      * Sends a batch of messages to the Azure Service Bus entity this sender is connected to. This method blocks until the batch is sent to the entity. Calling this method is equivalent to calling
@@ -38,6 +38,8 @@ public interface IMessageSender extends IMessageEntityClient {
      */
     void sendBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException;
 
+    void sendBatch(Collection<? extends IMessage> messages, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Sends a message to the Azure Service Bus entity this sender is connected to. This is an asynchronous method returning a CompletableFuture which completes when the message is sent to the entity.
      *
@@ -46,7 +48,7 @@ public interface IMessageSender extends IMessageEntityClient {
      */
     CompletableFuture<Void> sendAsync(IMessage message);
 
-    CompletableFuture<Void> sendAsync(IMessage message, ByteBuffer txnId);
+    CompletableFuture<Void> sendAsync(IMessage message, TransactionContext transaction);
 
     /**
      * Sends a batch of messages to the Azure Service Bus entity this sender is connected to. This is an asynchronous method returning a CompletableFuture which completes when the batch is sent to the entity.
@@ -55,6 +57,8 @@ public interface IMessageSender extends IMessageEntityClient {
      * @return a CompletableFuture representing the pending send
      */
     CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages);
+
+    CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages, TransactionContext transaction);
 
     /**
      * Sends a scheduled message to the Azure Service Bus entity this sender is connected to. A scheduled message is enqueued and made available to receivers only at the scheduled enqueue time.
@@ -67,6 +71,8 @@ public interface IMessageSender extends IMessageEntityClient {
      */
     CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc);
 
+    CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction);
+
     /**
      * Cancels the enqueuing of an already sent scheduled message, if it was not already enqueued. This is an asynchronous method returning a CompletableFuture which completes when the message is cancelled.
      *
@@ -74,6 +80,8 @@ public interface IMessageSender extends IMessageEntityClient {
      * @return a CompletableFuture representing the pending cancellation
      */
     CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber);
+
+    CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber, TransactionContext transaction);
 
     /**
      * Sends a scheduled message to the Azure Service Bus entity this sender is connected to. A scheduled message is enqueued and made available to receivers only at the scheduled enqueue time.
@@ -87,6 +95,8 @@ public interface IMessageSender extends IMessageEntityClient {
      */
     long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc) throws InterruptedException, ServiceBusException;
 
+    long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
     /**
      * Cancels the enqueuing of an already sent scheduled message, if it was not already enqueued. This method blocks until the message is sent to the entity. Calling this method is equivalent to calling <code>cancelScheduledMessageAsync(sequenceNumber).get()</code>.
      * For better performance, use async methods.
@@ -96,4 +106,6 @@ public interface IMessageSender extends IMessageEntityClient {
      * @throws ServiceBusException  if scheduled message couldn't be cancelled
      */
     void cancelScheduledMessage(long sequenceNumber) throws InterruptedException, ServiceBusException;
+
+    void cancelScheduledMessage(long sequenceNumber, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 }

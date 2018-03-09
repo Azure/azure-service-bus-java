@@ -1,6 +1,7 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import com.microsoft.azure.servicebus.ClientSettings;
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
@@ -83,7 +84,7 @@ public class Controller {
                 encodedPair.getFirstItem(),
                 encodedPair.getSecondItem(),
                 DeliveryImpl.DEFAULT_MESSAGE_FORMAT,
-                MessagingFactory.NULL_TXN_ID)
+                TransactionContext.NULL_TXN)
                 .handleAsync((state, ex) -> {
                     if (ex != null) {
                         TRACE_LOGGER.warn("Exception received in controller: {}", ex.getMessage());
@@ -125,7 +126,7 @@ public class Controller {
                 encodedPair.getFirstItem(),
                 encodedPair.getSecondItem(),
                 DeliveryImpl.DEFAULT_MESSAGE_FORMAT,
-                MessagingFactory.NULL_TXN_ID)
+                TransactionContext.NULL_TXN)
                 .thenCompose( state -> {
                     if (state instanceof Accepted) {
                         return CompletableFuture.completedFuture(null);

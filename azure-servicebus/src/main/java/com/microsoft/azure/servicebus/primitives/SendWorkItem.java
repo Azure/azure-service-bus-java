@@ -4,7 +4,8 @@
  */
 package com.microsoft.azure.servicebus.primitives;
 
-import java.nio.ByteBuffer;
+import com.microsoft.azure.servicebus.security.TransactionContext;
+
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
@@ -15,27 +16,27 @@ class SendWorkItem<T> extends WorkItem<T>
 	private int encodedMessageSize;
 	private boolean waitingForAck;
 	private String deliveryTag;
-	private ByteBuffer txnId;
+	private TransactionContext transaction;
 	
-	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, ByteBuffer txnId, CompletableFuture<T> completableFuture, Duration timeout)
+	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, TransactionContext transaction, CompletableFuture<T> completableFuture, Duration timeout)
 	{
 		super(completableFuture, timeout);
-		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag, txnId);
+		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag, transaction);
 	}
 
-	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, ByteBuffer txnId, CompletableFuture<T> completableFuture, TimeoutTracker timeout)
+	public SendWorkItem(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, TransactionContext transaction, CompletableFuture<T> completableFuture, TimeoutTracker timeout)
 	{
 		super(completableFuture, timeout);
-		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag, txnId);
+		this.initialize(amqpMessage, encodedMessageSize, messageFormat, deliveryTag, transaction);
 	}
 
-	private void initialize(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, ByteBuffer txnId)
+	private void initialize(byte[] amqpMessage, int encodedMessageSize, int messageFormat, String deliveryTag, TransactionContext transaction)
 	{
 		this.amqpMessage = amqpMessage;
 		this.messageFormat = messageFormat;
 		this.encodedMessageSize = encodedMessageSize;
 		this.deliveryTag = deliveryTag;
-		this.txnId = txnId;
+		this.transaction = transaction;
 	}
 
 	public byte[] getMessage()
@@ -73,7 +74,7 @@ class SendWorkItem<T> extends WorkItem<T>
 	    this.deliveryTag = deliveryTag;
 	}
 
-	public ByteBuffer getTxnId() { return this.txnId; }
+	public TransactionContext getTransaction() { return this.transaction; }
 
-	public void setTxnId(ByteBuffer txnId) { this.txnId = txnId; }
+	public void setTransaction(TransactionContext txnId) { this.transaction = txnId; }
 }

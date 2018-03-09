@@ -5,7 +5,6 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -27,6 +26,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
@@ -1025,16 +1025,16 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	/*
 	This is to be used for messages which are received on receiveLink.
 	 */
-	public CompletableFuture<Void> completeMessageAsync(byte[] deliveryTag, ByteBuffer txnId)
+	public CompletableFuture<Void> completeMessageAsync(byte[] deliveryTag, TransactionContext transaction)
 	{		
 		Outcome outcome = Accepted.getInstance();
-		return this.updateMessageStateAsync(deliveryTag, outcome, txnId);
+		return this.updateMessageStateAsync(deliveryTag, outcome, transaction);
 	}
 
 	/*
 	This is to be used for messages which are received on RequestResponseLink
 	 */
-	public CompletableFuture<Void> completeMessageAsync(UUID lockToken, ByteBuffer txnId)
+	public CompletableFuture<Void> completeMessageAsync(UUID lockToken, TransactionContext transaction)
 	{		
 		return this.updateDispositionAsync(
 				new UUID[]{lockToken},
@@ -1042,20 +1042,20 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				null,
 				null,
 				null,
-				txnId);
+				transaction);
 	}
 	
-	public CompletableFuture<Void> abandonMessageAsync(byte[] deliveryTag, Map<String, Object> propertiesToModify, ByteBuffer txnId)
+	public CompletableFuture<Void> abandonMessageAsync(byte[] deliveryTag, Map<String, Object> propertiesToModify, TransactionContext transaction)
 	{		
 		Modified outcome = new Modified();
 		if(propertiesToModify != null)
 		{
 			outcome.setMessageAnnotations(propertiesToModify);
 		}		
-		return this.updateMessageStateAsync(deliveryTag, outcome, txnId);
+		return this.updateMessageStateAsync(deliveryTag, outcome, transaction);
 	}
 	
-	public CompletableFuture<Void> abandonMessageAsync(UUID lockToken, Map<String, Object> propertiesToModify, ByteBuffer txnId)
+	public CompletableFuture<Void> abandonMessageAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction)
 	{
 		return this.updateDispositionAsync(
 				new UUID[]{lockToken},
@@ -1063,10 +1063,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				null
 				, null,
 				propertiesToModify,
-				txnId);
+				transaction);
 	}
 	
-	public CompletableFuture<Void> deferMessageAsync(byte[] deliveryTag, Map<String, Object> propertiesToModify, ByteBuffer txnId)
+	public CompletableFuture<Void> deferMessageAsync(byte[] deliveryTag, Map<String, Object> propertiesToModify, TransactionContext transaction)
 	{		
 		Modified outcome = new Modified();
 		outcome.setUndeliverableHere(true);
@@ -1074,10 +1074,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		{
 			outcome.setMessageAnnotations(propertiesToModify);
 		}
-		return this.updateMessageStateAsync(deliveryTag, outcome, txnId);
+		return this.updateMessageStateAsync(deliveryTag, outcome, transaction);
 	}
 	
-	public CompletableFuture<Void> deferMessageAsync(UUID lockToken, Map<String, Object> propertiesToModify, ByteBuffer txnId)
+	public CompletableFuture<Void> deferMessageAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction)
 	{		
 		return this.updateDispositionAsync(
 				new UUID[]{lockToken},
@@ -1085,7 +1085,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				null,
 				null,
 				propertiesToModify,
-				txnId);
+				transaction);
 	}
 	
 	public CompletableFuture<Void> deadLetterMessageAsync(
@@ -1093,7 +1093,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			String deadLetterReason,
 			String deadLetterErrorDescription,
 			Map<String, Object> propertiesToModify,
-			ByteBuffer txnId)
+			TransactionContext transaction)
 	{
 		Rejected outcome = new Rejected();
 		ErrorCondition error = new ErrorCondition(ClientConstants.DEADLETTERNAME, null);
@@ -1113,7 +1113,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		error.setInfo(errorInfo);
 		outcome.setError(error);
 		
-		return this.updateMessageStateAsync(deliveryTag, outcome, txnId);
+		return this.updateMessageStateAsync(deliveryTag, outcome, transaction);
 	}
 	
 	public CompletableFuture<Void> deadLetterMessageAsync(
@@ -1121,7 +1121,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			String deadLetterReason,
 			String deadLetterErrorDescription,
 			Map<String, Object> propertiesToModify,
-			ByteBuffer txnId)
+			TransactionContext transaction)
 	{
 		return this.updateDispositionAsync(
 				new UUID[]{lockToken},
@@ -1129,10 +1129,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				deadLetterReason,
 				deadLetterErrorDescription,
 				propertiesToModify,
-				txnId);
+				transaction);
 	}
 	
-	private CompletableFuture<Void> updateMessageStateAsync(byte[] deliveryTag, Outcome outcome, ByteBuffer txnId)
+	private CompletableFuture<Void> updateMessageStateAsync(byte[] deliveryTag, Outcome outcome, TransactionContext transaction)
 	{
 	    this.throwIfInUnusableState();
 		CompletableFuture<Void> completeMessageFuture = new CompletableFuture<Void>();
@@ -1148,9 +1148,9 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         else
         {
         	DeliveryState state;
-        	if (txnId != MessagingFactory.NULL_TXN_ID) {
+        	if (transaction != TransactionContext.NULL_TXN) {
         		state = new TransactionalState();
-				((TransactionalState)state).setTxnId(new Binary(txnId.array()));
+				((TransactionalState)state).setTxnId(new Binary(transaction.getTransactionId().array()));
 				((TransactionalState)state).setOutcome(outcome);
 			} else {
         		state = (DeliveryState) outcome;
@@ -1323,7 +1323,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			}
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_RENEWLOCK_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout), this.receiveLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, MessagingFactory.NULL_TXN_ID, this.operationTimeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, this.operationTimeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Collection<Instant>> returningFuture = new CompletableFuture<Collection<Instant>>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1349,7 +1349,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		});					
 	}
 	
-	public CompletableFuture<Collection<MessageWithLockToken>> receiveDeferredMessageBatchAsync(Long[] sequenceNumbers, ByteBuffer txnId)
+	public CompletableFuture<Collection<MessageWithLockToken>> receiveDeferredMessageBatchAsync(Long[] sequenceNumbers)
 	{
 	    this.throwIfInUnusableState();
 	    if(TRACE_LOGGER.isDebugEnabled())
@@ -1366,7 +1366,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			}
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_RECEIVE_BY_SEQUENCE_NUMBER, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout), this.receiveLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, txnId, this.operationTimeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, this.operationTimeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Collection<MessageWithLockToken>> returningFuture = new CompletableFuture<Collection<MessageWithLockToken>>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1421,7 +1421,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			String deadLetterReason,
 			String deadLetterErrorDescription,
 			Map<String, Object> propertiesToModify,
-			ByteBuffer txnId)
+			TransactionContext transaction)
 	{
 	    this.throwIfInUnusableState();
 	    if(TRACE_LOGGER.isDebugEnabled())
@@ -1454,7 +1454,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			}
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_UPDATE_DISPOSTION_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout), this.receiveLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, txnId, this.operationTimeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, transaction, this.operationTimeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1487,7 +1487,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_RENEW_SESSIONLOCK_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout), this.receiveLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, MessagingFactory.NULL_TXN_ID, this.operationTimeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, this.operationTimeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1519,7 +1519,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSIONID, this.getSessionId());		
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_GET_SESSION_STATE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout), this.receiveLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, MessagingFactory.NULL_TXN_ID, this.operationTimeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, this.operationTimeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<byte[]> returningFuture = new CompletableFuture<byte[]>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1562,7 +1562,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SESSION_STATE, sessionState == null ? null : new Binary(sessionState));
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_SET_SESSION_STATE_OPERATION, requestBodyMap, Util.adjustServerTimeout(this.operationTimeout), this.receiveLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, MessagingFactory.NULL_TXN_ID, this.operationTimeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, this.operationTimeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);

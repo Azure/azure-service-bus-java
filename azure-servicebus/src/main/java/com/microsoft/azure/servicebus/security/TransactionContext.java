@@ -11,5 +11,10 @@ public class TransactionContext {
         this.txnId = txnId;
     }
 
-    ByteBuffer getTransactionId() { return this.txnId; }
+    public ByteBuffer getTransactionId() { return this.txnId; }
+
+    @Override
+    public String toString() {
+        return new String(txnId.array(), txnId.position(), txnId.limit());
+    }
 }

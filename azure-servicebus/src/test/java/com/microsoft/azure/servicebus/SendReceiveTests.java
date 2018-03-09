@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.transaction.Discharge;
@@ -144,17 +145,17 @@ public abstract class SendReceiveTests extends Tests {
 		this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
 
 		for (int i = 0; i< 10; i++) {
-			ByteBuffer txnId = this.factory.startTransaction().get();
-			System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
+			TransactionContext transaction = this.factory.startTransaction().get();
+			System.out.println("Declared " + transaction);
 
 			String messageId = UUID.randomUUID().toString();
 			Message message = new Message("AMQP message");
 			message.setMessageId(messageId);
 			System.out.println("Sending");
-			this.sender.send(message, txnId);
+			this.sender.send(message, transaction);
 
 			System.out.println("Discharging");
-			this.factory.endTransaction(txnId, true).get();
+			this.factory.endTransaction(transaction, true).get();
 		}
 	}
 
@@ -165,18 +166,18 @@ public abstract class SendReceiveTests extends Tests {
 
 		for (int i = 0; i < 1; i++) {
 			System.out.println("Starting iteration: " + i);
-			ByteBuffer txnId = this.factory.startTransaction().get();
-			Assert.assertNotNull(txnId);
-			System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
+			TransactionContext transaction = this.factory.startTransaction().get();
+			Assert.assertNotNull(transaction);
+			System.out.println("Declared " + transaction);
 
 			String messageId = UUID.randomUUID().toString();
 			Message message = new Message("AMQP message");
 			message.setMessageId(messageId);
 			System.out.println("Sending");
-			this.sender.send(message, txnId);
+			this.sender.send(message, transaction);
 
 			System.out.println("Discharging");
-			this.factory.endTransaction(txnId, true).get();
+			this.factory.endTransaction(transaction, true).get();
 
 			IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
 
@@ -184,16 +185,16 @@ public abstract class SendReceiveTests extends Tests {
 			Assert.assertNotNull("Message not received", receivedMessage);
 			Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 
-			txnId = this.factory.startTransaction().get();
-			Assert.assertNotNull(txnId);
-			System.out.println("Declared " + new String(txnId.array(), txnId.position(), txnId.limit()));
+			transaction = this.factory.startTransaction().get();
+			Assert.assertNotNull(transaction);
+			System.out.println("Declared " + transaction);
 
 			System.out.println("Completing");
-			this.receiver.complete(receivedMessage.getLockToken(), txnId);
+			this.receiver.complete(receivedMessage.getLockToken(), transaction);
 			//this.receiver.complete(receivedMessage.getLockToken());
 
 			System.out.println("Discharging");
-			this.factory.endTransaction(txnId, true).get();
+			this.factory.endTransaction(transaction, true).get();
 
 			//receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
 			//Assert.assertNull(receivedMessage);

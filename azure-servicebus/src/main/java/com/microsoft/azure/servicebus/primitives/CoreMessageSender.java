@@ -5,7 +5,6 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -23,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
+import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
@@ -235,13 +235,13 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			final byte[] bytes,
 			final int arrayOffset,
 			final int messageFormat,
-			final ByteBuffer txnId)
+			final TransactionContext transaction)
 	{
 	    this.throwIfClosed(this.lastKnownLinkError);
 		TRACE_LOGGER.debug("Sending message to '{}'", this.sendPath);
 		String deliveryTag = CoreMessageSender.generateRandomDeliveryTag();
 		CompletableFuture<DeliveryState> onSendFuture = new CompletableFuture<DeliveryState>();
-		SendWorkItem<DeliveryState> sendWorkItem = new SendWorkItem<DeliveryState>(bytes, arrayOffset, messageFormat, deliveryTag, txnId, onSendFuture, this.operationTimeout);
+		SendWorkItem<DeliveryState> sendWorkItem = new SendWorkItem<DeliveryState>(bytes, arrayOffset, messageFormat, deliveryTag, transaction, onSendFuture, this.operationTimeout);
 		this.enlistSendRequest(deliveryTag, sendWorkItem, false);
 		this.scheduleSendTimeout(sendWorkItem);
 		return onSendFuture;
@@ -309,12 +309,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
     }
 
-    public CompletableFuture<Void> sendAsync(final Iterable<Message> messages)
-	{
-		return this.sendAsync(messages, MessagingFactory.NULL_TXN_ID);
-	}
-
-	public CompletableFuture<Void> sendAsync(final Iterable<Message> messages, ByteBuffer txnId)
+	public CompletableFuture<Void> sendAsync(final Iterable<Message> messages, TransactionContext transaction)
 	{
 		if (messages == null || IteratorUtil.sizeEquals(messages, 0))
 		{
@@ -326,7 +321,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		Message firstMessage = messages.iterator().next();
 		if (IteratorUtil.sizeEquals(messages, 1))
 		{
-			return this.sendAsync(firstMessage);
+			return this.sendAsync(firstMessage, transaction);
 		}
 
 		// proton-j doesn't support multiple dataSections to be part of AmqpMessage
@@ -360,20 +355,15 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			return sendTask;
 		}
 
-		return this.sendCoreAsync(bytes, byteArrayOffset, AmqpConstants.AMQP_BATCH_MESSAGE_FORMAT, txnId).thenAccept((x) -> { /*Do nothing*/ });
+		return this.sendCoreAsync(bytes, byteArrayOffset, AmqpConstants.AMQP_BATCH_MESSAGE_FORMAT, transaction).thenAccept((x) -> { /*Do nothing*/ });
 	}
 
-	public CompletableFuture<Void> sendAsync(Message msg)
-	{
-		return this.sendAsync(msg, MessagingFactory.NULL_TXN_ID);
-	}
-
-	public CompletableFuture<Void> sendAsync(Message msg, ByteBuffer txnId)
+	public CompletableFuture<Void> sendAsync(Message msg, TransactionContext transaction)
 	{
 		try
 		{
 			Pair<byte[], Integer> encodedPair = Util.encodeMessageToOptimalSizeArray(msg);
-			return this.sendCoreAsync(encodedPair.getFirstItem(), encodedPair.getSecondItem(), DeliveryImpl.DEFAULT_MESSAGE_FORMAT, txnId).thenAccept((x) -> { /*Do nothing*/ });
+			return this.sendCoreAsync(encodedPair.getFirstItem(), encodedPair.getSecondItem(), DeliveryImpl.DEFAULT_MESSAGE_FORMAT, transaction).thenAccept((x) -> { /*Do nothing*/ });
 		}
 		catch(PayloadSizeExceededException exception)
 		{
@@ -865,10 +855,10 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                     delivery = sendLinkCurrent.delivery(deliveryTag.getDeliveryTag().getBytes());
                     delivery.setMessageFormat(sendData.getMessageFormat());
 
-                    ByteBuffer txnId = sendData.getTxnId();
-                    if (txnId != MessagingFactory.NULL_TXN_ID) {
+                    TransactionContext transaction = sendData.getTransaction();
+                    if (transaction != TransactionContext.NULL_TXN) {
 						TransactionalState transactionalState = new TransactionalState();
-						transactionalState.setTxnId(new Binary(txnId.array()));
+						transactionalState.setTxnId(new Binary(transaction.getTransactionId().array()));
                     	delivery.disposition(transactionalState);
 					}
 
@@ -1034,7 +1024,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		}	
 	}
 
-	public CompletableFuture<long[]> scheduleMessageAsync(Message[] messages, ByteBuffer txnId, Duration timeout)
+	public CompletableFuture<long[]> scheduleMessageAsync(Message[] messages, TransactionContext transaction, Duration timeout)
 	{
 	    TRACE_LOGGER.debug("Sending '{}' scheduled message(s) to '{}'", messages.length, this.sendPath);
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
@@ -1075,7 +1065,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			}
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_MESSAGES, messageList);
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_SCHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout), this.sendLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, txnId, timeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, transaction, timeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<long[]> returningFuture = new CompletableFuture<long[]>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1101,7 +1091,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		});
 	}
 	
-	public CompletableFuture<Void> cancelScheduledMessageAsync(Long[] sequenceNumbers, ByteBuffer txnId, Duration timeout)
+	public CompletableFuture<Void> cancelScheduledMessageAsync(Long[] sequenceNumbers, TransactionContext transaction, Duration timeout)
 	{
 	    if(TRACE_LOGGER.isDebugEnabled())
 	    {
@@ -1113,7 +1103,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS, sequenceNumbers);
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_CANCEL_CHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout), this.sendLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, txnId, timeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, transaction, timeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
