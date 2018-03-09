@@ -291,7 +291,7 @@ public class ConnectionStringBuilder
 	 */
 	public RetryPolicy getRetryPolicy()
 	{
-		return (this.retryPolicy == null ? RetryPolicy.getNoRetry() : this.retryPolicy);
+		return (this.retryPolicy == null ? RetryPolicy.getDefault() : this.retryPolicy);
 	}
 
 	/**

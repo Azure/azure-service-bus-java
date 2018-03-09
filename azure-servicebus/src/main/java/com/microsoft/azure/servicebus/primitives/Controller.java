@@ -1,16 +1,14 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import com.microsoft.azure.servicebus.ClientSettings;
-import com.microsoft.azure.servicebus.security.TransactionContext;
+import com.microsoft.azure.servicebus.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
-import org.apache.qpid.proton.amqp.messaging.Rejected;
 import org.apache.qpid.proton.amqp.messaging.Source;
 import org.apache.qpid.proton.amqp.transaction.*;
-import org.apache.qpid.proton.amqp.transport.DeliveryState;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
 import org.apache.qpid.proton.amqp.transport.Target;
 import org.apache.qpid.proton.engine.impl.DeliveryImpl;

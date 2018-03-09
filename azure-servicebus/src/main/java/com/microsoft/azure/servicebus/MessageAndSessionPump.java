@@ -11,7 +11,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
-import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

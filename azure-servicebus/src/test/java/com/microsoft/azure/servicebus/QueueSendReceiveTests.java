@@ -4,9 +4,7 @@ import com.microsoft.azure.servicebus.management.EntityManager;
 import com.microsoft.azure.servicebus.management.ManagementException;
 import com.microsoft.azure.servicebus.management.QueueDescription;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
-import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;

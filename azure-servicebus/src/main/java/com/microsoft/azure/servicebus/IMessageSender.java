@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
-import com.microsoft.azure.servicebus.security.TransactionContext;
 
 /**
  * Represents a message sender that sends messages to Azure Service Bus.

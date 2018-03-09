@@ -4,7 +4,7 @@
  */
 package com.microsoft.azure.servicebus.primitives;
 
-import com.microsoft.azure.servicebus.security.TransactionContext;
+import com.microsoft.azure.servicebus.TransactionContext;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;

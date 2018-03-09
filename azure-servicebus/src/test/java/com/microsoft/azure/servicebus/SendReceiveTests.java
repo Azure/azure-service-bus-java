@@ -1,13 +1,10 @@
 package com.microsoft.azure.servicebus;
 
-import java.io.Console;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import com.microsoft.azure.servicebus.security.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.transaction.Discharge;

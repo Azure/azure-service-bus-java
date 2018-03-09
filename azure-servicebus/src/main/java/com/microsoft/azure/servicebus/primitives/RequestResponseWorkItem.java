@@ -1,10 +1,9 @@
 package com.microsoft.azure.servicebus.primitives;
 
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
-import com.microsoft.azure.servicebus.security.TransactionContext;
+import com.microsoft.azure.servicebus.TransactionContext;
 import org.apache.qpid.proton.message.Message;
 
 public class RequestResponseWorkItem extends WorkItem<Message>

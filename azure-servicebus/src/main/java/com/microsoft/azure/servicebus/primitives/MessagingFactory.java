@@ -6,7 +6,6 @@ package com.microsoft.azure.servicebus.primitives;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.channels.UnresolvedAddressException;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 
-import com.microsoft.azure.servicebus.security.TransactionContext;
+import com.microsoft.azure.servicebus.TransactionContext;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
@@ -121,7 +120,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 */
     public CompletableFuture<Void> endTransaction(TransactionContext transaction, boolean commit) {
 	    return this.getController()
-                .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit));
+                .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit)
+				.thenRun(() -> transaction.notifyTransactionCompletion(commit)));
     }
 
 	private CompletableFuture<Controller> getController() {

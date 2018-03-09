@@ -16,14 +16,13 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.microsoft.azure.servicebus.security.TransactionContext;
+import org.apache.qpid.proton.amqp.transaction.TransactionalState;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
-import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.CoreMessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessageWithDeliveryTag;
 import com.microsoft.azure.servicebus.primitives.MessageWithLockToken;
@@ -226,7 +225,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
         return this.checkIfValidRequestResponseLockTokenAsync(lockToken).thenCompose((requestResponseLocked) -> {
             if (requestResponseLocked) {
                 return this.internalReceiver.abandonMessageAsync(lockToken, propertiesToModify, transaction)
-                        .thenRun(() -> MessageReceiver.this.requestResponseLockTokensToLockTimesMap.remove(lockToken));
+                        .thenRun( () -> this.disposeLockToken(lockToken, transaction));
             } else {
                 return this.internalReceiver.abandonMessageAsync(Util.convertUUIDToDotNetBytes(lockToken), propertiesToModify, transaction);
             }
@@ -261,7 +260,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
         return this.checkIfValidRequestResponseLockTokenAsync(lockToken).thenCompose((requestResponseLocked) -> {
             if (requestResponseLocked) {
                 return this.internalReceiver.completeMessageAsync(lockToken, transaction)
-                        .thenRun(() -> MessageReceiver.this.requestResponseLockTokensToLockTimesMap.remove(lockToken));
+                        .thenRun( () -> this.disposeLockToken(lockToken, transaction));
             } else {
                 return this.internalReceiver.completeMessageAsync(Util.convertUUIDToDotNetBytes(lockToken), transaction);
             }
@@ -317,7 +316,8 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
         TRACE_LOGGER.debug("Deferring message with lock token '{}'", lockToken);
         return this.checkIfValidRequestResponseLockTokenAsync(lockToken).thenCompose((requestResponseLocked) -> {
             if (requestResponseLocked) {
-                return this.internalReceiver.deferMessageAsync(lockToken, propertiesToModify, transaction).thenRun(() -> MessageReceiver.this.requestResponseLockTokensToLockTimesMap.remove(lockToken));
+                return this.internalReceiver.deferMessageAsync(lockToken, propertiesToModify, transaction)
+                        .thenRun( () -> this.disposeLockToken(lockToken, transaction));
             } else {
                 return this.internalReceiver.deferMessageAsync(Util.convertUUIDToDotNetBytes(lockToken), propertiesToModify, transaction);
             }
@@ -416,7 +416,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                         deadLetterErrorDescription,
                         propertiesToModify,
                         transaction)
-                        .thenRun(() -> MessageReceiver.this.requestResponseLockTokensToLockTimesMap.remove(lockToken));
+                        .thenRun( () -> this.disposeLockToken(lockToken, transaction));
             } else {
                 return this.internalReceiver.deadLetterMessageAsync(
                         Util.convertUUIDToDotNetBytes(lockToken),
@@ -570,6 +570,18 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
             }
 
             this.internalReceiver.setPrefetchCount(prefetchCount);
+        }
+    }
+
+    private void disposeLockToken(UUID lockToken, TransactionContext transaction) {
+        if (transaction != TransactionContext.NULL_TXN) {
+            transaction.registerHandler((commit) -> {
+                if (commit) {
+                    MessageReceiver.this.requestResponseLockTokensToLockTimesMap.remove(lockToken);
+                }
+            });
+        } else {
+            MessageReceiver.this.requestResponseLockTokensToLockTimesMap.remove(lockToken);
         }
     }
 

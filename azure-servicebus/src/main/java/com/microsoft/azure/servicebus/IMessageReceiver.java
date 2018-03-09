@@ -11,7 +11,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
-import com.microsoft.azure.servicebus.security.TransactionContext;
 
 /**
  * Defines message receiver interface. The MessageReceiver can be used to receive messages from Queues and Subscriptions and acknowledge them.
