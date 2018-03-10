@@ -42,9 +42,6 @@ import com.microsoft.azure.servicebus.amqp.ReactorDispatcher;
 import com.microsoft.azure.servicebus.amqp.ReactorHandler;
 import com.microsoft.azure.servicebus.security.SecurityToken;
 
-import javax.naming.NamingException;
-import javax.persistence.*;
-
 /**
  * Abstracts all AMQP related details and encapsulates an AMQP connection and manages its life cycle. Each instance of this class represent one AMQP connection to the namespace.
  * If an application creates multiple senders, receivers or clients using the same MessagingFacotry instance, all those senders, receivers or clients will share the same connection to the namespace.
@@ -77,8 +74,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	
 	private final ClientSettings clientSettings;
 	private final URI namespaceEndpointUri;
-	EntityManagerFactory entityManagerFactory;
-	
+
 	private MessagingFactory(URI namespaceEndpointUri, ClientSettings clientSettings)
 	{
 	    super("MessagingFactory".concat(StringUtil.getShortRandomString()), null);
@@ -113,11 +109,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
                 .thenCompose(controller -> controller.declareAsync()
                         .thenApply(binary -> new TransactionContext(binary.asByteBuffer())));
     }
-/*
-    public Binary getTransactionId() {
-        return TransactionManager.getTransactionId();
-    }
-*/
+
     public CompletableFuture<Void> endTransaction(TransactionContext transaction, boolean commit) {
 	    return this.getController()
                 .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit)
@@ -136,28 +128,12 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	    if (this.controller != null) {
 	        return CompletableFuture.completedFuture(this.controller);
         }
-        /*
-        ClientSettings newClientSettings = new ClientSettings(
-                this.clientSettings.getTokenProvider(),
-                RetryPolicy.getNoRetry(),
-                this.clientSettings.getOperationTimeout());
-        */
+
 	    Controller controller = new Controller(this.namespaceEndpointUri, this, this.clientSettings);
 	    return controller.initializeAsync().thenApply(v -> {
 	        this.controller = controller;
 	        return controller;
         });
-    }
-
-    void trial() throws NamingException {
-        //InitialContext ic = new InitialContext();
-        //UserTransaction utx = (UserTransaction) ic.lookup("java:comp/UserTransaction");
-
-        entityManagerFactory = Persistence.createEntityManagerFactory("asbpu");
-        EntityManager entityManager = entityManagerFactory.createEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
-
-
     }
 
 	String getHostName()

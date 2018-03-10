@@ -3,12 +3,19 @@ package com.microsoft.azure.servicebus;
 import com.microsoft.azure.servicebus.management.EntityManager;
 import com.microsoft.azure.servicebus.management.ManagementException;
 import com.microsoft.azure.servicebus.management.QueueDescription;
+import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.util.Date;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 public class QueueSendReceiveTests extends SendReceiveTests
