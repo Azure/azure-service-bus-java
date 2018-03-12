@@ -104,12 +104,24 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         Timer.register(this.getClientId());
 	}
 
+	/**
+	 * Starts a new service side transaction. The {@link TransactionContext} should be passed to all operations that
+	 * needs to be in this transaction.
+	 * @return A <code>CompletableFuture</code> which returns a new transaction
+	 */
 	public CompletableFuture<TransactionContext> startTransaction() {
         return this.getController()
                 .thenCompose(controller -> controller.declareAsync()
                         .thenApply(binary -> new TransactionContext(binary.asByteBuffer())));
     }
 
+	/**
+	 * Ends a transaction that was initiated using {@link MessagingFactory#startTransaction()}.
+	 * @param transaction The transaction object.
+	 * @param commit A boolean value of <code>true</code> indicates transaction to be committed. A value of
+	 *                  <code>false</code> indicates a transaction rollback.
+	 * @return A <code>CompletableFuture</code>
+	 */
     public CompletableFuture<Void> endTransaction(TransactionContext transaction, boolean commit) {
 	    return this.getController()
                 .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit)

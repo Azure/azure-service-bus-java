@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-public class Controller {
+class Controller {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(Controller.class);
     private MessagingFactory messagingFactory;
     private CoreMessageSender internalSender;
