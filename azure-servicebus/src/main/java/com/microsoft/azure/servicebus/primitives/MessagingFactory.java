@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 
 import com.microsoft.azure.servicebus.TransactionContext;
+import com.microsoft.azure.servicebus.Utils;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
@@ -108,22 +109,45 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	/**
 	 * Starts a new service side transaction. The {@link TransactionContext} should be passed to all operations that
 	 * needs to be in this transaction.
+	 * @return a new transaction
+	 * @throws ServiceBusException
+	 * @throws InterruptedException
+	 */
+	public TransactionContext startTransaction() throws ServiceBusException, InterruptedException {
+		return Utils.completeFuture(this.startTransactionAsync());
+	}
+
+	/**
+	 * Starts a new service side transaction. The {@link TransactionContext} should be passed to all operations that
+	 * needs to be in this transaction.
 	 * @return A <code>CompletableFuture</code> which returns a new transaction
 	 */
-	public CompletableFuture<TransactionContext> startTransaction() {
+	public CompletableFuture<TransactionContext> startTransactionAsync() {
         return this.getController()
                 .thenCompose(controller -> controller.declareAsync()
                         .thenApply(binary -> new TransactionContext(binary.asByteBuffer())));
     }
 
 	/**
-	 * Ends a transaction that was initiated using {@link MessagingFactory#startTransaction()}.
+	 * Ends a transaction that was initiated using {@link MessagingFactory#startTransactionAsync()}.
+	 * @param transaction The transaction object.
+	 * @param commit A boolean value of <code>true</code> indicates transaction to be committed. A value of
+	 *                  <code>false</code> indicates a transaction rollback.
+	 * @throws ServiceBusException
+	 * @throws InterruptedException
+	 */
+    public void endTransaction(TransactionContext transaction, boolean commit) throws ServiceBusException, InterruptedException {
+		Utils.completeFuture(this.endTransactionAsync(transaction, commit));
+	}
+
+	/**
+	 * Ends a transaction that was initiated using {@link MessagingFactory#startTransactionAsync()}.
 	 * @param transaction The transaction object.
 	 * @param commit A boolean value of <code>true</code> indicates transaction to be committed. A value of
 	 *                  <code>false</code> indicates a transaction rollback.
 	 * @return A <code>CompletableFuture</code>
 	 */
-    public CompletableFuture<Void> endTransaction(TransactionContext transaction, boolean commit) {
+    public CompletableFuture<Void> endTransactionAsync(TransactionContext transaction, boolean commit) {
 	    return this.getController()
                 .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit)
 				.thenRun(() -> transaction.notifyTransactionCompletion(commit)));

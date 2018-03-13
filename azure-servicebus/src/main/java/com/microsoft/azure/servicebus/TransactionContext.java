@@ -6,10 +6,10 @@ import java.nio.ByteBuffer;
 
 /**
  * Represents an active servicebus transaction.
- * A transaction is initiated by calling {@link MessagingFactory#startTransaction()}.
+ * A transaction is initiated by calling {@link MessagingFactory#startTransactionAsync()}.
  * A transaction can result in commit or rollback.
- * To commit, call {@link MessagingFactory#endTransaction(TransactionContext, boolean)} with <code>commit = true</code>
- * To rollback, call {@link MessagingFactory#endTransaction(TransactionContext, boolean)} with <code>commit = false</code>
+ * To commit, call {@link MessagingFactory#endTransactionAsync(TransactionContext, boolean)} with <code>commit = true</code>
+ * To rollback, call {@link MessagingFactory#endTransactionAsync(TransactionContext, boolean)} with <code>commit = false</code>
  */
 public class TransactionContext {
     public static TransactionContext NULL_TXN = new TransactionContext(null);

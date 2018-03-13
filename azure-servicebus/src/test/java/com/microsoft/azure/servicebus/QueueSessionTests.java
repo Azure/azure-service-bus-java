@@ -47,10 +47,10 @@ public class QueueSessionTests extends SessionTests
         Assert.assertNotNull("Message not received", receivedMessage);
         Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
         this.session.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, true).get();
+        this.factory.endTransactionAsync(transaction, true).get();
 
         receivedMessage = this.session.receive(SHORT_WAIT_TIME);
         Assert.assertNull("Message received again", receivedMessage);
@@ -71,10 +71,10 @@ public class QueueSessionTests extends SessionTests
         Assert.assertNotNull("Message not received", receivedMessage);
         Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
         this.session.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, false).get();
+        this.factory.endTransactionAsync(transaction, false).get();
         this.session.close();
 
         this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
@@ -97,10 +97,10 @@ public class QueueSessionTests extends SessionTests
         this.session.defer(receivedMessage.getLockToken());
         receivedMessage = this.session.receiveDeferredMessage(receivedMessage.getSequenceNumber());
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
         this.session.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, true).get();
+        this.factory.endTransactionAsync(transaction, true).get();
 
         receivedMessage = this.session.receiveDeferredMessage(receivedMessage.getSequenceNumber());
     }

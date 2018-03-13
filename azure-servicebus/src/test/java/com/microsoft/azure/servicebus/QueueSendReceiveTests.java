@@ -3,19 +3,12 @@ package com.microsoft.azure.servicebus;
 import com.microsoft.azure.servicebus.management.EntityManager;
 import com.microsoft.azure.servicebus.management.ManagementException;
 import com.microsoft.azure.servicebus.management.QueueDescription;
-import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.time.Duration;
-import java.util.Date;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 public class QueueSendReceiveTests extends SendReceiveTests
@@ -44,7 +37,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
     public void transactionalSendCommitTest() throws ServiceBusException, InterruptedException, ExecutionException {
         this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
 
         String messageId = UUID.randomUUID().toString();
@@ -52,7 +45,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
         message.setMessageId(messageId);
         this.sender.send(message, transaction);
 
-        this.factory.endTransaction(transaction, true).get();
+        this.factory.endTransactionAsync(transaction, true).get();
 
         IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
         Assert.assertNotNull("Message not received", receivedMessage);
@@ -65,7 +58,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
     public void transactionalSendRollbackTest() throws ServiceBusException, InterruptedException, ExecutionException {
         this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.PEEKLOCK);
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
 
         String messageId = UUID.randomUUID().toString();
@@ -73,7 +66,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
         message.setMessageId(messageId);
         this.sender.send(message, transaction);
 
-        this.factory.endTransaction(transaction, false).get();
+        this.factory.endTransactionAsync(transaction, false).get();
 
         IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
         Assert.assertNull(receivedMessage);
@@ -87,9 +80,9 @@ public class QueueSendReceiveTests extends SendReceiveTests
         this.sender.send(message);
         IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, true).get();
+        this.factory.endTransactionAsync(transaction, true).get();
         receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
         Assert.assertNull(receivedMessage);
     }
@@ -102,10 +95,10 @@ public class QueueSendReceiveTests extends SendReceiveTests
         this.sender.send(message);
 
         IMessage receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, false).get();
+        this.factory.endTransactionAsync(transaction, false).get();
         this.receiver.complete(receivedMessage.getLockToken());
     }
 
@@ -120,9 +113,9 @@ public class QueueSendReceiveTests extends SendReceiveTests
         receivedMessage = this.receiver.receiveDeferredMessage(receivedMessage.getSequenceNumber());
         Assert.assertNotNull(receivedMessage);
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, true).get();
+        this.factory.endTransactionAsync(transaction, true).get();
 
         receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
         Assert.assertNull(receivedMessage);
@@ -139,10 +132,10 @@ public class QueueSendReceiveTests extends SendReceiveTests
         receivedMessage = this.receiver.receiveDeferredMessage(receivedMessage.getSequenceNumber());
         Assert.assertNotNull(receivedMessage);
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransaction(transaction, false).get();
+        this.factory.endTransactionAsync(transaction, false).get();
 
         this.receiver.complete(receivedMessage.getLockToken());
     }
@@ -162,7 +155,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
             IMessageSender pSender = ClientFactory.createMessageSenderFromEntityPath(factory, partitionedEntityName);
             IMessageReceiver pReceiver = ClientFactory.createMessageReceiverFromEntityPath(factory, partitionedEntityName, ReceiveMode.PEEKLOCK);
 
-            TransactionContext transaction = this.factory.startTransaction().get();
+            TransactionContext transaction = this.factory.startTransactionAsync().get();
             Message message1 = new Message("AMQP message");
             message1.setPartitionKey("1");
             Message message2 = new Message("AMQP message 2");
@@ -178,7 +171,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
             }
 
             Assert.assertTrue(caught);
-            this.factory.endTransaction(transaction, false).get();
+            this.factory.endTransactionAsync(transaction, false).get();
 
             pSender.send(message1);
             pSender.send(message2);
@@ -188,7 +181,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
             Assert.assertNotNull("Message not received", receivedMessage1);
             Assert.assertNotNull("Message not received", receivedMessage2);
 
-            transaction = this.factory.startTransaction().get();
+            transaction = this.factory.startTransactionAsync().get();
             pReceiver.complete(receivedMessage1.getLockToken(), transaction);
             try {
                 caught = false;
@@ -200,7 +193,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
 
             Assert.assertTrue(caught);
 
-            this.factory.endTransaction(transaction, false);
+            this.factory.endTransactionAsync(transaction, false);
         }
         finally {
             EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, partitionedEntityName);
@@ -218,10 +211,10 @@ public class QueueSendReceiveTests extends SendReceiveTests
         this.sender.send(message1);
         IMessage receivedMessage = this.receiver.receive();
 
-        TransactionContext transaction = this.factory.startTransaction().get();
+        TransactionContext transaction = this.factory.startTransactionAsync().get();
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
         this.sender.send(message2, transaction);
-        this.factory.endTransaction(transaction, true).get();
+        this.factory.endTransactionAsync(transaction, true).get();
 
         receivedMessage = this.receiver.receive();
         Assert.assertNotNull(receivedMessage);
