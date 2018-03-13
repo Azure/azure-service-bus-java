@@ -82,7 +82,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
 
         TransactionContext transaction = this.factory.startTransactionAsync().get();
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransactionAsync(transaction, true).get();
+        transaction.commit();
         receivedMessage = this.receiver.receive(TestCommons.SHORT_WAIT_TIME);
         Assert.assertNull(receivedMessage);
     }
@@ -98,7 +98,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
         TransactionContext transaction = this.factory.startTransactionAsync().get();
         Assert.assertNotNull(transaction);
         this.receiver.complete(receivedMessage.getLockToken(), transaction);
-        this.factory.endTransactionAsync(transaction, false).get();
+        transaction.rollback();
         this.receiver.complete(receivedMessage.getLockToken());
     }
 

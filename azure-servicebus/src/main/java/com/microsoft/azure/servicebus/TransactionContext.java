@@ -1,8 +1,11 @@
 package com.microsoft.azure.servicebus;
 
+import com.microsoft.azure.servicebus.primitives.ExceptionUtil;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
+import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Represents an active servicebus transaction.
@@ -12,13 +15,15 @@ import java.nio.ByteBuffer;
  * To rollback, call {@link MessagingFactory#endTransactionAsync(TransactionContext, boolean)} with <code>commit = false</code>
  */
 public class TransactionContext {
-    public static TransactionContext NULL_TXN = new TransactionContext(null);
+    public static TransactionContext NULL_TXN = new TransactionContext(null, null);
 
     private ByteBuffer txnId;
     private ITransactionHandler txnHandler = null;
+    private MessagingFactory messagingFactory;
 
-    public TransactionContext(ByteBuffer txnId) {
+    public TransactionContext(ByteBuffer txnId, MessagingFactory messagingFactory) {
         this.txnId = txnId;
+        this.messagingFactory = messagingFactory;
     }
 
     /**
@@ -30,6 +35,58 @@ public class TransactionContext {
     @Override
     public String toString() {
         return new String(txnId.array(), txnId.position(), txnId.limit());
+    }
+
+    /**
+     * Commits the transaction
+     * @throws ServiceBusException
+     * @throws InterruptedException
+     */
+    public void commit() throws ServiceBusException, InterruptedException {
+        if (this.messagingFactory == null) {
+            throw new ServiceBusException(false, "MessagingFactory should not be null");
+        }
+
+        this.messagingFactory.endTransaction(this, true);
+    }
+
+    /**
+     * Asynchronously commits the transaction
+     */
+    public CompletableFuture<Void> commitAsync() {
+        if (this.messagingFactory == null) {
+            CompletableFuture<Void> exceptionCompletion = new CompletableFuture<>();
+            exceptionCompletion.completeExceptionally(new ServiceBusException(false, "MessagingFactory should not be null"));
+            return exceptionCompletion;
+        }
+
+        return this.messagingFactory.endTransactionAsync(this, true);
+    }
+
+    /**
+     * Rollback the transaction
+     * @throws ServiceBusException
+     * @throws InterruptedException
+     */
+    public void rollback() throws ServiceBusException, InterruptedException {
+        if (this.messagingFactory == null) {
+            throw new ServiceBusException(false, "MessagingFactory should not be null");
+        }
+
+        this.messagingFactory.endTransaction(this, false);
+    }
+
+    /**
+     * Asynchronously rollback the transaction.
+     */
+    public CompletableFuture<Void> rollbackAsync() {
+        if (this.messagingFactory == null) {
+            CompletableFuture<Void> exceptionCompletion = new CompletableFuture<>();
+            exceptionCompletion.completeExceptionally(new ServiceBusException(false, "MessagingFactory should not be null"));
+            return exceptionCompletion;
+        }
+
+        return this.messagingFactory.endTransactionAsync(this, false);
     }
 
     /**

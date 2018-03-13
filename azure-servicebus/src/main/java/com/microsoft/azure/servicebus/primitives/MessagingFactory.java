@@ -125,7 +125,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	public CompletableFuture<TransactionContext> startTransactionAsync() {
         return this.getController()
                 .thenCompose(controller -> controller.declareAsync()
-                        .thenApply(binary -> new TransactionContext(binary.asByteBuffer())));
+                        .thenApply(binary -> new TransactionContext(binary.asByteBuffer(), this)));
     }
 
 	/**
@@ -148,7 +148,13 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	 * @return A <code>CompletableFuture</code>
 	 */
     public CompletableFuture<Void> endTransactionAsync(TransactionContext transaction, boolean commit) {
-	    return this.getController()
+        if (transaction == null) {
+            CompletableFuture<Void> exceptionCompletion = new CompletableFuture<>();
+            exceptionCompletion.completeExceptionally(new ServiceBusException(false, "Transaction cannot not be null"));
+            return exceptionCompletion;
+        }
+
+        return this.getController()
                 .thenCompose(controller -> controller.dischargeAsync(new Binary(transaction.getTransactionId().array()), commit)
 				.thenRun(() -> transaction.notifyTransactionCompletion(commit)));
     }
