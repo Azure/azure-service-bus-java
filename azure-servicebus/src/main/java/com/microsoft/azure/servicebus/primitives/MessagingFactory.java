@@ -43,8 +43,9 @@ import com.microsoft.azure.servicebus.amqp.ReactorHandler;
 import com.microsoft.azure.servicebus.security.SecurityToken;
 
 /**
- * Abstracts all AMQP related details and encapsulates an AMQP connection and manages its life cycle. Each instance of this class represent one AMQP connection to the namespace.
- * If an application creates multiple senders, receivers or clients using the same MessagingFacotry instance, all those senders, receivers or clients will share the same connection to the namespace.
+ * Abstracts all AMQP related details and encapsulates an AMQP connection and manages its life cycle. Each instance of
+ * this class represent one AMQP connection to the namespace. If an application creates multiple senders, receivers
+ * or clients using the same MessagingFactory instance, all those senders, receivers or clients will share the same connection to the namespace.
  * @since 1.0
  */
 public class MessagingFactory extends ClientEntity implements IAmqpConnection

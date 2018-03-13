@@ -33,7 +33,6 @@ import com.microsoft.azure.servicebus.primitives.Timer;
 import com.microsoft.azure.servicebus.primitives.TimerType;
 import com.microsoft.azure.servicebus.primitives.Util;
 
-// TODO As part of receive, don't return messages whose lock is already expired. Can happen because of delay between prefetch and actual receive from client.
 class MessageReceiver extends InitializableEntity implements IMessageReceiver, IMessageBrowser {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageReceiver.class);
     // Using 0 pre-fetch count for both receive modes, to avoid message lock lost exceptions in application receiving messages at a slow rate.
