@@ -66,8 +66,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 {
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(CoreMessageReceiver.class);
 	private static final Duration LINK_REOPEN_TIMEOUT = Duration.ofMinutes(5); // service closes link long before this timeout expires
-	private static final Duration RETURN_MESSAGES_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(100); // Wakes up every 100 milliseconds
-	private static final Duration UPDATE_STATE_REQUESTS_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(1000); // Wakes up every second
+	private static final Duration RETURN_MESSAGES_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(1); // Wakes up every 1 millisecond
+	private static final Duration UPDATE_STATE_REQUESTS_DAEMON_WAKE_UP_INTERVAL = Duration.ofMillis(500); // Wakes up every 500 milliseconds
 	private static final Duration ZERO_TIMEOUT_APPROXIMATION = Duration.ofMillis(200);
 	private static final int CREDIT_FLOW_BATCH_SIZE = 50;// Arbitrarily chosen 50 to avoid sending too many flows in case prefetch count is large
 	
@@ -259,7 +259,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	{
 		this.linkOpen = new WorkItem<CoreMessageReceiver>(new CompletableFuture<CoreMessageReceiver>(), this.operationTimeout);
 		this.scheduleLinkOpenTimeout(this.linkOpen.getTimeoutTracker());
-		this.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sasTokenEx) -> {
+		this.sendTokenAndSetRenewTimer(false).handleAsync((v, sasTokenEx) -> {
             if(sasTokenEx != null)
             {
                 Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sasTokenEx);
@@ -385,7 +385,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		this.receiveLink = receiver;
 	}
 	
-	CompletableFuture<Void> sendSASTokenAndSetRenewTimer(boolean retryOnFailure)
+	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)
     {
         if(this.getIsClosingOrClosed())
         {
@@ -393,7 +393,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         }
         else
         {            
-            CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSASTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendSASTokenAndSetRenewTimer(true));
+            CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
             return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
         }
     }
@@ -604,17 +604,18 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		else
 		{
-		    TRACE_LOGGER.error("Opening receive link to '{}' failed.", this.receivePath, exception);
             this.cancelSASTokenRenewTimer();
             
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
-			{  
+			{
+			    TRACE_LOGGER.error("Opening receive link to '{}' failed.", this.receivePath, exception);
 				this.setClosed();
 				ExceptionUtil.completeExceptionally(this.linkOpen.getWork(), exception, this, true);
 			}
 			
 			if(this.receiveLinkReopenFuture != null && !this.receiveLinkReopenFuture.isDone())
             {
+			    TRACE_LOGGER.warn("Opening receive link to '{}' failed.", this.receivePath, exception);
 			    AsyncUtil.completeFutureExceptionally(this.receiveLinkReopenFuture, exception);
 			    this.receiveLinkReopenFuture = null;
 			    if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
@@ -662,7 +663,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		    }
 		    catch(Exception e)
 		    {
-		        TRACE_LOGGER.error("Reading message from delivery '{}' from '{}', session '{}' failed with unexpected exception.", deliveryTagAsString, this.receivePath, this.sessionId, e);
+		        TRACE_LOGGER.warn("Reading message from delivery '{}' from '{}', session '{}' failed with unexpected exception.", deliveryTagAsString, this.receivePath, this.sessionId, e);
 		        delivery.disposition(Released.getInstance());
                 delivery.settle();
                 return;
@@ -785,7 +786,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		else
 		{
-		    TRACE_LOGGER.error("Receive link to '{}', sessionId '{}' closed with error.", this.receivePath, this.sessionId, exception);
+		    TRACE_LOGGER.warn("Receive link to '{}', sessionId '{}' closed with error.", this.receivePath, this.sessionId, exception);
 			this.lastKnownLinkError = exception;
 			if ((this.linkOpen != null && !this.linkOpen.getWork().isDone()) ||
 			     (this.receiveLinkReopenFuture !=null && !receiveLinkReopenFuture.isDone()))
@@ -819,7 +820,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	                            .getNextRetryInterval(this.getClientId(), exception, workItem.getTimeoutTracker().remaining());
 	                    if (nextRetryInterval != null)
 	                    {
-	                        TRACE_LOGGER.error("Receive link to '{}', sessionId '{}' will be reopened after '{}'", this.receivePath, this.sessionId, nextRetryInterval);
+	                        TRACE_LOGGER.info("Receive link to '{}', sessionId '{}' will be reopened after '{}'", this.receivePath, this.sessionId, nextRetryInterval);
 	                        Timer.schedule(() -> {CoreMessageReceiver.this.ensureLinkIsOpen();}, nextRetryInterval, TimerType.OneTimeRun);
 	                    }
 	                }
@@ -1088,7 +1089,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         Delivery delivery = CoreMessageReceiver.this.tagsToDeliveriesMap.get(deliveryTagAsString);
         if(delivery == null)
         {
-            TRACE_LOGGER.error("Delivery not found for delivery tag '{}'. Receive link to '{}' closed with a transient error and reopened.", deliveryTagAsString, this.receivePath);
+            TRACE_LOGGER.error("Delivery not found for delivery tag '{}'. Either receive link to '{}' closed with a transient error and reopened or the delivery was already settled by complete/abandon/defer/deadletter.", deliveryTagAsString, this.receivePath);
             AsyncUtil.completeFutureExceptionally(completeMessageFuture, generateDeliveryNotFoundException());
         }
         else
@@ -1145,7 +1146,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	                    , CoreMessageReceiver.LINK_REOPEN_TIMEOUT
 	                    , TimerType.OneTimeRun);
 	            this.cancelSASTokenRenewTimer();
-	            this.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
+	            this.sendTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
 	                if(sendTokenEx != null)
 	                {
 	                    this.receiveLinkReopenFuture.completeExceptionally(sendTokenEx);

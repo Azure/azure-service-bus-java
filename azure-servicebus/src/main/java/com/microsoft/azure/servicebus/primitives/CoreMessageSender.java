@@ -95,7 +95,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		TimeoutTracker openLinkTracker = TimeoutTracker.create(factory.getOperationTimeout());
 		msgSender.initializeLinkOpen(openLinkTracker);
 		
-		msgSender.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sasTokenEx) -> {
+		msgSender.sendTokenAndSetRenewTimer(false).handleAsync((v, sasTokenEx) -> {
 		    if(sasTokenEx != null)
 		    {
 		        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sasTokenEx);
@@ -242,7 +242,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             {
                 if (!sendWorkItem.getWork().isDone())
                 {
-                    TRACE_LOGGER.error("Delivery '{}' to '{}' did not receive ack from service. Throwing timeout.", sendWorkItem.getDeliveryTag(), CoreMessageSender.this.sendPath);
+                    TRACE_LOGGER.warn("Delivery '{}' to '{}' did not receive ack from service. Throwing timeout.", sendWorkItem.getDeliveryTag(), CoreMessageSender.this.sendPath);
                     CoreMessageSender.this.pendingSendsData.remove(sendWorkItem.getDeliveryTag());
                     CoreMessageSender.this.throwSenderTimeout(sendWorkItem.getWork(), sendWorkItem.getLastKnownException());
                     // Weighted delivery tag not removed from the pending sends queue, but send loop will ignore it anyway if it is present
@@ -418,7 +418,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			
 			if(this.sendLinkReopenFuture != null && !this.sendLinkReopenFuture.isDone())
             {
-			    TRACE_LOGGER.error("Opening send link to '{}' failed", this.sendPath, completionException);
+			    TRACE_LOGGER.warn("Opening send link to '{}' failed", this.sendPath, completionException);
                 AsyncUtil.completeFutureExceptionally(this.sendLinkReopenFuture, completionException);
                 this.sendLinkReopenFuture = null;
             }
@@ -599,7 +599,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		this.sendLink = sender;
 	}
 	
-	CompletableFuture<Void> sendSASTokenAndSetRenewTimer(boolean retryOnFailure)
+	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)
 	{
 	    if(this.getIsClosingOrClosed())
         {
@@ -607,7 +607,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
         else
         {            
-            CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSASTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendSASTokenAndSetRenewTimer(true));
+            CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
             return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
         }
 	}
@@ -707,7 +707,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                         , CoreMessageSender.LINK_REOPEN_TIMEOUT
                         , TimerType.OneTimeRun);
                 this.cancelSASTokenRenewTimer();
-                this.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
+                this.sendTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
                     if(sendTokenEx != null)
                     {
                         this.sendLinkReopenFuture.completeExceptionally(sendTokenEx);
@@ -766,7 +766,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                 return;
             }
             
-            final Sender sendLinkCurrent = this.sendLink;       
+            final Sender sendLinkCurrent = this.sendLink;
             while (sendLinkCurrent != null
                     && sendLinkCurrent.getLocalState() == EndpointState.ACTIVE && sendLinkCurrent.getRemoteState() == EndpointState.ACTIVE
                     && this.linkCredit > 0)
@@ -788,7 +788,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                         sendData = this.pendingSendsData.get(deliveryTag.getDeliveryTag());
                         if(sendData == null)
                         {
-                            TRACE_LOGGER.error("SendData not found for this delivery. path:{}, linkName:{}, deliveryTag:{}", this.sendPath, this.sendLink.getName(), deliveryTag);
+                            TRACE_LOGGER.warn("SendData not found for this delivery. path:{}, linkName:{}, deliveryTag:{}", this.sendPath, this.sendLink.getName(), deliveryTag);
                             continue;
                         }
                     }
