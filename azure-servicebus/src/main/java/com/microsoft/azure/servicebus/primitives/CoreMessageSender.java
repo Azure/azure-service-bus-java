@@ -80,16 +80,21 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private Exception lastKnownLinkError;
 	private Instant lastKnownErrorReportedAt;
 	private ScheduledFuture<?> sasTokenRenewTimerFuture;
+	private ScheduledFuture<?> transferSasTokenRenewTimerFuture;
 	private CompletableFuture<Void> requestResponseLinkCreationFuture;
 	private CompletableFuture<Void> sendLinkReopenFuture;
 	private SenderLinkSettings linkSettings;
+	private String transferDestinationPath;
+	private String transferSasTokenAudienceURI;
+	private boolean isSendVia;
 
 	public static CompletableFuture<CoreMessageSender> create(
 			final MessagingFactory factory,
 			final String clientId,
-			final String senderPath)
+			final String senderPath,
+			final String transferDestinationPath)
 	{
-		return CoreMessageSender.create(factory, clientId, CoreMessageSender.getDefaultLinkProperties(senderPath, factory));
+		return CoreMessageSender.create(factory, clientId, CoreMessageSender.getDefaultLinkProperties(senderPath, transferDestinationPath, factory));
 	}
 
 	static CompletableFuture<CoreMessageSender> create(
@@ -192,6 +197,17 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		super(sendLinkName);
 
 		this.sendPath = linkSettings.linkPath;
+		if (linkSettings.linkProperties != null)
+		{
+			String transferPath = (String)linkSettings.linkProperties.getOrDefault(ClientConstants.LINK_TRANSFER_DESTINATION_PROPERTY, null);
+			if (transferPath != null && !transferPath.isEmpty())
+			{
+				this.transferDestinationPath = transferPath;
+				this.isSendVia = true;
+				this.transferSasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), transferDestinationPath);
+			}
+		}
+
 		this.sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), linkSettings.linkPath);
 		this.underlyingFactory = factory;
 		this.operationTimeout = factory.getOperationTimeout();
@@ -590,7 +606,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		ExceptionUtil.completeExceptionally(failedSend.getWork(), exception, this, true);
 	}
 
-	private static SenderLinkSettings getDefaultLinkProperties(String sendPath, MessagingFactory underlyingFactory)
+	private static SenderLinkSettings getDefaultLinkProperties(String sendPath, String transferDestinationPath, MessagingFactory underlyingFactory)
 	{
 		SenderLinkSettings linkSettings = new SenderLinkSettings();
 		linkSettings.linkPath = sendPath;
@@ -605,6 +621,11 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		Map<Symbol, Object> linkProperties = new HashMap<>();
 		// ServiceBus expects timeout to be of type unsignedint
 		linkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(underlyingFactory.getOperationTimeout()).toMillis()));
+		if (transferDestinationPath != null && !transferDestinationPath.isEmpty())
+		{
+			linkProperties.put(ClientConstants.LINK_TRANSFER_DESTINATION_PROPERTY, transferDestinationPath);
+		}
+
 		linkSettings.linkProperties = linkProperties;
 
 		return linkSettings;
@@ -642,7 +663,17 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         else
         {            
             CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+			CompletableFuture<Void> sasTokenFuture = sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+
+			if (this.transferDestinationPath!= null && !this.transferDestinationPath.isEmpty())
+			{
+				CompletableFuture<ScheduledFuture<?>> transferSendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.transferSasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
+				CompletableFuture<Void> transferSasTokenFuture = transferSendTokenFuture.thenAccept((f) -> {this.transferSasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token for transfer destination and set renew timer");});
+
+				return CompletableFuture.allOf(sasTokenFuture, transferSasTokenFuture);
+			}
+
+			return sasTokenFuture;
         }
 	}
 	
@@ -653,6 +684,12 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             this.sasTokenRenewTimerFuture.cancel(true);
             TRACE_LOGGER.debug("Cancelled SAS Token renew timer");
         }
+
+		if(this.transferSasTokenRenewTimerFuture != null && !this.transferSasTokenRenewTimerFuture.isDone())
+		{
+			this.transferSasTokenRenewTimerFuture.cancel(true);
+			TRACE_LOGGER.debug("Cancelled SAS Token renew timer for transfer destination");
+		}
     }
 	
 	// TODO: consolidate common-code written for timeouts in Sender/Receiver

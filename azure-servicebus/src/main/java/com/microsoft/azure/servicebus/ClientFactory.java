@@ -132,7 +132,7 @@ public final class ClientFactory {
     public static CompletableFuture<IMessageSender> createMessageSenderFromEntityPathAsync(URI namespaceEndpointURI, String entityPath, ClientSettings clientSettings)
     {
         Utils.assertNonNull("namespaceEndpointURI", namespaceEndpointURI);
-        MessageSender sender = new MessageSender(namespaceEndpointURI, entityPath, clientSettings);
+        MessageSender sender = new MessageSender(namespaceEndpointURI, entityPath, null, clientSettings);
         return sender.initializeAsync().thenApply((v) -> sender);
     }
 
@@ -145,6 +145,13 @@ public final class ClientFactory {
     public static CompletableFuture<IMessageSender> createMessageSenderFromEntityPathAsync(MessagingFactory messagingFactory, String entityPath) {
         Utils.assertNonNull("messagingFactory", messagingFactory);
         MessageSender sender = new MessageSender(messagingFactory, entityPath);
+        return sender.initializeAsync().thenApply((v) -> sender);
+    }
+
+    public static CompletableFuture<IMessageSender> createSendViaMessageSenderFromEntityPathAsync(URI namespaceEndpointURI, String entityPath, String viaEntityPath, ClientSettings clientSettings)
+    {
+        Utils.assertNonNull("namespaceEndpointURI", namespaceEndpointURI);
+        MessageSender sender = new MessageSender(namespaceEndpointURI, viaEntityPath, entityPath, clientSettings);
         return sender.initializeAsync().thenApply((v) -> sender);
     }
 

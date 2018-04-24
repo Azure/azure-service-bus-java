@@ -112,6 +112,26 @@ public abstract class SendReceiveTests extends Tests {
 	}
 
 	@Test
+	public void testSendVia() throws InterruptedException, ServiceBusException, ExecutionException, ManagementException {
+		URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
+		ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
+		String destinationQ = "destinationQ";
+
+		try {
+			QueueDescription queueDescription = new QueueDescription(destinationQ);
+			queueDescription.setEnablePartitioning(false);
+			EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+
+			this.sender = ClientFactory.createSendViaMessageSenderFromEntityPathAsync(namespaceEndpointURI, destinationQ, this.entityName, TestUtils.getClientSettings()).get();
+			this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destinationQ, ReceiveMode.RECEIVEANDDELETE);
+			TestCommons.testBasicReceiveAndDelete(this.sender, this.sessionId, this.receiver);
+		}
+		finally {
+			EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destinationQ);
+		}
+	}
+
+	@Test
 	public void testBasicReceiveAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
 		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.RECEIVEANDDELETE);

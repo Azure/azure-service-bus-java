@@ -22,6 +22,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageSender.class);
     private boolean ownsMessagingFactory;
     private String entityPath = null;
+    private String transferDestinationPath = null;
     private MessagingFactory messagingFactory = null;
     private CoreMessageSender internalSender = null;
     private boolean isInitialized = false;
@@ -32,10 +33,11 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
         super(StringUtil.getShortRandomString());
     }
 
-    MessageSender(URI namespaceEndpointURI, String entityPath, ClientSettings clientSettings) {
+    MessageSender(URI namespaceEndpointURI, String entityPath, String transferDestinationPath, ClientSettings clientSettings) {
         this();
 
         this.namespaceEndpointURI = namespaceEndpointURI;
+        this.transferDestinationPath = transferDestinationPath;
         this.entityPath = entityPath;
         this.clientSettings = clientSettings;
         this.ownsMessagingFactory = true;
@@ -77,7 +79,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
             return factoryFuture.thenComposeAsync((v) ->
             {
                 TRACE_LOGGER.info("Creating MessageSender to entity '{}'", this.entityPath);
-                CompletableFuture<CoreMessageSender> senderFuture = CoreMessageSender.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath);
+                CompletableFuture<CoreMessageSender> senderFuture = CoreMessageSender.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath, this.transferDestinationPath);
                 CompletableFuture<Void> postSenderCreationFuture = new CompletableFuture<Void>();
                 senderFuture.handleAsync((s, coreSenderCreationEx) -> {
                     if (coreSenderCreationEx == null) {
