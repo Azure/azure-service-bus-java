@@ -80,7 +80,6 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private Exception lastKnownLinkError;
 	private Instant lastKnownErrorReportedAt;
 	private ScheduledFuture<?> sasTokenRenewTimerFuture;
-	private ScheduledFuture<?> transferSasTokenRenewTimerFuture;
 	private CompletableFuture<Void> requestResponseLinkCreationFuture;
 	private CompletableFuture<Void> sendLinkReopenFuture;
 	private SenderLinkSettings linkSettings;
@@ -667,10 +666,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 
 			if (this.transferDestinationPath!= null && !this.transferDestinationPath.isEmpty())
 			{
-				CompletableFuture<ScheduledFuture<?>> transferSendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.transferSasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
-				CompletableFuture<Void> transferSasTokenFuture = transferSendTokenFuture.thenAccept((f) -> {this.transferSasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token for transfer destination and set renew timer");});
-
-				return CompletableFuture.allOf(sasTokenFuture, transferSasTokenFuture);
+				CompletableFuture<Void> transferSendTokenFuture = this.underlyingFactory.sendSecurityToken(this.transferSasTokenAudienceURI);
+				return CompletableFuture.allOf(sasTokenFuture, transferSendTokenFuture);
 			}
 
 			return sasTokenFuture;
@@ -684,12 +681,6 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             this.sasTokenRenewTimerFuture.cancel(true);
             TRACE_LOGGER.debug("Cancelled SAS Token renew timer");
         }
-
-		if(this.transferSasTokenRenewTimerFuture != null && !this.transferSasTokenRenewTimerFuture.isDone())
-		{
-			this.transferSasTokenRenewTimerFuture.cancel(true);
-			TRACE_LOGGER.debug("Cancelled SAS Token renew timer for transfer destination");
-		}
     }
 	
 	// TODO: consolidate common-code written for timeouts in Sender/Receiver

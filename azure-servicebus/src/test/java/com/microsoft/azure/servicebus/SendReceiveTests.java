@@ -122,7 +122,7 @@ public abstract class SendReceiveTests extends Tests {
 			queueDescription.setEnablePartitioning(false);
 			EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 
-			this.sender = ClientFactory.createSendViaMessageSenderFromEntityPathAsync(namespaceEndpointURI, destinationQ, this.entityName, TestUtils.getClientSettings()).get();
+			this.sender = ClientFactory.createTransferMessageSenderFromEntityPathAsync(this.factory, destinationQ, this.entityName).get();
 			this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destinationQ, ReceiveMode.RECEIVEANDDELETE);
 			TestCommons.testBasicReceiveAndDelete(this.sender, this.sessionId, this.receiver);
 		}

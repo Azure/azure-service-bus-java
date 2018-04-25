@@ -37,6 +37,7 @@ public final class ClientConstants
 	//public static final String LOCKTOKENNAME = "x-opt-lock-token";
 	public static final String LOCKEDUNTILNAME = "x-opt-locked-until";
 	public static final String PARTITIONKEYNAME = "x-opt-partition-key";
+	public static final String VIAPARTITIONKEYNAME = "x-opt-via-partition-key";
 	public static final String DEADLETTERSOURCENAME = "x-opt-deadletter-source";
 	public static final UUID ZEROLOCKTOKEN = new UUID(0l, 0l);	
 

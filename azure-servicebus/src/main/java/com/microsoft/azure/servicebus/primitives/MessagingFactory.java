@@ -630,7 +630,24 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	{
 		this.getReactorScheduler().invoke(delay, handler);
 	}
-	
+
+	CompletableFuture<Void> sendSecurityToken(String sasTokenAudienceUri)
+	{
+		TRACE_LOGGER.debug("Sending token for {}", sasTokenAudienceUri);
+		CompletableFuture<SecurityToken> tokenFuture = this.clientSettings.getTokenProvider().getSecurityTokenAsync(sasTokenAudienceUri);
+		return tokenFuture.thenComposeAsync((t) ->
+		{
+			SecurityToken generatedSecurityToken = t;
+			CompletableFuture<Void> sendTokenFuture = this.cbsLinkCreationFuture.thenComposeAsync((v) -> {
+				return CommonRequestResponseOperations.sendCBSTokenAsync(this.cbsLink, Util.adjustServerTimeout(this.clientSettings.getOperationTimeout()), generatedSecurityToken);
+			});
+
+			return sendTokenFuture.thenAccept((v) -> {
+				TRACE_LOGGER.debug("Sent token for {}", sasTokenAudienceUri);});
+
+		});
+	}
+
 	CompletableFuture<ScheduledFuture<?>> sendSecurityTokenAndSetRenewTimer(String sasTokenAudienceURI, boolean retryOnFailure, Runnable validityRenewer)
     {
 	    TRACE_LOGGER.debug("Sending token for {}", sasTokenAudienceURI);

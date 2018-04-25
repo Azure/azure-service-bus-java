@@ -148,10 +148,10 @@ public final class ClientFactory {
         return sender.initializeAsync().thenApply((v) -> sender);
     }
 
-    public static CompletableFuture<IMessageSender> createSendViaMessageSenderFromEntityPathAsync(URI namespaceEndpointURI, String entityPath, String viaEntityPath, ClientSettings clientSettings)
+    public static CompletableFuture<IMessageSender> createTransferMessageSenderFromEntityPathAsync(MessagingFactory messagingFactory, String entityPath, String viaEntityPath)
     {
-        Utils.assertNonNull("namespaceEndpointURI", namespaceEndpointURI);
-        MessageSender sender = new MessageSender(namespaceEndpointURI, viaEntityPath, entityPath, clientSettings);
+        Utils.assertNonNull("messagingFactory", messagingFactory);
+        MessageSender sender = new MessageSender(messagingFactory, viaEntityPath, entityPath);
         return sender.initializeAsync().thenApply((v) -> sender);
     }
 

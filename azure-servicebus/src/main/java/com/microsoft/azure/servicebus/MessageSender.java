@@ -44,14 +44,19 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     }
 
     MessageSender(MessagingFactory messagingFactory, String entityPath) {
-        this(messagingFactory, entityPath, false);
+        this(messagingFactory, entityPath, null, false);
     }
 
-    private MessageSender(MessagingFactory messagingFactory, String entityPath, boolean ownsMessagingFactory) {
+    MessageSender(MessagingFactory messagingFactory, String entityPath, String transferDestinationPath) {
+        this(messagingFactory, entityPath, transferDestinationPath, false);
+    }
+
+    private MessageSender(MessagingFactory messagingFactory, String entityPath, String transferDestinationPath, boolean ownsMessagingFactory) {
         this();
 
         this.messagingFactory = messagingFactory;
         this.entityPath = entityPath;
+        this.transferDestinationPath = transferDestinationPath;
         this.ownsMessagingFactory = ownsMessagingFactory;
     }
 
