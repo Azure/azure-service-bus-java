@@ -151,7 +151,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             if(this.requestResponseLinkCreationFuture == null)
             {
                 this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath).handleAsync((rrlink, ex) ->
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath, this.transferDestinationPath).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
                     {
@@ -183,7 +183,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             if(this.requestResponseLinkCreationFuture != null)
             {
                 this.requestResponseLinkCreationFuture.thenRun(() -> {
-                    this.underlyingFactory.releaseRequestResponseLink(this.sendPath);
+                    this.underlyingFactory.releaseRequestResponseLink(this.sendPath, this.transferDestinationPath);
                     this.requestResponseLink = null;
                 });
                 this.requestResponseLinkCreationFuture = null;
@@ -205,6 +205,11 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 				this.isSendVia = true;
 				this.transferSasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), transferDestinationPath);
 			}
+			else
+            {
+                // Ensure it is null.
+                this.transferDestinationPath = null;
+            }
 		}
 
 		this.sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), linkSettings.linkPath);
@@ -1087,6 +1092,12 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 				{
 					messageEntry.put(ClientConstants.REQUEST_RESPONSE_PARTITION_KEY, (String)partitionKey);
 				}
+
+                Object viaPartitionKey = message.getMessageAnnotations().getValue().get(Symbol.valueOf(ClientConstants.VIAPARTITIONKEYNAME));
+                if(viaPartitionKey != null && !((String)viaPartitionKey).isEmpty())
+                {
+                    messageEntry.put(ClientConstants.REQUEST_RESPONSE_VIA_PARTITION_KEY, (String)viaPartitionKey);
+                }
 				
 				messageList.add(messageEntry);
 			}
@@ -1118,7 +1129,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		});
 	}
 	
-	public CompletableFuture<Void> cancelScheduledMessageAsync(Long[] sequenceNumbers, TransactionContext transaction, Duration timeout)
+	public CompletableFuture<Void> cancelScheduledMessageAsync(Long[] sequenceNumbers, Duration timeout)
 	{
 	    if(TRACE_LOGGER.isDebugEnabled())
 	    {
@@ -1130,7 +1141,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS, sequenceNumbers);
 			
 			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_CANCEL_CHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout), this.sendLink.getName());
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, transaction, timeout);
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, timeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);

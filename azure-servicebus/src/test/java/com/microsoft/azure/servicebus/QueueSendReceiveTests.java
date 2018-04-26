@@ -8,6 +8,8 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -317,6 +319,56 @@ public class QueueSendReceiveTests extends SendReceiveTests
             EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, intermediateQueue);
             EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destination1);
             EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destination2);
+        }
+    }
+
+    @Test
+    public void sendViaScheduledMessagesTest() throws ManagementException, ServiceBusException, InterruptedException, ExecutionException {
+        URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
+        ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
+
+        String viaQueue = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
+        QueueDescription queueDescription = new QueueDescription(viaQueue);
+        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+
+        String destinationQ = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
+        queueDescription = new QueueDescription(destinationQ);
+        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+
+        IMessageSender destination1ViaSender = ClientFactory.createTransferMessageSenderFromEntityPathAsync(factory, destinationQ, viaQueue).get();
+        IMessageReceiver destinationReceiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destinationQ, ReceiveMode.PEEKLOCK);
+
+        try {
+            Message message1 = new Message("message");
+            message1.setMessageId("1");
+
+            Message message2 = new Message("message");
+            message2.setMessageId("2");
+
+            long sequenceNum;
+
+            TransactionContext transaction = this.factory.startTransaction();
+            sequenceNum = destination1ViaSender.scheduleMessage(message1, Instant.now().plusSeconds(2), transaction);
+            transaction.rollback();
+
+            transaction = this.factory.startTransaction();
+            sequenceNum = destination1ViaSender.scheduleMessage(message2, Instant.now().plusSeconds(2), transaction);
+            transaction.commit();
+
+            Assert.assertNotEquals(0, sequenceNum);
+
+            IMessage message = destinationReceiver.receive();
+            Assert.assertEquals("2", message.getMessageId());
+
+            message = destinationReceiver.receive();
+            Assert.assertNull(message);
+        }
+        finally {
+            destination1ViaSender.close();
+            destinationReceiver.close();
+
+            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, viaQueue);
+            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destinationQ);
         }
     }
 }

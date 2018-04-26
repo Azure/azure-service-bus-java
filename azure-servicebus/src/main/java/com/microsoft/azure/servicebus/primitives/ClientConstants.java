@@ -120,6 +120,7 @@ public final class ClientConstants
 	public static final String REQUEST_RESPONSE_MESSAGE_ID = "message-id";
 	public static final String REQUEST_RESPONSE_SESSION_ID = "session-id";
 	public static final String REQUEST_RESPONSE_PARTITION_KEY = "partition-key";
+    public static final String REQUEST_RESPONSE_VIA_PARTITION_KEY = "via-partition-key";
 	public static final String REQUEST_RESPONSE_FROM_SEQUENCE_NUMER = "from-sequence-number";
 	public static final String REQUEST_RESPONSE_MESSAGE_COUNT = "message-count";
 	public static final String REQUEST_RESPONSE_STATUS_CODE = "statusCode";
