@@ -360,7 +360,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
             IMessage message = destinationReceiver.receive();
             Assert.assertEquals("2", message.getMessageId());
 
-            message = destinationReceiver.receive();
+            message = destinationReceiver.receive(Duration.ofSeconds(5));
             Assert.assertNull(message);
         }
         finally {
