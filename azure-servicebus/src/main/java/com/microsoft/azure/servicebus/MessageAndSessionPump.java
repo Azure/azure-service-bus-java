@@ -27,8 +27,6 @@ import com.microsoft.azure.servicebus.primitives.TimerType;
 
 class MessageAndSessionPump extends InitializableEntity implements IMessageAndSessionPump {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageAndSessionPump.class);
-    // Larger value means few receive calls to the internal receiver and better.
-    private static final Duration MESSAGE_RECEIVE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration MINIMUM_MESSAGE_LOCK_VALIDITY = Duration.ofSeconds(4);
     private static final Duration MAXIMUM_RENEW_LOCK_BUFFER = Duration.ofSeconds(10);
     private static final Duration SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION = Duration.ofMinutes(1);
@@ -48,7 +46,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
     private int prefetchCount;
 
     public MessageAndSessionPump(MessagingFactory factory, String entityPath, ReceiveMode receiveMode) {
-        super(StringUtil.getShortRandomString(), null);
+        super(StringUtil.getShortRandomString());
         this.factory = factory;
         this.entityPath = entityPath;
         this.receiveMode = receiveMode;
@@ -92,7 +90,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         this.sessionHandlerOptions = handlerOptions;
 
         for (int i = 0; i < handlerOptions.getMaxConcurrentSessions(); i++) {
-            this.acceptSessionsAndPumpMessage();
+            this.acceptSessionAndPumpMessages();
         }
     }
 
@@ -109,7 +107,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
     private void receiveAndPumpMessage() {
         if (!this.getIsClosingOrClosed()) {
-            CompletableFuture<IMessage> receiveMessageFuture = this.innerReceiver.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
+            CompletableFuture<IMessage> receiveMessageFuture = this.innerReceiver.receiveAsync(this.messageHandlerOptions.getMessageWaitDuration());
             receiveMessageFuture.handleAsync((message, receiveEx) -> {
                 if (receiveEx != null) {
                     receiveEx = ExceptionUtil.extractAsyncCompletionCause(receiveEx);
@@ -141,6 +139,12 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                             TRACE_LOGGER.error("Invocation of onMessage with message containing sequence number '{}' threw unexpected exception", message.getSequenceNumber(), onMessageSyncEx);
                             onMessageFuture = new CompletableFuture<Void>();
                             onMessageFuture.completeExceptionally(onMessageSyncEx);
+                        }
+                        
+                        // Some clients are returning null from the call
+                        if(onMessageFuture == null)
+                        {
+                            onMessageFuture = CompletableFuture.completedFuture(null);
                         }
 
                         onMessageFuture.handleAsync((v, onMessageEx) -> {
@@ -203,7 +207,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         }
     }
 
-    private void acceptSessionsAndPumpMessage() {
+    private void acceptSessionAndPumpMessages() {
         if (!this.getIsClosingOrClosed()) {
             TRACE_LOGGER.debug("Accepting a session from entity '{}'", this.entityPath);
             CompletableFuture<IMessageSession> acceptSessionFuture = ClientFactory.acceptSessionFromEntityPathAsync(this.factory, this.entityPath, null, this.receiveMode);
@@ -222,7 +226,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         // In case of any other exception, sleep and retry
                         TRACE_LOGGER.debug("AcceptSession from entity '{}' will be retried after '{}'.", this.entityPath, SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION);
                         Timer.schedule(() -> {
-                            MessageAndSessionPump.this.acceptSessionsAndPumpMessage();
+                            MessageAndSessionPump.this.acceptSessionAndPumpMessages();
                         }, SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION, TimerType.OneTimeRun);
                     }
                 } else {
@@ -254,7 +258,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
     private void receiveFromSessionAndPumpMessage(SessionTracker sessionTracker) {
         if (!this.getIsClosingOrClosed()) {
             IMessageSession session = sessionTracker.getSession();
-            CompletableFuture<IMessage> receiverFuture = session.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
+            CompletableFuture<IMessage> receiverFuture = session.receiveAsync(this.sessionHandlerOptions.getMessageWaitDuration());
             receiverFuture.handleAsync((message, receiveEx) -> {
                 if (receiveEx != null) {
                     receiveEx = ExceptionUtil.extractAsyncCompletionCause(receiveEx);
@@ -293,6 +297,12 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                             onMessageFuture.completeExceptionally(onMessageSyncEx);
                         }
 
+                        // Some clients are returning null from the call
+                        if(onMessageFuture == null)
+                        {
+                            onMessageFuture = CompletableFuture.completedFuture(null);
+                        }
+                        
                         onMessageFuture.handleAsync((v, onMessageEx) -> {
                             renewCancelTimer.cancel(true);
                             if (onMessageEx != null) {
@@ -419,6 +429,12 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                     onCloseFuture = new CompletableFuture<Void>();
                     onCloseFuture.completeExceptionally(onCloseSyncEx);
                 }
+                
+                // Some clients are returning null from the call
+                if(onCloseFuture == null)
+                {
+                    onCloseFuture = CompletableFuture.completedFuture(null);
+                }
 
                 onCloseFuture.handleAsync((v, onCloseEx) -> {
                     renewCancelTimer.cancel(true);
@@ -441,7 +457,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         }
 
                         this.messageAndSessionPump.openSessions.remove(this.session.getSessionId());
-                        this.messageAndSessionPump.acceptSessionsAndPumpMessage();
+                        this.messageAndSessionPump.acceptSessionAndPumpMessages();
                         return null;
                     });
                     return null;
@@ -603,38 +619,68 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
     @Override
     public void abandon(UUID lockToken) throws InterruptedException, ServiceBusException {
+        this.abandon(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void abandon(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.abandon(lockToken);
+        this.innerReceiver.abandon(lockToken, transaction);
     }
 
     @Override
     public void abandon(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
+        this.abandon(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void abandon(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.abandon(lockToken, propertiesToModify);
+        this.innerReceiver.abandon(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public CompletableFuture<Void> abandonAsync(UUID lockToken) {
+        return this.abandonAsync(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> abandonAsync(UUID lockToken, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.abandonAsync(lockToken);
+        return this.innerReceiver.abandonAsync(lockToken, transaction);
     }
 
     @Override
     public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
+        return this.abandonAsync(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.abandonAsync(lockToken, propertiesToModify);
+        return this.innerReceiver.abandonAsync(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public void complete(UUID lockToken) throws InterruptedException, ServiceBusException {
+        this.complete(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void complete(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.complete(lockToken);
+        this.innerReceiver.complete(lockToken, transaction);
     }
 
     @Override
     public CompletableFuture<Void> completeAsync(UUID lockToken) {
+        return this.completeAsync(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> completeAsync(UUID lockToken, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.completeAsync(lockToken);
+        return this.innerReceiver.completeAsync(lockToken, transaction);
     }
 
     //	@Override
@@ -663,48 +709,90 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
     @Override
     public void deadLetter(UUID lockToken) throws InterruptedException, ServiceBusException {
-        this.innerReceiver.deadLetter(lockToken);
+        this.deadLetter(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.checkInnerReceiveCreated();
+        this.innerReceiver.deadLetter(lockToken, transaction);
     }
 
     @Override
     public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
-        this.innerReceiver.deadLetter(lockToken, propertiesToModify);
+        this.deadLetter(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.checkInnerReceiveCreated();
+        this.innerReceiver.deadLetter(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription) throws InterruptedException, ServiceBusException {
+        this.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription);
+        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
     }
 
     @Override
     public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
+        this.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken) {
+        return this.deadLetterAsync(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken);
+        return this.innerReceiver.deadLetterAsync(lockToken, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
+        return this.deadLetterAsync(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, propertiesToModify);
+        return this.innerReceiver.deadLetterAsync(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription) {
+        return this.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription);
+        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
+        return  this.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
     }
 
     private void checkInnerReceiveCreated() {

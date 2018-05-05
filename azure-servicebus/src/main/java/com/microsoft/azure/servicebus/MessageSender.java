@@ -3,6 +3,7 @@
 
 package com.microsoft.azure.servicebus;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,7 +12,6 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.CoreMessageSender;
 import com.microsoft.azure.servicebus.primitives.ExceptionUtil;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
@@ -21,21 +21,23 @@ import com.microsoft.azure.servicebus.primitives.StringUtil;
 final class MessageSender extends InitializableEntity implements IMessageSender {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageSender.class);
     private boolean ownsMessagingFactory;
-    private ConnectionStringBuilder amqpConnectionStringBuilder = null;
     private String entityPath = null;
     private MessagingFactory messagingFactory = null;
     private CoreMessageSender internalSender = null;
     private boolean isInitialized = false;
+    private URI namespaceEndpointURI;
+    private ClientSettings clientSettings;
 
     private MessageSender() {
-        super(StringUtil.getShortRandomString(), null);
+        super(StringUtil.getShortRandomString());
     }
 
-    MessageSender(ConnectionStringBuilder amqpConnectionStringBuilder) {
+    MessageSender(URI namespaceEndpointURI, String entityPath, ClientSettings clientSettings) {
         this();
 
-        this.amqpConnectionStringBuilder = amqpConnectionStringBuilder;
-        this.entityPath = this.amqpConnectionStringBuilder.getEntityPath();
+        this.namespaceEndpointURI = namespaceEndpointURI;
+        this.entityPath = entityPath;
+        this.clientSettings = clientSettings;
         this.ownsMessagingFactory = true;
     }
 
@@ -59,13 +61,13 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
             CompletableFuture<Void> factoryFuture;
             if (this.messagingFactory == null) {
                 if (TRACE_LOGGER.isInfoEnabled()) {
-                    TRACE_LOGGER.info("Creating MessagingFactory from connection string '{}'", this.amqpConnectionStringBuilder.toLoggableString());
+                    TRACE_LOGGER.info("Creating MessagingFactory to namespace '{}'", this.namespaceEndpointURI.toString());
                 }
-                factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(this.amqpConnectionStringBuilder).thenAcceptAsync((f) ->
+                factoryFuture = MessagingFactory.createFromNamespaceEndpointURIAsyc(this.namespaceEndpointURI, this.clientSettings).thenAcceptAsync((f) ->
                 {
                     this.messagingFactory = f;
                     if (TRACE_LOGGER.isInfoEnabled()) {
-                        TRACE_LOGGER.info("Created MessagingFactory from connection string '{}'", this.amqpConnectionStringBuilder.toLoggableString());
+                        TRACE_LOGGER.info("Created MessagingFactory to namespace '{}'", this.namespaceEndpointURI.toString());
                     }
                 });
             } else {
@@ -105,7 +107,12 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
 
     @Override
     public void send(IMessage message) throws InterruptedException, ServiceBusException {
-        Utils.completeFuture(this.sendAsync(message));
+        this.send(message, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void send(IMessage message, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.sendAsync(message, transaction));
     }
 
     @Override
@@ -114,19 +121,34 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     }
 
     @Override
+    public void sendBatch(Collection<? extends IMessage> message, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.sendBatchAsync(message, transaction));
+    }
+
+    @Override
     public CompletableFuture<Void> sendAsync(IMessage message) {
+        return this.sendAsync(message, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendAsync(IMessage message, TransactionContext transaction) {
         org.apache.qpid.proton.message.Message amqpMessage = MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message);
-        return this.internalSender.sendAsync(amqpMessage);
+        return this.internalSender.sendAsync(amqpMessage, transaction);
     }
 
     @Override
     public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages) {
+        return this.sendBatchAsync(messages, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages, TransactionContext transaction) {
         ArrayList<org.apache.qpid.proton.message.Message> convertedMessages = new ArrayList<org.apache.qpid.proton.message.Message>();
         for (IMessage message : messages) {
             convertedMessages.add(MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message));
         }
 
-        return this.internalSender.sendAsync(convertedMessages);
+        return this.internalSender.sendAsync(convertedMessages, transaction);
     }
 
     @Override
@@ -138,7 +160,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
                 TRACE_LOGGER.info("Closed message sender to entity '{}'", this.entityPath);
                 if (MessageSender.this.ownsMessagingFactory) {
                     if (TRACE_LOGGER.isInfoEnabled()) {
-                        TRACE_LOGGER.info("Closing MessagingFactory associated with connection string '{}'", this.amqpConnectionStringBuilder.toLoggableString());
+                        TRACE_LOGGER.info("Closing MessagingFactory associated with namespace '{}'", this.namespaceEndpointURI.toString());
                     }
 
                     return MessageSender.this.messagingFactory.closeAsync();
@@ -158,14 +180,30 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
 
     @Override
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
+        return this.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) {
         message.setScheduledEnqueueTimeUtc(scheduledEnqueueTimeUtc);
         org.apache.qpid.proton.message.Message amqpMessage = MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message);
-        return this.internalSender.scheduleMessageAsync(new org.apache.qpid.proton.message.Message[]{amqpMessage}, this.messagingFactory.getOperationTimeout()).thenApply(sequenceNumbers -> sequenceNumbers[0]);
+        return this.internalSender.scheduleMessageAsync(
+                new org.apache.qpid.proton.message.Message[]{amqpMessage},
+                transaction,
+                this.messagingFactory.getClientSetttings().getOperationTimeout()).thenApply(sequenceNumbers -> sequenceNumbers[0]);
     }
 
     @Override
     public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber) {
-        return this.internalSender.cancelScheduledMessageAsync(new Long[]{sequenceNumber}, this.messagingFactory.getOperationTimeout());
+        return this.cancelScheduledMessageAsync(sequenceNumber, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> cancelScheduledMessageAsync(long sequenceNumber, TransactionContext transaction) {
+        return this.internalSender.cancelScheduledMessageAsync(
+                new Long[]{sequenceNumber},
+                transaction,
+                this.messagingFactory.getClientSetttings().getOperationTimeout());
     }
 
     @Override
@@ -174,8 +212,18 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     }
 
     @Override
+    public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        return Utils.completeFuture(this.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, transaction));
+    }
+
+    @Override
     public void cancelScheduledMessage(long sequenceNumber) throws InterruptedException, ServiceBusException {
         Utils.completeFuture(this.cancelScheduledMessageAsync(sequenceNumber));
+    }
+
+    @Override
+    public void cancelScheduledMessage(long sequenceNumber, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        Utils.completeFuture(this.cancelScheduledMessageAsync(sequenceNumber, transaction));
     }
 
     MessagingFactory getMessagingFactory() {

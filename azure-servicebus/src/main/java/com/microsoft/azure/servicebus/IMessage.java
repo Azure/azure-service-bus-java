@@ -110,7 +110,7 @@ public interface IMessage {
      * is incremented and the message is again available for retrieval. This property is read-only.
             
      * @return the instant at which the lock of this message expires if the message is received using PEEKLOCK mode. Otherwise it returns null.
-     * @see <a href="https://docs.microsoft.com/azure/service-bus-messaging/message-transfers-locks-settlement>Message transfers, locks, and settlement</a>
+     * @see <a href="https://docs.microsoft.com/azure/service-bus-messaging/message-transfers-locks-settlement">Message transfers, locks, and settlement</a>
      */
     public Instant getLockedUntilUtc();
 
@@ -206,7 +206,7 @@ public interface IMessage {
      * @return the map of user application properties of this message
      * @see <a href="https://docs.microsoft.com/azure/service-bus-messaging/service-bus-messages-payloads">Messages, payloads, and serialization</a>
      */
-    public Map<String, Object> getProperties();
+    public Map<String, String> getProperties();
 
     /**
      * Sets the map of user application properties of this message. Client applications 
@@ -215,7 +215,7 @@ public interface IMessage {
      * @param properties the map of user application properties of this message
      * @see #getProperties()
      */
-    void setProperties(Map<String, Object> properties);
+    void setProperties(Map<String, String> properties);
 
     /**
      * Gets a correlation identifier.
