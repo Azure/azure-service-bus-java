@@ -110,8 +110,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	 * Starts a new service side transaction. The {@link TransactionContext} should be passed to all operations that
 	 * needs to be in this transaction.
 	 * @return a new transaction
-	 * @throws ServiceBusException
-	 * @throws InterruptedException
+	 * @throws ServiceBusException if transaction fails to start
+	 * @throws InterruptedException if the current thread was interrupted while waiting
 	 */
 	public TransactionContext startTransaction() throws ServiceBusException, InterruptedException {
 		return Utils.completeFuture(this.startTransactionAsync());
@@ -133,8 +133,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	 * @param transaction The transaction object.
 	 * @param commit A boolean value of <code>true</code> indicates transaction to be committed. A value of
 	 *                  <code>false</code> indicates a transaction rollback.
-	 * @throws ServiceBusException
-	 * @throws InterruptedException
+	 * @throws ServiceBusException if transaction fails to end
+	 * @throws InterruptedException if the current thread was interrupted while waiting
 	 */
     public void endTransaction(TransactionContext transaction, boolean commit) throws ServiceBusException, InterruptedException {
 		Utils.completeFuture(this.endTransactionAsync(transaction, commit));
@@ -630,7 +630,24 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	{
 		this.getReactorScheduler().invoke(delay, handler);
 	}
-	
+
+	CompletableFuture<Void> sendSecurityToken(String sasTokenAudienceUri)
+	{
+		TRACE_LOGGER.debug("Sending token for {}", sasTokenAudienceUri);
+		CompletableFuture<SecurityToken> tokenFuture = this.clientSettings.getTokenProvider().getSecurityTokenAsync(sasTokenAudienceUri);
+		return tokenFuture.thenComposeAsync((t) ->
+		{
+			SecurityToken generatedSecurityToken = t;
+			CompletableFuture<Void> sendTokenFuture = this.cbsLinkCreationFuture.thenComposeAsync((v) -> {
+				return CommonRequestResponseOperations.sendCBSTokenAsync(this.cbsLink, Util.adjustServerTimeout(this.clientSettings.getOperationTimeout()), generatedSecurityToken);
+			});
+
+			return sendTokenFuture.thenAccept((v) -> {
+				TRACE_LOGGER.debug("Sent token for {}", sasTokenAudienceUri);});
+
+		});
+	}
+
 	CompletableFuture<ScheduledFuture<?>> sendSecurityTokenAndSetRenewTimer(String sasTokenAudienceURI, boolean retryOnFailure, Runnable validityRenewer)
     {
 	    TRACE_LOGGER.debug("Sending token for {}", sasTokenAudienceURI);
@@ -679,16 +696,30 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath)
 	{
 	    this.throwIfClosed(null);
-	    return this.managementLinksCache.obtainRequestResponseLinkAsync(entityPath);
+	    return this.managementLinksCache.obtainRequestResponseLinkAsync(entityPath, null);
 	}
+
+    CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath, String transferDestinationPath)
+    {
+        this.throwIfClosed(null);
+        return this.managementLinksCache.obtainRequestResponseLinkAsync(entityPath, transferDestinationPath);
+    }
 	
 	void releaseRequestResponseLink(String entityPath)
 	{
 	    if(!this.getIsClosed())
 	    {
-	        this.managementLinksCache.releaseRequestResponseLink(entityPath);
+	        this.managementLinksCache.releaseRequestResponseLink(entityPath, null);
 	    }	    
 	}
+
+    void releaseRequestResponseLink(String entityPath, String transferDestinationPath)
+    {
+        if(!this.getIsClosed())
+        {
+            this.managementLinksCache.releaseRequestResponseLink(entityPath, transferDestinationPath);
+        }
+    }
 	
 	private CompletableFuture<Void> createCBSLinkAsync()
     {
@@ -703,7 +734,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	        String requestResponseLinkPath = RequestResponseLink.getCBSNodeLinkPath();
 	        TRACE_LOGGER.info("Creating CBS link to {}", requestResponseLinkPath);
 	        CompletableFuture<Void> crateAndAssignRequestResponseLink =
-	                        RequestResponseLink.createAsync(this, this.getClientId() + "-cbs", requestResponseLinkPath, null).handleAsync((cbsLink, ex) ->
+	                        RequestResponseLink.createAsync(this, this.getClientId() + "-cbs", requestResponseLinkPath, null, null, null)
+                                    .handleAsync((cbsLink, ex) ->
 	                        {
 	                            if(ex == null)
 	                            {
