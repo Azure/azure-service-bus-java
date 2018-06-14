@@ -17,7 +17,9 @@ import org.slf4j.LoggerFactory;
 
 public final class ClientConstants
 {
-	private ClientConstants() { }
+	final static String END_POINT_FORMAT = "amqps://%s.servicebus.windows.net";
+
+    private ClientConstants() { }
 
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ClientConstants.class);
 
@@ -26,6 +28,8 @@ public final class ClientConstants
     public final static String CURRENT_JAVACLIENT_VERSION =  getClientVersion();
     public static final String PLATFORM_INFO = getPlatformInfo();
     
+    public static final int DEFAULT_OPERATION_TIMEOUT_IN_SECONDS = 30;
+    
 	public static final int LOCKTOKENSIZE = 16;
 	public static final String ENQUEUEDTIMEUTCNAME = "x-opt-enqueued-time";
 	public static final String SCHEDULEDENQUEUETIMENAME = "x-opt-scheduled-enqueue-time";
@@ -33,6 +37,7 @@ public final class ClientConstants
 	//public static final String LOCKTOKENNAME = "x-opt-lock-token";
 	public static final String LOCKEDUNTILNAME = "x-opt-locked-until";
 	public static final String PARTITIONKEYNAME = "x-opt-partition-key";
+	public static final String VIAPARTITIONKEYNAME = "x-opt-via-partition-key";
 	public static final String DEADLETTERSOURCENAME = "x-opt-deadletter-source";
 	public static final UUID ZEROLOCKTOKEN = new UUID(0l, 0l);	
 
@@ -48,6 +53,7 @@ public final class ClientConstants
 	public final static Symbol PUBLISHER_REVOKED_ERROR = Symbol.getSymbol(AmqpConstants.VENDOR + ":publisher-revoked");
 	public final static Symbol TIMEOUT_ERROR = Symbol.getSymbol(AmqpConstants.VENDOR + ":timeout");
 	public final static Symbol LINK_TIMEOUT_PROPERTY = Symbol.getSymbol(AmqpConstants.VENDOR + ":timeout");
+    public final static Symbol LINK_TRANSFER_DESTINATION_PROPERTY = Symbol.getSymbol(AmqpConstants.VENDOR + ":transfer-destination-address");
 	public final static Symbol LINK_PEEKMODE_PROPERTY = Symbol.getSymbol(AmqpConstants.VENDOR + ":peek-mode");
 	public final static Symbol TRACKING_ID_PROPERTY = Symbol.getSymbol(AmqpConstants.VENDOR + ":tracking-id");
 	public static final Symbol DEADLETTERNAME = Symbol.valueOf(AmqpConstants.VENDOR + ":dead-letter");
@@ -99,7 +105,8 @@ public final class ClientConstants
     public static final String REQUEST_RESPONSE_GET_RULES_OPERATION = AmqpConstants.VENDOR + ":enumerate-rules";
     public static final String REQUEST_RESPONSE_PUT_TOKEN_OPERATION = "put-token";
     public static final String REQUEST_RESPONSE_PUT_TOKEN_TYPE = "type";
-    public static final String REQUEST_RESPONSE_PUT_TOKEN_AUDIENCE = "name";    
+    public static final String REQUEST_RESPONSE_PUT_TOKEN_AUDIENCE = "name";
+    public static final String REQUEST_RESPONSE_PUT_TOKEN_EXPIRATION = "expiration";
 	public static final String REQUEST_RESPONSE_LOCKTOKENS = "lock-tokens";
 	public static final String REQUEST_RESPONSE_LOCKTOKEN = "lock-token";
 	public static final String REQUEST_RESPONSE_EXPIRATION = "expiration";
@@ -113,11 +120,14 @@ public final class ClientConstants
 	public static final String REQUEST_RESPONSE_MESSAGE_ID = "message-id";
 	public static final String REQUEST_RESPONSE_SESSION_ID = "session-id";
 	public static final String REQUEST_RESPONSE_PARTITION_KEY = "partition-key";
+    public static final String REQUEST_RESPONSE_VIA_PARTITION_KEY = "via-partition-key";
 	public static final String REQUEST_RESPONSE_FROM_SEQUENCE_NUMER = "from-sequence-number";
 	public static final String REQUEST_RESPONSE_MESSAGE_COUNT = "message-count";
 	public static final String REQUEST_RESPONSE_STATUS_CODE = "statusCode";
     public static final String REQUEST_RESPONSE_STATUS_DESCRIPTION = "statusDescription";
     public static final String REQUEST_RESPONSE_ERROR_CONDITION = "errorCondition";
+    public static final String REQUEST_RESPONSE_ASSOCIATED_LINK_NAME = "associated-link-name";
+    
     // Legacy property names are used in CBS responses
     public static final String REQUEST_RESPONSE_LEGACY_STATUS_CODE = "status-code";
     public static final String REQUEST_RESPONSE_LEGACY_STATUS_DESCRIPTION = "status-description";
@@ -167,9 +177,7 @@ public final class ClientConstants
     public static final UnsignedLong TRUE_FILTER_DESCRIPTOR = new UnsignedLong(0x000001370000007L);
     public static final UnsignedLong FALSE_FILTER_DESCRIPTOR = new UnsignedLong(0x000001370000008L);
     public static final UnsignedLong CORRELATION_FILTER_DESCRIPTOR = new UnsignedLong(0x000001370000009L);
-
-    static final String SAS_TOKEN_TYPE = "servicebus.windows.net:sastoken";
-    static final int DEFAULT_SAS_TOKEN_VALIDITY_IN_SECONDS = 20*60; // 20 minutes
+    
     static final int DEFAULT_SAS_TOKEN_SEND_RETRY_INTERVAL_IN_SECONDS = 5;
     static final String SAS_TOKEN_AUDIENCE_FORMAT = "amqp://%s/%s";
 
@@ -179,7 +187,7 @@ public final class ClientConstants
         try {
             properties.load(ClientConstants.class.getResourceAsStream("/client.properties"));
             clientVersion = properties.getProperty("client.version");
-        } catch (IOException e) {
+        } catch (Exception e) {
             clientVersion = "NOTFOUND";
             TRACE_LOGGER.error("Exception while retrieving client version. Exception: ", e.toString());
         }

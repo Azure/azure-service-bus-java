@@ -12,10 +12,7 @@ import java.util.UUID;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
-import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
-import org.apache.qpid.proton.amqp.messaging.Data;
-import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
-import org.apache.qpid.proton.amqp.messaging.Section;
+import org.apache.qpid.proton.amqp.messaging.*;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
 import com.microsoft.azure.servicebus.primitives.MessageWithDeliveryTag;
@@ -61,6 +58,11 @@ class MessageConverter
 		if(!StringUtil.isNullOrEmpty(brokeredMessage.getPartitionKey()))
 		{
 			messageAnnotationsMap.put(Symbol.valueOf(ClientConstants.PARTITIONKEYNAME), brokeredMessage.getPartitionKey());
+		}
+
+		if(!StringUtil.isNullOrEmpty(brokeredMessage.getViaPartitionKey()))
+		{
+			messageAnnotationsMap.put(Symbol.valueOf(ClientConstants.VIAPARTITIONKEYNAME), brokeredMessage.getViaPartitionKey());
 		}
 		
 		amqpMessage.setMessageAnnotations(new MessageAnnotations(messageAnnotationsMap));
@@ -121,15 +123,26 @@ class MessageConverter
 		brokeredMessage.setDeliveryCount(amqpMessage.getDeliveryCount());
 		
 		// Properties
-		brokeredMessage.setMessageId(amqpMessage.getMessageId().toString());
+		Object messageId = amqpMessage.getMessageId();
+		if (messageId != null)
+		{
+			brokeredMessage.setMessageId(messageId.toString());
+		}
+
 		brokeredMessage.setContentType(amqpMessage.getContentType());
 		Object correlationId = amqpMessage.getCorrelationId();
 		if(correlationId != null)
 		{
-			brokeredMessage.setCorrelationId(amqpMessage.getCorrelationId().toString());
-		}		
+			brokeredMessage.setCorrelationId(correlationId.toString());
+		}
+
+		Properties properties = amqpMessage.getProperties();
+		if (properties != null)
+		{
+			brokeredMessage.setTo(properties.getTo());
+		}
+
 		brokeredMessage.setLabel(amqpMessage.getSubject());
-		brokeredMessage.setTo(amqpMessage.getProperties().getTo());
 		brokeredMessage.setReplyTo(amqpMessage.getReplyTo());
 		brokeredMessage.setReplyToSessionId(amqpMessage.getReplyToGroupId());
 		brokeredMessage.setSessionId(amqpMessage.getGroupId());
@@ -161,6 +174,9 @@ class MessageConverter
 	                    case ClientConstants.PARTITIONKEYNAME:
 	                        brokeredMessage.setPartitionKey((String)entry.getValue());
 	                        break;
+						case ClientConstants.VIAPARTITIONKEYNAME:
+							brokeredMessage.setViaPartitionKey((String)entry.getValue());
+							break;
 	                    case ClientConstants.DEADLETTERSOURCENAME:
 	                        brokeredMessage.setDeadLetterSource((String)entry.getValue());
 	                        break;

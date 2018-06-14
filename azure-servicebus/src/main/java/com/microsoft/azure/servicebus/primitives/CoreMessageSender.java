@@ -22,16 +22,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
+import com.microsoft.azure.servicebus.TransactionContext;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
-import org.apache.qpid.proton.amqp.messaging.Accepted;
-import org.apache.qpid.proton.amqp.messaging.Data;
-import org.apache.qpid.proton.amqp.messaging.Rejected;
-import org.apache.qpid.proton.amqp.messaging.Released;
-import org.apache.qpid.proton.amqp.messaging.Source;
-import org.apache.qpid.proton.amqp.messaging.Target;
+import org.apache.qpid.proton.amqp.messaging.*;
+import org.apache.qpid.proton.amqp.transaction.Declared;
+import org.apache.qpid.proton.amqp.transaction.TransactionalState;
 import org.apache.qpid.proton.amqp.transport.DeliveryState;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
@@ -70,7 +68,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private final RetryPolicy retryPolicy;
 	private final CompletableFuture<Void> linkClose;
 	private final Object pendingSendLock;
-	private final ConcurrentHashMap<String, SendWorkItem<Void>> pendingSendsData;
+	private final ConcurrentHashMap<String, SendWorkItem<DeliveryState>> pendingSendsData;
 	private final PriorityQueue<WeightedDeliveryTag> pendingSends;
 	private final DispatchHandler sendWork;
 	private boolean isSendLoopRunning;
@@ -84,47 +82,65 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private ScheduledFuture<?> sasTokenRenewTimerFuture;
 	private CompletableFuture<Void> requestResponseLinkCreationFuture;
 	private CompletableFuture<Void> sendLinkReopenFuture;
+	private SenderLinkSettings linkSettings;
+	private String transferDestinationPath;
+	private String transferSasTokenAudienceURI;
+	private boolean isSendVia;
 
 	public static CompletableFuture<CoreMessageSender> create(
 			final MessagingFactory factory,
-			final String sendLinkName,
-			final String senderPath)
+			final String clientId,
+			final String senderPath,
+			final String transferDestinationPath)
 	{
-	    TRACE_LOGGER.info("Creating core message sender to '{}'", senderPath);
-		final CoreMessageSender msgSender = new CoreMessageSender(factory, sendLinkName, senderPath);
+		return CoreMessageSender.create(factory, clientId, CoreMessageSender.getDefaultLinkProperties(senderPath, transferDestinationPath, factory));
+	}
+
+	static CompletableFuture<CoreMessageSender> create(
+			final MessagingFactory factory,
+			final String clientId,
+			final SenderLinkSettings linkSettings)
+	{
+	    TRACE_LOGGER.info("Creating core message sender to '{}'", linkSettings.linkPath);
+
+		final Connection connection = factory.getConnection();
+		final String sendLinkNamePrefix = StringUtil.getShortRandomString();
+		linkSettings.linkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ?
+				sendLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
+				sendLinkNamePrefix;
+
+	    final CoreMessageSender msgSender = new CoreMessageSender(factory, clientId, linkSettings);
 		TimeoutTracker openLinkTracker = TimeoutTracker.create(factory.getOperationTimeout());
 		msgSender.initializeLinkOpen(openLinkTracker);
-		
-		msgSender.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sasTokenEx) -> {
-		    if(sasTokenEx != null)
-		    {
-		        Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sasTokenEx);
-		        TRACE_LOGGER.error("Sending SAS Token to '{}' failed.", msgSender.sendPath, cause);
-		        msgSender.linkFirstOpen.completeExceptionally(cause);
-		    }
-		    else
-		    {
-		        try
-	            {
-	                msgSender.underlyingFactory.scheduleOnReactorThread(new DispatchHandler()
-	                {
-	                    @Override
-	                    public void onEvent()
-	                    {
-	                        msgSender.createSendLink();
-	                    }
-	                });
-	            }
-	            catch (IOException ioException)
-	            {
-	                msgSender.cancelSASTokenRenewTimer();
-	                msgSender.linkFirstOpen.completeExceptionally(new ServiceBusException(false, "Failed to create Sender, see cause for more details.", ioException));
-	            }
-		    }
-		    
-		    return null;
-        });
-		
+
+		CompletableFuture<Void> authenticationFuture = null;
+		if (linkSettings.requiresAuthentication) {
+			authenticationFuture = msgSender.sendTokenAndSetRenewTimer(false);
+		} else {
+			authenticationFuture = CompletableFuture.completedFuture(null);
+		}
+
+		authenticationFuture.handleAsync((v, sasTokenEx) -> {
+			if (sasTokenEx != null) {
+				Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sasTokenEx);
+				TRACE_LOGGER.error("Sending SAS Token to '{}' failed.", msgSender.sendPath, cause);
+				msgSender.linkFirstOpen.completeExceptionally(cause);
+			} else {
+				try {
+					msgSender.underlyingFactory.scheduleOnReactorThread(new DispatchHandler() {
+						@Override
+						public void onEvent() {
+							msgSender.createSendLink(msgSender.linkSettings);
+						}
+					});
+				} catch (IOException ioException) {
+					msgSender.cancelSASTokenRenewTimer();
+					msgSender.linkFirstOpen.completeExceptionally(new ServiceBusException(false, "Failed to create Sender, see cause for more details.", ioException));
+				}
+			}
+
+			return null;
+		});
 		
 		return msgSender.linkFirstOpen;
 	}
@@ -135,7 +151,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             if(this.requestResponseLinkCreationFuture == null)
             {
                 this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath).handleAsync((rrlink, ex) ->
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath, this.transferDestinationPath).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
                     {
@@ -167,7 +183,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             if(this.requestResponseLinkCreationFuture != null)
             {
                 this.requestResponseLinkCreationFuture.thenRun(() -> {
-                    this.underlyingFactory.releaseRequestResponseLink(this.sendPath);
+                    this.underlyingFactory.releaseRequestResponseLink(this.sendPath, this.transferDestinationPath);
                     this.requestResponseLink = null;
                 });
                 this.requestResponseLinkCreationFuture = null;
@@ -175,14 +191,31 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
     }
 
-	private CoreMessageSender(final MessagingFactory factory, final String sendLinkName, final String senderPath)
+	private CoreMessageSender(final MessagingFactory factory, final String sendLinkName, final SenderLinkSettings linkSettings)
 	{
-		super(sendLinkName, factory);
+		super(sendLinkName);
 
-		this.sendPath = senderPath;
-		this.sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), senderPath);
+		this.sendPath = linkSettings.linkPath;
+		if (linkSettings.linkProperties != null)
+		{
+			String transferPath = (String)linkSettings.linkProperties.getOrDefault(ClientConstants.LINK_TRANSFER_DESTINATION_PROPERTY, null);
+			if (transferPath != null && !transferPath.isEmpty())
+			{
+				this.transferDestinationPath = transferPath;
+				this.isSendVia = true;
+				this.transferSasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), transferDestinationPath);
+			}
+			else
+            {
+                // Ensure it is null.
+                this.transferDestinationPath = null;
+            }
+		}
+
+		this.sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), linkSettings.linkPath);
 		this.underlyingFactory = factory;
 		this.operationTimeout = factory.getOperationTimeout();
+		this.linkSettings = linkSettings;
 		
 		this.lastKnownLinkError = null;
 		this.lastKnownErrorReportedAt = Instant.EPOCH;
@@ -190,7 +223,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		this.retryPolicy = factory.getRetryPolicy();
 
 		this.pendingSendLock = new Object();
-		this.pendingSendsData = new ConcurrentHashMap<String, SendWorkItem<Void>>();
+		this.pendingSendsData = new ConcurrentHashMap<String, SendWorkItem<DeliveryState>>();
 		this.pendingSends = new PriorityQueue<WeightedDeliveryTag>(1000, new DeliveryTagComparator());
 		this.linkCredit = 0;
 
@@ -217,22 +250,23 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	    return UUID.randomUUID().toString().replace("-", StringUtil.EMPTY);
 	}
 	
-	private CompletableFuture<Void> sendCoreAsync(
+	CompletableFuture<DeliveryState> sendCoreAsync(
 			final byte[] bytes,
 			final int arrayOffset,
-			final int messageFormat)
+			final int messageFormat,
+			final TransactionContext transaction)
 	{
 	    this.throwIfClosed(this.lastKnownLinkError);
 		TRACE_LOGGER.debug("Sending message to '{}'", this.sendPath);
 		String deliveryTag = CoreMessageSender.generateRandomDeliveryTag();
-		CompletableFuture<Void> onSendFuture = new CompletableFuture<Void>();
-		SendWorkItem<Void> sendWorkItem = new SendWorkItem<Void>(bytes, arrayOffset, messageFormat, deliveryTag, onSendFuture, this.operationTimeout);
+		CompletableFuture<DeliveryState> onSendFuture = new CompletableFuture<DeliveryState>();
+		SendWorkItem<DeliveryState> sendWorkItem = new SendWorkItem<DeliveryState>(bytes, arrayOffset, messageFormat, deliveryTag, transaction, onSendFuture, this.operationTimeout);
 		this.enlistSendRequest(deliveryTag, sendWorkItem, false);
 		this.scheduleSendTimeout(sendWorkItem);
 		return onSendFuture;
 	}
 	
-	private void scheduleSendTimeout(SendWorkItem<Void> sendWorkItem)
+	private void scheduleSendTimeout(SendWorkItem<DeliveryState> sendWorkItem)
 	{
 	    // Timer to timeout the request
         ScheduledFuture<?> timeoutTask = Timer.schedule(new Runnable()
@@ -242,7 +276,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             {
                 if (!sendWorkItem.getWork().isDone())
                 {
-                    TRACE_LOGGER.error("Delivery '{}' to '{}' did not receive ack from service. Throwing timeout.", sendWorkItem.getDeliveryTag(), CoreMessageSender.this.sendPath);
+                    TRACE_LOGGER.warn("Delivery '{}' to '{}' did not receive ack from service. Throwing timeout.", sendWorkItem.getDeliveryTag(), CoreMessageSender.this.sendPath);
                     CoreMessageSender.this.pendingSendsData.remove(sendWorkItem.getDeliveryTag());
                     CoreMessageSender.this.throwSenderTimeout(sendWorkItem.getWork(), sendWorkItem.getLastKnownException());
                     // Weighted delivery tag not removed from the pending sends queue, but send loop will ignore it anyway if it is present
@@ -254,7 +288,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         sendWorkItem.setTimeoutTask(timeoutTask);
 	}
 	
-	private void enlistSendRequest(String deliveryTag, SendWorkItem<Void> sendWorkItem, boolean isRetrySend)
+	private void enlistSendRequest(String deliveryTag, SendWorkItem<DeliveryState> sendWorkItem, boolean isRetrySend)
 	{
 	    synchronized (this.pendingSendLock)
         {
@@ -275,7 +309,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
 	}
 	
-	private void reSendAsync(String deliveryTag, SendWorkItem<Void> retryingSendWorkItem, boolean reuseDeliveryTag)
+	private void reSendAsync(String deliveryTag, SendWorkItem<DeliveryState> retryingSendWorkItem, boolean reuseDeliveryTag)
     {
 	    if(!retryingSendWorkItem.getWork().isDone() && retryingSendWorkItem.cancelTimeoutTask(false))
         {
@@ -294,7 +328,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
     }
 
-	public CompletableFuture<Void> sendAsync(final Iterable<Message> messages)
+	public CompletableFuture<Void> sendAsync(final Iterable<Message> messages, TransactionContext transaction)
 	{
 		if (messages == null || IteratorUtil.sizeEquals(messages, 0))
 		{
@@ -306,7 +340,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		Message firstMessage = messages.iterator().next();
 		if (IteratorUtil.sizeEquals(messages, 1))
 		{
-			return this.sendAsync(firstMessage);
+			return this.sendAsync(firstMessage, transaction);
 		}
 
 		// proton-j doesn't support multiple dataSections to be part of AmqpMessage
@@ -340,15 +374,15 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			return sendTask;
 		}
 
-		return this.sendCoreAsync(bytes, byteArrayOffset, AmqpConstants.AMQP_BATCH_MESSAGE_FORMAT);
+		return this.sendCoreAsync(bytes, byteArrayOffset, AmqpConstants.AMQP_BATCH_MESSAGE_FORMAT, transaction).thenAccept((x) -> { /*Do nothing*/ });
 	}
 
-	public CompletableFuture<Void> sendAsync(Message msg)
+	public CompletableFuture<Void> sendAsync(Message msg, TransactionContext transaction)
 	{
 		try
 		{
 			Pair<byte[], Integer> encodedPair = Util.encodeMessageToOptimalSizeArray(msg);
-			return this.sendCoreAsync(encodedPair.getFirstItem(), encodedPair.getSecondItem(), DeliveryImpl.DEFAULT_MESSAGE_FORMAT);
+			return this.sendCoreAsync(encodedPair.getFirstItem(), encodedPair.getSecondItem(), DeliveryImpl.DEFAULT_MESSAGE_FORMAT, transaction).thenAccept((x) -> { /*Do nothing*/ });
 		}
 		catch(PayloadSizeExceededException exception)
 		{
@@ -364,6 +398,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	{
 		if (completionException == null)
 		{
+		    this.underlyingFactory.registerForConnectionError(this.sendLink);
 			this.lastKnownLinkError = null;
 			this.retryPolicy.resetRetryCount(this.getClientId());
 
@@ -417,7 +452,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			
 			if(this.sendLinkReopenFuture != null && !this.sendLinkReopenFuture.isDone())
             {
-			    TRACE_LOGGER.error("Opening send link to '{}' failed", this.sendPath, completionException);
+			    TRACE_LOGGER.warn("Opening send link to '{}' failed", this.sendPath, completionException);
                 AsyncUtil.completeFutureExceptionally(this.sendLinkReopenFuture, completionException);
                 this.sendLinkReopenFuture = null;
             }
@@ -450,6 +485,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		}
 		else
 		{
+		    this.underlyingFactory.deregisterForConnectionError(this.sendLink);
 			this.lastKnownLinkError = completionException;
 			this.lastKnownErrorReportedAt = Instant.now();
 
@@ -463,7 +499,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			}
 			else
 			{			    
-				final Map.Entry<String, SendWorkItem<Void>> pendingSendEntry = IteratorUtil.getFirst(this.pendingSendsData.entrySet());
+				final Map.Entry<String, SendWorkItem<DeliveryState>> pendingSendEntry = IteratorUtil.getFirst(this.pendingSendsData.entrySet());
 				if (pendingSendEntry != null && pendingSendEntry.getValue() != null)
 				{
 					final TimeoutTracker tracker = pendingSendEntry.getValue().getTimeoutTracker();
@@ -484,21 +520,35 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	@Override
 	public void onSendComplete(final Delivery delivery)
 	{
-		final DeliveryState outcome = delivery.getRemoteState();
+		DeliveryState outcome = delivery.getRemoteState();
 		final String deliveryTag = new String(delivery.getTag());
 		
 		TRACE_LOGGER.debug("Received ack for delivery. path:{}, linkName:{}, deliveryTag:{}, outcome:{}", CoreMessageSender.this.sendPath, this.sendLink.getName(), deliveryTag, outcome);
-		final SendWorkItem<Void> pendingSendWorkItem = this.pendingSendsData.remove(deliveryTag);
+		final SendWorkItem<DeliveryState> pendingSendWorkItem = this.pendingSendsData.remove(deliveryTag);
 
 		if (pendingSendWorkItem != null)
 		{
+			if (outcome instanceof TransactionalState) {
+				TRACE_LOGGER.trace("State of delivery is Transactional, retrieving outcome: {}", outcome);
+				Outcome transactionalOutcome = ((TransactionalState) outcome).getOutcome();
+				if (transactionalOutcome instanceof DeliveryState) {
+					outcome = (DeliveryState) transactionalOutcome;
+				} else {
+					this.cleanupFailedSend(pendingSendWorkItem, new ServiceBusException(false, "Unknown delivery state: " + outcome.toString()));
+					return;
+				}
+			}
+
 			if (outcome instanceof Accepted)
 			{
 				this.lastKnownLinkError = null;
 				this.retryPolicy.resetRetryCount(this.getClientId());
 
 				pendingSendWorkItem.cancelTimeoutTask(false);
-				AsyncUtil.completeFuture(pendingSendWorkItem.getWork(), null);
+				AsyncUtil.completeFuture(pendingSendWorkItem.getWork(), outcome);
+			}
+			else if (outcome instanceof Declared) {
+				AsyncUtil.completeFuture(pendingSendWorkItem.getWork(), outcome);
 			}
 			else if (outcome instanceof Rejected)
 			{
@@ -544,7 +594,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	{
 	    synchronized (this.pendingSendLock)
         {
-            for (Map.Entry<String, SendWorkItem<Void>> pendingSend: this.pendingSendsData.entrySet())
+            for (Map.Entry<String, SendWorkItem<DeliveryState>> pendingSend: this.pendingSendsData.entrySet())
             {
                 this.cleanupFailedSend(pendingSend.getValue(), failureException);
             }
@@ -554,13 +604,38 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
 	}
 	
-	private void cleanupFailedSend(final SendWorkItem<Void> failedSend, final Exception exception)
+	private void cleanupFailedSend(final SendWorkItem<DeliveryState> failedSend, final Exception exception)
 	{
 		failedSend.cancelTimeoutTask(false);		
 		ExceptionUtil.completeExceptionally(failedSend.getWork(), exception, this, true);
 	}
 
-	private void createSendLink()
+	private static SenderLinkSettings getDefaultLinkProperties(String sendPath, String transferDestinationPath, MessagingFactory underlyingFactory)
+	{
+		SenderLinkSettings linkSettings = new SenderLinkSettings();
+		linkSettings.linkPath = sendPath;
+
+		final Target target = new Target();
+		target.setAddress(sendPath);
+		linkSettings.target = target;
+		linkSettings.source = new Source();
+		linkSettings.settleMode = SenderSettleMode.UNSETTLED;
+		linkSettings.requiresAuthentication = true;
+
+		Map<Symbol, Object> linkProperties = new HashMap<>();
+		// ServiceBus expects timeout to be of type unsignedint
+		linkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(underlyingFactory.getOperationTimeout()).toMillis()));
+		if (transferDestinationPath != null && !transferDestinationPath.isEmpty())
+		{
+			linkProperties.put(ClientConstants.LINK_TRANSFER_DESTINATION_PROPERTY, transferDestinationPath);
+		}
+
+		linkSettings.linkProperties = linkProperties;
+
+		return linkSettings;
+	}
+
+	private void createSendLink(SenderLinkSettings linkSettings)
 	{
 	    TRACE_LOGGER.info("Creating send link to '{}'", this.sendPath);
 		final Connection connection = this.underlyingFactory.getConnection();
@@ -569,44 +644,21 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		session.open();
 		BaseHandler.setHandler(session, new SessionHandler(sendPath));
 
-		final String sendLinkNamePrefix = StringUtil.getShortRandomString();
-		final String sendLinkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ?
-				sendLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
-				sendLinkNamePrefix;
-		
-		final Sender sender = session.sender(sendLinkName);
-		final Target target = new Target();
-		target.setAddress(sendPath);
-		sender.setTarget(target);
+		final Sender sender = session.sender(linkSettings.linkName);
+		sender.setTarget(linkSettings.target);
+		sender.setSource(linkSettings.source);
+		sender.setProperties(linkSettings.linkProperties);
 
-		final Source source = new Source();
-		sender.setSource(source);
+		TRACE_LOGGER.debug("Send link settle mode '{}'", linkSettings.settleMode);
+		sender.setSenderSettleMode(linkSettings.settleMode);
 
-		SenderSettleMode settleMode = SenderSettleMode.UNSETTLED;
-		TRACE_LOGGER.debug("Send link settle mode '{}'", settleMode);
-		sender.setSenderSettleMode(settleMode);
-
-		Map<Symbol, Object> linkProperties = new HashMap<>();
-		// ServiceBus expects timeout to be of type unsignedint
-		linkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()).toMillis()));
-		sender.setProperties(linkProperties);
-		
 		SendLinkHandler handler = new SendLinkHandler(CoreMessageSender.this);
 		BaseHandler.setHandler(sender, handler);
-
-		this.underlyingFactory.registerForConnectionError(sender);
 		sender.open();
-		
-		if (this.sendLink != null)
-		{
-			final Sender oldSender = this.sendLink;
-			this.underlyingFactory.deregisterForConnectionError(oldSender);
-		}
-		
 		this.sendLink = sender;
 	}
 	
-	CompletableFuture<Void> sendSASTokenAndSetRenewTimer(boolean retryOnFailure)
+	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)
 	{
 	    if(this.getIsClosingOrClosed())
         {
@@ -614,8 +666,16 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
         else
         {            
-            CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSASTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendSASTokenAndSetRenewTimer(true));
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+            CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
+			CompletableFuture<Void> sasTokenFuture = sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+
+			if (this.transferDestinationPath!= null && !this.transferDestinationPath.isEmpty())
+			{
+				CompletableFuture<Void> transferSendTokenFuture = this.underlyingFactory.sendSecurityToken(this.transferSasTokenAudienceURI);
+				return CompletableFuture.allOf(sasTokenFuture, transferSendTokenFuture);
+			}
+
+			return sasTokenFuture;
         }
 	}
 	
@@ -714,7 +774,15 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                         , CoreMessageSender.LINK_REOPEN_TIMEOUT
                         , TimerType.OneTimeRun);
                 this.cancelSASTokenRenewTimer();
-                this.sendSASTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
+
+				CompletableFuture<Void> authenticationFuture = null;
+				if (linkSettings.requiresAuthentication) {
+					authenticationFuture = this.sendTokenAndSetRenewTimer(false);
+				} else {
+					authenticationFuture = CompletableFuture.completedFuture(null);
+				}
+
+				authenticationFuture.handleAsync((v, sendTokenEx) -> {
                     if(sendTokenEx != null)
                     {
                         this.sendLinkReopenFuture.completeExceptionally(sendTokenEx);
@@ -728,7 +796,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                                 @Override
                                 public void onEvent()
                                 {
-                                    CoreMessageSender.this.createSendLink();
+                                    CoreMessageSender.this.createSendLink(CoreMessageSender.this.linkSettings);
                                 }
                             });
                         }
@@ -773,13 +841,13 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                 return;
             }
             
-            final Sender sendLinkCurrent = this.sendLink;       
+            final Sender sendLinkCurrent = this.sendLink;
             while (sendLinkCurrent != null
                     && sendLinkCurrent.getLocalState() == EndpointState.ACTIVE && sendLinkCurrent.getRemoteState() == EndpointState.ACTIVE
                     && this.linkCredit > 0)
             {
                 final WeightedDeliveryTag deliveryTag;
-                final SendWorkItem<Void> sendData;
+                final SendWorkItem<DeliveryState> sendData;
                 synchronized (this.pendingSendLock)
                 {
                     deliveryTag = this.pendingSends.poll();
@@ -795,7 +863,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                         sendData = this.pendingSendsData.get(deliveryTag.getDeliveryTag());
                         if(sendData == null)
                         {
-                            TRACE_LOGGER.error("SendData not found for this delivery. path:{}, linkName:{}, deliveryTag:{}", this.sendPath, this.sendLink.getName(), deliveryTag);
+                            TRACE_LOGGER.warn("SendData not found for this delivery. path:{}, linkName:{}, deliveryTag:{}", this.sendPath, this.sendLink.getName(), deliveryTag);
                             continue;
                         }
                     }
@@ -818,6 +886,14 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
                 {
                     delivery = sendLinkCurrent.delivery(deliveryTag.getDeliveryTag().getBytes());
                     delivery.setMessageFormat(sendData.getMessageFormat());
+
+                    TransactionContext transaction = sendData.getTransaction();
+                    if (transaction != TransactionContext.NULL_TXN) {
+						TransactionalState transactionalState = new TransactionalState();
+						transactionalState.setTxnId(new Binary(transaction.getTransactionId().array()));
+                    	delivery.disposition(transactionalState);
+					}
+
                     TRACE_LOGGER.debug("Sending message delivery '{}' to '{}'", deliveryTag.getDeliveryTag(), this.sendPath);
                     sentMsgSize = sendLinkCurrent.send(sendData.getMessage(), 0, sendData.getEncodedMessageSize());
                     assert sentMsgSize == sendData.getEncodedMessageSize() : "Contract of the ProtonJ library for Sender.Send API changed";
@@ -862,7 +938,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
 	}
 
-	private void throwSenderTimeout(CompletableFuture<Void> pendingSendWork, Exception lastKnownException)
+	private void throwSenderTimeout(CompletableFuture<DeliveryState> pendingSendWork, Exception lastKnownException)
 	{
 		Exception cause = lastKnownException;
 		if (lastKnownException == null && this.lastKnownLinkError != null)
@@ -948,7 +1024,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             this.closeRequestResponseLink();
         }
 	}
-	
+
 	private static class WeightedDeliveryTag
 	{
 		private final String deliveryTag;
@@ -979,8 +1055,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			return deliveryTag1.getPriority() - deliveryTag0.getPriority();
 		}	
 	}
-	
-	public CompletableFuture<long[]> scheduleMessageAsync(Message[] messages, Duration timeout)
+
+	public CompletableFuture<long[]> scheduleMessageAsync(Message[] messages, TransactionContext transaction, Duration timeout)
 	{
 	    TRACE_LOGGER.debug("Sending '{}' scheduled message(s) to '{}'", messages.length, this.sendPath);
 		return this.createRequestResponseLink().thenComposeAsync((v) -> {
@@ -1016,12 +1092,18 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 				{
 					messageEntry.put(ClientConstants.REQUEST_RESPONSE_PARTITION_KEY, (String)partitionKey);
 				}
+
+                Object viaPartitionKey = message.getMessageAnnotations().getValue().get(Symbol.valueOf(ClientConstants.VIAPARTITIONKEYNAME));
+                if(viaPartitionKey != null && !((String)viaPartitionKey).isEmpty())
+                {
+                    messageEntry.put(ClientConstants.REQUEST_RESPONSE_VIA_PARTITION_KEY, (String)viaPartitionKey);
+                }
 				
 				messageList.add(messageEntry);
 			}
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_MESSAGES, messageList);
-			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_SCHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout));
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, timeout);
+			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_SCHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout), this.sendLink.getName());
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, transaction, timeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<long[]> returningFuture = new CompletableFuture<long[]>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1058,8 +1140,8 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 			HashMap requestBodyMap = new HashMap();
 			requestBodyMap.put(ClientConstants.REQUEST_RESPONSE_SEQUENCE_NUMBERS, sequenceNumbers);
 			
-			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_CANCEL_CHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout));
-			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, timeout);
+			Message requestMessage = RequestResponseUtils.createRequestMessageFromPropertyBag(ClientConstants.REQUEST_RESPONSE_CANCEL_CHEDULE_MESSAGE_OPERATION, requestBodyMap, Util.adjustServerTimeout(timeout), this.sendLink.getName());
+			CompletableFuture<Message> responseFuture = this.requestResponseLink.requestAysnc(requestMessage, TransactionContext.NULL_TXN, timeout);
 			return responseFuture.thenComposeAsync((responseMessage) -> {
 				CompletableFuture<Void> returningFuture = new CompletableFuture<Void>();
 				int statusCode = RequestResponseUtils.getResponseStatusCode(responseMessage);
@@ -1086,7 +1168,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	    TRACE_LOGGER.debug("Peeking '{}' messages in '{}' from sequence number '{}'", messageCount, this.sendPath, fromSequenceNumber);
 		return this.createRequestResponseLink().thenComposeAsync((v) ->
 		{
-			return CommonRequestResponseOperations.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, null);
+			return CommonRequestResponseOperations.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, null, this.sendLink.getName());
 		});
 	}
 }

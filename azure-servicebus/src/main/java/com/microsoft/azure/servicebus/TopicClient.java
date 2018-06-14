@@ -3,6 +3,7 @@
 
 package com.microsoft.azure.servicebus;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -14,6 +15,7 @@ import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
+import com.microsoft.azure.servicebus.primitives.Util;
 
 /**
  * The topic client that interacts with service bus topic.
@@ -24,7 +26,7 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     private MessageBrowser browser;
 
     private TopicClient() {
-        super(StringUtil.getShortRandomString(), null);
+        super(StringUtil.getShortRandomString());
     }
 
     public TopicClient(ConnectionStringBuilder amqpConnectionStringBuilder) throws InterruptedException, ServiceBusException {
@@ -33,6 +35,21 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
         this.browser = new MessageBrowser((MessageSender) sender);
         if (TRACE_LOGGER.isInfoEnabled()) {
             TRACE_LOGGER.info("Created topic client to connection string '{}'", amqpConnectionStringBuilder.toLoggableString());
+        }
+    }
+    
+    public TopicClient(String namespace, String topicPath, ClientSettings clientSettings) throws InterruptedException, ServiceBusException
+    {
+        this(Util.convertNamespaceToEndPointURI(namespace), topicPath, clientSettings);
+    }
+    
+    public TopicClient(URI namespaceEndpointURI, String topicPath, ClientSettings clientSettings) throws InterruptedException, ServiceBusException
+    {
+        this();
+        this.sender = ClientFactory.createMessageSenderFromEntityPath(namespaceEndpointURI, topicPath, clientSettings);
+        this.browser = new MessageBrowser((MessageSender) sender);
+        if (TRACE_LOGGER.isInfoEnabled()) {
+            TRACE_LOGGER.info("Created topic client to topic '{}/{}'", namespaceEndpointURI.toString(), topicPath);
         }
     }
 
@@ -49,8 +66,18 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
+    public void send(IMessage message, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.sender.send(message, transaction);
+    }
+
+    @Override
     public void sendBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException {
         this.sender.sendBatch(messages);
+    }
+
+    @Override
+    public void sendBatch(Collection<? extends IMessage> messages, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.sender.sendBatch(messages, transaction);
     }
 
     @Override
@@ -59,13 +86,28 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     }
 
     @Override
+    public CompletableFuture<Void> sendAsync(IMessage message, TransactionContext transaction) {
+        return this.sender.sendAsync(message, transaction);
+    }
+
+    @Override
     public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages) {
         return this.sender.sendBatchAsync(messages);
     }
 
     @Override
+    public CompletableFuture<Void> sendBatchAsync(Collection<? extends IMessage> messages, TransactionContext transaction) {
+        return this.sender.sendBatchAsync(messages, transaction);
+    }
+
+    @Override
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
         return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc);
+    }
+
+    @Override
+    public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) {
+        return this.sender.scheduleMessageAsync(message, scheduledEnqueueTimeUtc, transaction);
     }
 
     @Override
@@ -76,6 +118,11 @@ public final class TopicClient extends InitializableEntity implements ITopicClie
     @Override
     public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc) throws InterruptedException, ServiceBusException {
         return this.sender.scheduleMessage(message, scheduledEnqueueTimeUtc);
+    }
+
+    @Override
+    public long scheduleMessage(IMessage message, Instant scheduledEnqueueTimeUtc, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        return this.sender.scheduleMessage(message, scheduledEnqueueTimeUtc, transaction);
     }
 
     @Override
