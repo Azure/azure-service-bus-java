@@ -348,7 +348,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		session.open();
 		BaseHandler.setHandler(session, new SessionHandler(this.receivePath));
 
-		final String receiveLinkNamePrefix = StringUtil.getShortRandomString();
+		final String receiveLinkNamePrefix = "Receiver".concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(StringUtil.getShortRandomString());
 		final String receiveLinkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ? 
 				receiveLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
 				receiveLinkNamePrefix;
@@ -590,7 +590,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			if(this.receiveLinkReopenFuture != null && !this.receiveLinkReopenFuture.isDone())
 			{
 			    AsyncUtil.completeFuture(this.receiveLinkReopenFuture, null);
-			    this.receiveLinkReopenFuture = null;
 			}
 
 			this.lastKnownLinkError = null;
@@ -617,7 +616,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             {
 			    TRACE_LOGGER.warn("Opening receive link to '{}' failed.", this.receivePath, exception);
 			    AsyncUtil.completeFutureExceptionally(this.receiveLinkReopenFuture, exception);
-			    this.receiveLinkReopenFuture = null;
 			    if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
                 {
                     // No point in retrying to establish a link.. SessionLock is lost
@@ -1122,9 +1120,9 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private synchronized CompletableFuture<Void> ensureLinkIsOpen()
 	{
 	    // Send SAS token before opening a link as connection might have been closed and reopened
-		if (this.receiveLink.getLocalState() == EndpointState.CLOSED || this.receiveLink.getRemoteState() == EndpointState.CLOSED)
+		if (!(this.receiveLink.getLocalState() == EndpointState.ACTIVE && this.receiveLink.getRemoteState() == EndpointState.ACTIVE))
 		{
-		    if(this.receiveLinkReopenFuture == null)
+		    if(this.receiveLinkReopenFuture == null || this.receiveLinkReopenFuture.isDone())
 		    {
 		        TRACE_LOGGER.info("Recreating receive link to '{}'", this.receivePath);
 	            this.retryPolicy.incrementRetryCount(this.getClientId());
@@ -1149,6 +1147,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	            this.sendTokenAndSetRenewTimer(false).handleAsync((v, sendTokenEx) -> {
 	                if(sendTokenEx != null)
 	                {
+	                	Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sendTokenEx);
+        				TRACE_LOGGER.error("Sending SAS Token to '{}' failed.", this.receivePath, cause);
 	                    this.receiveLinkReopenFuture.completeExceptionally(sendTokenEx);
 	                }
 	                else
