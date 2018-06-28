@@ -316,7 +316,7 @@ class RequestResponseLink extends ClientEntity{
                     if (!recreateInternalLinksFuture.isDone())
                     {
                         Exception operationTimedout = new TimeoutException(
-                                String.format(Locale.US, "Recreating internal links of requestresponselink to %s.", RequestResponseLink.this.linkPath));
+                                String.format(Locale.US, "Recreating internal links of requestresponselink to %s timed out.", RequestResponseLink.this.linkPath));
                         TRACE_LOGGER.warn("Recreating internal links of requestresponselink timed out.", operationTimedout);
                         RequestResponseLink.this.cancelSASTokenRenewTimer();
                         recreateInternalLinksFuture.completeExceptionally(operationTimedout);
@@ -345,8 +345,8 @@ class RequestResponseLink extends ClientEntity{
 	{	    
 		this.throwIfClosed(null);
 		// Check and recreate links if necessary
-        if((this.amqpSender.sendLink.getLocalState() == EndpointState.CLOSED || this.amqpSender.sendLink.getRemoteState() == EndpointState.CLOSED)
-                || (this.amqpReceiver.receiveLink.getLocalState() == EndpointState.CLOSED || this.amqpReceiver.receiveLink.getRemoteState() == EndpointState.CLOSED))
+        if(!((this.amqpSender.sendLink.getLocalState() == EndpointState.ACTIVE && this.amqpSender.sendLink.getRemoteState() == EndpointState.ACTIVE)
+                && (this.amqpReceiver.receiveLink.getLocalState() == EndpointState.ACTIVE && this.amqpReceiver.receiveLink.getRemoteState() == EndpointState.ACTIVE)))
         {
             synchronized (this.recreateLinksLock) {
                 if(!this.isRecreateLinksInProgress)
@@ -378,7 +378,7 @@ class RequestResponseLink extends ClientEntity{
 		this.pendingRequests.put(requestId, workItem);
 		workItem.setTimeoutTask(this.scheduleRequestTimeout(requestId, timeout));
 		TRACE_LOGGER.debug("Sending request with id:{}", requestId);
-		this.amqpSender.sendRequest(requestMessage, false);		
+		this.amqpSender.sendRequest(requestId, false);
 		return responseFuture;
 	}
 	
@@ -390,7 +390,7 @@ class RequestResponseLink extends ClientEntity{
 				    TRACE_LOGGER.warn("Request with id:{} timed out", requestId);
 					RequestResponseWorkItem completedWorkItem = RequestResponseLink.this.exceptionallyCompleteRequest(requestId, new TimeoutException("Request timed out."), true);
 					boolean isRetriedWorkItem = completedWorkItem.getLastKnownException() != null;
-					RequestResponseLink.this.amqpSender.removeEnqueuedRequest(completedWorkItem.request, isRetriedWorkItem);
+					RequestResponseLink.this.amqpSender.removeEnqueuedRequest(requestId, isRetriedWorkItem);
 				}
 			}, timeout, TimerType.OneTimeRun);
 	}
@@ -447,7 +447,7 @@ class RequestResponseLink extends ClientEntity{
 									@Override
 									public void onEvent()
 									{
-										RequestResponseLink.this.amqpSender.sendRequest(workItem.getRequest(), true);
+										RequestResponseLink.this.amqpSender.sendRequest(requestId, true);
 									}
 								});
 					} catch (IOException e) {
@@ -696,8 +696,8 @@ class RequestResponseLink extends ClientEntity{
 		private CompletableFuture<Void> openFuture;
 		private CompletableFuture<Void> closeFuture;
 		private AtomicInteger availableCredit;
-		private LinkedList<Message> pendingFreshSends;
-		private LinkedList<Message> pendingRetrySends;
+		private LinkedList<String> pendingFreshSends;
+		private LinkedList<String> pendingRetrySends;
 		private Object pendingSendsSyncLock;
 		private boolean isSendLoopRunning;
 		private int maxMessageSize;
@@ -859,17 +859,17 @@ class RequestResponseLink extends ClientEntity{
 			}
 		}
 		
-		public void sendRequest(Message requestMessage, boolean isRetry)
+		public void sendRequest(String requestId, boolean isRetry)
 		{
 			synchronized(this.pendingSendsSyncLock)
 			{
 				if(isRetry)
 				{
-					this.pendingRetrySends.add(requestMessage);
+					this.pendingRetrySends.add(requestId);
 				}
 				else
 				{
-					this.pendingFreshSends.add(requestMessage);
+					this.pendingFreshSends.add(requestId);
 				}
 				
 				// This check must be done inside lock
@@ -887,22 +887,22 @@ class RequestResponseLink extends ClientEntity{
                     }
                 });
             } catch (IOException e) {
-                this.parent.exceptionallyCompleteRequest((String)requestMessage.getMessageId(), e, true);
+                this.parent.exceptionallyCompleteRequest(requestId, e, true);
             }
 		}
 		
-		public void removeEnqueuedRequest(Message requestMessage, boolean isRetry)
+		public void removeEnqueuedRequest(String requestId, boolean isRetry)
 		{
 			synchronized(this.pendingSendsSyncLock)
 			{
 				// Collections are more likely to be very small. So remove() shouldn't be a problem.
 				if(isRetry)
 				{
-					this.pendingRetrySends.remove(requestMessage);
+					this.pendingRetrySends.remove(requestId);
 				}
 				else
 				{
-					this.pendingFreshSends.remove(requestMessage);
+					this.pendingFreshSends.remove(requestId);
 				}				
 			}
 		}
@@ -945,15 +945,15 @@ class RequestResponseLink extends ClientEntity{
             {
                 while(this.sendLink != null && this.sendLink.getLocalState() == EndpointState.ACTIVE && this.sendLink.getRemoteState() == EndpointState.ACTIVE && this.availableCredit.get() > 0)
                 {
-                    Message requestToBeSent = null;
+                	String requestIdToBeSent = null;					
                     synchronized(pendingSendsSyncLock)
                     {
                         // First send retries and then fresh ones
-                        requestToBeSent = this.pendingRetrySends.poll();
-                        if(requestToBeSent == null)
+                    	requestIdToBeSent = this.pendingRetrySends.poll();
+                        if(requestIdToBeSent == null)
                         {
-                            requestToBeSent = this.pendingFreshSends.poll();
-                            if(requestToBeSent == null)
+                        	requestIdToBeSent = this.pendingFreshSends.poll();
+                            if(requestIdToBeSent == null)
                             {
                                 // Set to false inside the synchronized block to avoid race condition
                                 this.isSendLoopRunning = false;
@@ -963,32 +963,40 @@ class RequestResponseLink extends ClientEntity{
                         }
                     }
                     
-                    Delivery delivery = this.sendLink.delivery(UUID.randomUUID().toString().getBytes());
-                    delivery.setMessageFormat(DeliveryImpl.DEFAULT_MESSAGE_FORMAT);
+                    RequestResponseWorkItem requestToBeSent = this.parent.pendingRequests.get(requestIdToBeSent);
+                    if(requestToBeSent != null)
+                    {
+                    	Delivery delivery = this.sendLink.delivery(UUID.randomUUID().toString().getBytes());
+                        delivery.setMessageFormat(DeliveryImpl.DEFAULT_MESSAGE_FORMAT);
                     
-                    Pair<byte[], Integer> encodedPair = null;
-                    try
-                    {
-                        encodedPair = Util.encodeMessageToOptimalSizeArray(requestToBeSent, this.maxMessageSize);
+                        Pair<byte[], Integer> encodedPair = null;
+                        try
+                        {
+                        	encodedPair = Util.encodeMessageToOptimalSizeArray(requestToBeSent.getRequest(), this.maxMessageSize);
+                        }
+                        catch(PayloadSizeExceededException exception)
+                        {
+                        	this.parent.exceptionallyCompleteRequest(requestIdToBeSent, new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", this.maxMessageSize / 1024), exception), false);
+                        }
+                        
+                        try
+                        {
+                            int sentMsgSize = this.sendLink.send(encodedPair.getFirstItem(), 0, encodedPair.getSecondItem());
+                            assert sentMsgSize == encodedPair.getSecondItem() : "Contract of the ProtonJ library for Sender.Send API changed";
+                            delivery.settle();
+                            this.availableCredit.decrementAndGet();
+                            TRACE_LOGGER.debug("RequestResonseLink {} internal sender sent a request. available credit :{}", this.parent.linkPath, this.availableCredit.get());
+                        }
+                        catch(Exception e)
+                        {
+                            TRACE_LOGGER.error("RequestResonseLink {} failed to send request with request id:{}.", this.parent.linkPath, requestIdToBeSent, e);
+                            this.parent.exceptionallyCompleteRequest(requestIdToBeSent, e, false);
+                        }
                     }
-                    catch(PayloadSizeExceededException exception)
+                    else
                     {
-                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessageId(), new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", this.maxMessageSize / 1024), exception), false);
-                    }
-                    
-                    try
-                    {
-                        int sentMsgSize = this.sendLink.send(encodedPair.getFirstItem(), 0, encodedPair.getSecondItem());
-                        assert sentMsgSize == encodedPair.getSecondItem() : "Contract of the ProtonJ library for Sender.Send API changed";
-                        delivery.settle();
-                        this.availableCredit.decrementAndGet();
-                        TRACE_LOGGER.debug("RequestResonseLink {} internal sender sent a request. available credit :{}", this.parent.linkPath, this.availableCredit.get());
-                    }
-                    catch(Exception e)
-                    {
-                        TRACE_LOGGER.error("RequestResonseLink {} failed to send request with request id:{}.", this.parent.linkPath, requestToBeSent.getMessageId(), e);
-                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessageId(), e, false);
-                    }
+                    	TRACE_LOGGER.warn("Request with id:{} not found in the requestresponse link.", requestIdToBeSent);
+                    }                    
                 }
             }
             finally
