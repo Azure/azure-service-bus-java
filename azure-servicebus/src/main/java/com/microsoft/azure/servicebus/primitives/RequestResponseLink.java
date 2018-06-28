@@ -700,6 +700,7 @@ class RequestResponseLink extends ClientEntity{
 		private LinkedList<Message> pendingRetrySends;
 		private Object pendingSendsSyncLock;
 		private boolean isSendLoopRunning;
+		private int maxMessageSize;
 
 		protected InternalSender(String clientId, RequestResponseLink parent, InternalSender senderToBeCopied) {
 			super(clientId);			
@@ -772,7 +773,8 @@ class RequestResponseLink extends ClientEntity{
 			{
 			    TRACE_LOGGER.debug("Opened internal send link of requestresponselink to {}", parent.linkPath);
 			    this.parent.underlyingFactory.registerForConnectionError(this.sendLink);
-				this.openFuture.complete(null);	
+			    this.maxMessageSize = Util.getMaxMessageSizeFromLink(this.sendLink);
+				this.openFuture.complete(null);
 				this.runSendLoop();
 			}
 			else
@@ -967,11 +969,11 @@ class RequestResponseLink extends ClientEntity{
                     Pair<byte[], Integer> encodedPair = null;
                     try
                     {
-                        encodedPair = Util.encodeMessageToOptimalSizeArray(requestToBeSent);
+                        encodedPair = Util.encodeMessageToOptimalSizeArray(requestToBeSent, this.maxMessageSize);
                     }
                     catch(PayloadSizeExceededException exception)
                     {
-                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessageId(), new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", ClientConstants.MAX_MESSAGE_LENGTH_BYTES / 1024), exception), false);
+                        this.parent.exceptionallyCompleteRequest((String)requestToBeSent.getMessageId(), new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", this.maxMessageSize / 1024), exception), false);
                     }
                     
                     try
