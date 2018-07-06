@@ -257,12 +257,12 @@ final public class Message implements Serializable, IMessage {
 	}
 
 	@Override
-	public Instant getScheduledEnqueuedTimeUtc() {
+	public Instant getScheduledEnqueueTimeUtc() {
 		return this.scheduledEnqueueTimeUtc;
 	}
 
 	@Override
-	public void setScheduledEnqueuedTimeUtc(Instant scheduledEnqueueTimeUtc) {
+	public void setScheduledEnqueueTimeUtc(Instant scheduledEnqueueTimeUtc) {
 		this.scheduledEnqueueTimeUtc = scheduledEnqueueTimeUtc;		
 	}	
 

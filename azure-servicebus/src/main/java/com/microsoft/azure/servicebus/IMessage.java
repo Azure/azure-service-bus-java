@@ -138,15 +138,15 @@ public interface IMessage {
      * @return the instant at which the message will be enqueued in Azure Service Bus
      * @see <a href="https://docs.microsoft.com/azure/service-bus-messaging/message-sequencing">Message Sequencing and Timestamps</a> 
      */
-    public Instant getScheduledEnqueuedTimeUtc();
+    public Instant getScheduledEnqueueTimeUtc();
 
     /**
      * Sets the scheduled enqueue time of this message.  
      * 
      * @param scheduledEnqueueTimeUtc the instant at which this message should be enqueued in Azure Service Bus
-     * @see #getScheduledEnqueuedTimeUtc()
+     * @see #getScheduledEnqueueTimeUtc()
      */
-    public void setScheduledEnqueuedTimeUtc(Instant scheduledEnqueueTimeUtc);
+    public void setScheduledEnqueueTimeUtc(Instant scheduledEnqueueTimeUtc);
 
     /**
      * Gets the unique number assigned to a message by Service Bus.
