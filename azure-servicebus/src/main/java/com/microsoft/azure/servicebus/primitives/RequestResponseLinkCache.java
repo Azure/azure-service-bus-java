@@ -21,7 +21,7 @@ class RequestResponseLinkcache
         this.pathToRRLinkMap = new HashMap<>();
     }
     
-    public CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath)
+    public CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath, MessagingEntityType entityType)
     {
         RequestResponseLinkWrapper wrapper;
         synchronized (lock)
@@ -29,7 +29,7 @@ class RequestResponseLinkcache
             wrapper = this.pathToRRLinkMap.get(entityPath);
             if(wrapper == null)
             {
-                wrapper = new RequestResponseLinkWrapper(this.underlyingFactory, entityPath);
+                wrapper = new RequestResponseLinkWrapper(this.underlyingFactory, entityPath, entityType);
                 this.pathToRRLinkMap.put(entityPath, wrapper);
             }
         }
@@ -75,14 +75,16 @@ class RequestResponseLinkcache
         private Object lock = new Object();
         private final MessagingFactory underlyingFactory;
         private final String entityPath;
+        private final MessagingEntityType entityType;
         private RequestResponseLink requestResponseLink;
         private int referenceCount;
         private ArrayList<CompletableFuture<RequestResponseLink>> waiters;
         
-        public RequestResponseLinkWrapper(MessagingFactory underlyingFactory, String entityPath)
+        public RequestResponseLinkWrapper(MessagingFactory underlyingFactory, String entityPath, MessagingEntityType entityType)
         {
             this.underlyingFactory = underlyingFactory;
             this.entityPath = entityPath;
+            this.entityType = entityType;
             this.requestResponseLink = null;
             this.referenceCount = 0;
             this.waiters = new ArrayList<>();
@@ -94,7 +96,7 @@ class RequestResponseLinkcache
             String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.entityPath);
             String sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, this.underlyingFactory.getHostName(), this.entityPath);
             TRACE_LOGGER.debug("Creating requestresponselink to '{}'", requestResponseLinkPath);
-            RequestResponseLink.createAsync(this.underlyingFactory, StringUtil.getShortRandomString() + "-RequestResponse", requestResponseLinkPath, sasTokenAudienceURI).handleAsync((rrlink, ex) ->
+            RequestResponseLink.createAsync(this.underlyingFactory, StringUtil.getShortRandomString() + "-RequestResponse", requestResponseLinkPath, sasTokenAudienceURI, this.entityType).handleAsync((rrlink, ex) ->
             {
                 synchronized (this.lock)
                 {
