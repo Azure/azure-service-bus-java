@@ -107,6 +107,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private final Runnable returnMesagesLoopDaemon;
 	private final ScheduledFuture<?> updateStateRequestsTimeoutChecker;
 	private final ScheduledFuture<?> returnMessagesLoopRunner;
+	private final MessagingEntityType entityType;
 	
 	// TODO Change onReceiveComplete to handle empty deliveries. Change onError to retry updateState requests.
 	private CoreMessageReceiver(final MessagingFactory factory,
@@ -114,7 +115,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			final String recvPath,
 			final String sessionId,
 			final int prefetchCount,
-			final SettleModePair settleModePair)
+			final SettleModePair settleModePair,
+			final MessagingEntityType entityType)
 	{
 		super(name);
 
@@ -142,6 +144,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		this.creditToFlow = new AtomicInteger();
 		this.creditNeededtoServePendingReceives = new AtomicInteger();
 		this.currentPrefetechedMessagesCount = new AtomicInteger();
+		this.entityType = entityType;
 		
 		this.timedOutUpdateStateRequestsDaemon = new Runnable() {
 			@Override
@@ -215,12 +218,37 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	}
 
 	// Connection has to be associated with Reactor before Creating a receiver on it.
+	@Deprecated
 	public static CompletableFuture<CoreMessageReceiver> create(
 			final MessagingFactory factory, 
 			final String name, 
 			final String recvPath,
 			final int prefetchCount,
 			final SettleModePair settleModePair)
+	{
+	    return create(factory, name, recvPath, prefetchCount, settleModePair, null);
+	}
+	
+	@Deprecated
+	public static CompletableFuture<CoreMessageReceiver> create(
+			final MessagingFactory factory, 
+			final String name, 
+			final String recvPath,
+			final String sessionId,
+			final boolean isBrowsableSession,
+			final int prefetchCount,
+			final SettleModePair settleModePair)
+	{
+	    return create(factory, name, recvPath, sessionId, isBrowsableSession, prefetchCount, settleModePair, null);
+	}
+	
+	public static CompletableFuture<CoreMessageReceiver> create(
+			final MessagingFactory factory, 
+			final String name, 
+			final String recvPath,
+			final int prefetchCount,
+			final SettleModePair settleModePair,
+			final MessagingEntityType entityType)
 	{
 	    TRACE_LOGGER.info("Creating core message receiver to '{}'", recvPath);
 		CoreMessageReceiver msgReceiver = new CoreMessageReceiver(
@@ -229,7 +257,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				recvPath,
 				null,
 				prefetchCount,
-				settleModePair);
+				settleModePair,
+				entityType);
 		return msgReceiver.createLink();
 	}
 	
@@ -240,7 +269,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			final String sessionId,
 			final boolean isBrowsableSession,
 			final int prefetchCount,
-			final SettleModePair settleModePair)
+			final SettleModePair settleModePair,
+			final MessagingEntityType entityType)
 	{
 	    TRACE_LOGGER.info("Creating core session receiver to '{}', sessionId '{}', browseonly session '{}'", recvPath, sessionId, isBrowsableSession);
 		CoreMessageReceiver msgReceiver = new CoreMessageReceiver(
@@ -249,7 +279,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 				recvPath,
 				sessionId,
 				prefetchCount,
-				settleModePair);
+				settleModePair,
+				entityType);
 		msgReceiver.isSessionReceiver = true;
 		msgReceiver.isBrowsableSession = isBrowsableSession;
 		return msgReceiver.createLink();
@@ -298,7 +329,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             if(this.requestResponseLinkCreationFuture == null)
             {
                 this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                this.underlyingFactory.obtainRequestResponseLinkAsync(this.receivePath).handleAsync((rrlink, ex) ->
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.receivePath, this.entityType).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
                     {
@@ -359,6 +390,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		Map<Symbol, Object> linkProperties = new HashMap<>();
 		// ServiceBus expects timeout to be of type unsignedint
 		linkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()).toMillis()));
+		if(this.entityType != null)
+		{
+			linkProperties.put(ClientConstants.ENTITY_TYPE_PROPERTY, this.entityType.getIntValue());
+		}
 		
 		if(this.isSessionReceiver)
 		{

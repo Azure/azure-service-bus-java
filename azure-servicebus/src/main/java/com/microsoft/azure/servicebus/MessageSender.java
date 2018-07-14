@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.CoreMessageSender;
 import com.microsoft.azure.servicebus.primitives.ExceptionUtil;
+import com.microsoft.azure.servicebus.primitives.MessagingEntityType;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
@@ -22,35 +23,38 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageSender.class);
     private boolean ownsMessagingFactory;
     private String entityPath = null;
+    private MessagingEntityType entityType = null;
     private MessagingFactory messagingFactory = null;
     private CoreMessageSender internalSender = null;
     private boolean isInitialized = false;
     private URI namespaceEndpointURI;
-    private ClientSettings clientSettings;
+    private ClientSettings clientSettings;    
 
     private MessageSender() {
         super(StringUtil.getShortRandomString());
     }
 
-    MessageSender(URI namespaceEndpointURI, String entityPath, ClientSettings clientSettings) {
+    MessageSender(URI namespaceEndpointURI, String entityPath, MessagingEntityType entityType, ClientSettings clientSettings) {
         this();
 
         this.namespaceEndpointURI = namespaceEndpointURI;
         this.entityPath = entityPath;
         this.clientSettings = clientSettings;
         this.ownsMessagingFactory = true;
+        this.entityType = entityType;
     }
 
-    MessageSender(MessagingFactory messagingFactory, String entityPath) {
-        this(messagingFactory, entityPath, false);
+    MessageSender(MessagingFactory messagingFactory, String entityPath, MessagingEntityType entityType) {
+        this(messagingFactory, entityPath, entityType, false);
     }
 
-    private MessageSender(MessagingFactory messagingFactory, String entityPath, boolean ownsMessagingFactory) {
+    private MessageSender(MessagingFactory messagingFactory, String entityPath, MessagingEntityType entityType, boolean ownsMessagingFactory) {
         this();
 
         this.messagingFactory = messagingFactory;
         this.entityPath = entityPath;
         this.ownsMessagingFactory = ownsMessagingFactory;
+        this.entityType = entityType;
     }
 
     @Override
@@ -77,7 +81,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
             return factoryFuture.thenComposeAsync((v) ->
             {
                 TRACE_LOGGER.info("Creating MessageSender to entity '{}'", this.entityPath);
-                CompletableFuture<CoreMessageSender> senderFuture = CoreMessageSender.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath);
+                CompletableFuture<CoreMessageSender> senderFuture = CoreMessageSender.create(this.messagingFactory, StringUtil.getShortRandomString(), this.entityPath, this.entityType);
                 CompletableFuture<Void> postSenderCreationFuture = new CompletableFuture<Void>();
                 senderFuture.handleAsync((s, coreSenderCreationEx) -> {
                     if (coreSenderCreationEx == null) {
@@ -160,7 +164,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
 
     @Override
     public CompletableFuture<Long> scheduleMessageAsync(IMessage message, Instant scheduledEnqueueTimeUtc) {
-        message.setScheduledEnqueuedTimeUtc(scheduledEnqueueTimeUtc);
+        message.setScheduledEnqueueTimeUtc(scheduledEnqueueTimeUtc);
         org.apache.qpid.proton.message.Message amqpMessage = MessageConverter.convertBrokeredMessageToAmqpMessage((Message) message);
         return this.internalSender.scheduleMessageAsync(new org.apache.qpid.proton.message.Message[]{amqpMessage}, this.messagingFactory.getClientSetttings().getOperationTimeout()).thenApply(sequenceNumbers -> sequenceNumbers[0]);
     }

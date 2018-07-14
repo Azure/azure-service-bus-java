@@ -58,10 +58,11 @@ class RequestResponseLink extends ClientEntity{
 	private InternalReceiver amqpReceiver;
 	private InternalSender amqpSender;
 	private boolean isRecreateLinksInProgress;
+	private MessagingEntityType entityType;
 	
-	public static CompletableFuture<RequestResponseLink> createAsync(MessagingFactory messagingFactory, String linkName, String linkPath, String sasTokenAudienceURI)
+	public static CompletableFuture<RequestResponseLink> createAsync(MessagingFactory messagingFactory, String linkName, String linkPath, String sasTokenAudienceURI, MessagingEntityType entityType)
 	{
-		final RequestResponseLink requestReponseLink = new RequestResponseLink(messagingFactory, linkName, linkPath, sasTokenAudienceURI);
+		final RequestResponseLink requestReponseLink = new RequestResponseLink(messagingFactory, linkName, linkPath, sasTokenAudienceURI, entityType);
 		
 		Timer.schedule(
 				new Runnable()
@@ -143,7 +144,7 @@ class RequestResponseLink extends ClientEntity{
         return AmqpConstants.CBS_NODE_ADDRESS_SEGMENT;
     }
 	
-	private RequestResponseLink(MessagingFactory messagingFactory, String linkName, String linkPath, String sasTokenAudienceURI)
+	private RequestResponseLink(MessagingFactory messagingFactory, String linkName, String linkPath, String sasTokenAudienceURI, MessagingEntityType entityType)
 	{
 		super(linkName);
 		
@@ -158,6 +159,7 @@ class RequestResponseLink extends ClientEntity{
 		this.requestCounter = new AtomicInteger();
 		this.replyTo = UUID.randomUUID().toString();
 		this.createFuture = new CompletableFuture<RequestResponseLink>();
+		this.entityType = entityType;
 	}
 	
 	public String getLinkPath()
@@ -192,6 +194,10 @@ class RequestResponseLink extends ClientEntity{
 		Map<Symbol, Object> commonLinkProperties = new HashMap<>();
 		// ServiceBus expects timeout to be of type unsignedint
 		commonLinkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()).toMillis()));
+		if(this.entityType != null)
+		{
+			commonLinkProperties.put(ClientConstants.ENTITY_TYPE_PROPERTY, this.entityType.getIntValue());
+		}
 		
 		// Create send link
 		final Connection connection = this.underlyingFactory.getConnection();

@@ -73,6 +73,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private final ConcurrentHashMap<String, SendWorkItem<Void>> pendingSendsData;
 	private final PriorityQueue<WeightedDeliveryTag> pendingSends;
 	private final DispatchHandler sendWork;
+	private final MessagingEntityType entityType;
 	private boolean isSendLoopRunning;
 
 	private Sender sendLink;
@@ -86,13 +87,23 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private CompletableFuture<Void> sendLinkReopenFuture;
 	private int maxMessageSize;
 
+	@Deprecated
 	public static CompletableFuture<CoreMessageSender> create(
 			final MessagingFactory factory,
 			final String sendLinkName,
 			final String senderPath)
 	{
+		return CoreMessageSender.create(factory, sendLinkName, senderPath, null);
+	}
+	
+	public static CompletableFuture<CoreMessageSender> create(
+			final MessagingFactory factory,
+			final String sendLinkName,			
+			final String senderPath,
+			final MessagingEntityType entityType)
+	{
 	    TRACE_LOGGER.info("Creating core message sender to '{}'", senderPath);
-		final CoreMessageSender msgSender = new CoreMessageSender(factory, sendLinkName, senderPath);
+		final CoreMessageSender msgSender = new CoreMessageSender(factory, sendLinkName, senderPath, entityType);
 		TimeoutTracker openLinkTracker = TimeoutTracker.create(factory.getOperationTimeout());
 		msgSender.initializeLinkOpen(openLinkTracker);
 		
@@ -136,7 +147,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             if(this.requestResponseLinkCreationFuture == null)
             {
                 this.requestResponseLinkCreationFuture = new CompletableFuture<Void>();
-                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath).handleAsync((rrlink, ex) ->
+                this.underlyingFactory.obtainRequestResponseLinkAsync(this.sendPath, this.entityType).handleAsync((rrlink, ex) ->
                 {
                     if(ex == null)
                     {
@@ -176,12 +187,13 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
         }
     }
 
-	private CoreMessageSender(final MessagingFactory factory, final String sendLinkName, final String senderPath)
+	private CoreMessageSender(final MessagingFactory factory, final String sendLinkName, final String senderPath, final MessagingEntityType entityType)
 	{
 		super(sendLinkName);
 
 		this.sendPath = senderPath;
 		this.sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, factory.getHostName(), senderPath);
+		this.entityType = entityType;
 		this.underlyingFactory = factory;
 		this.operationTimeout = factory.getOperationTimeout();
 		
@@ -591,6 +603,11 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		Map<Symbol, Object> linkProperties = new HashMap<>();
 		// ServiceBus expects timeout to be of type unsignedint
 		linkProperties.put(ClientConstants.LINK_TIMEOUT_PROPERTY, UnsignedInteger.valueOf(Util.adjustServerTimeout(this.underlyingFactory.getOperationTimeout()).toMillis()));
+		if(entityType != null)
+		{
+			linkProperties.put(ClientConstants.ENTITY_TYPE_PROPERTY, entityType.getIntValue());
+		}
+
 		sender.setProperties(linkProperties);
 		
 		SendLinkHandler handler = new SendLinkHandler(CoreMessageSender.this);
