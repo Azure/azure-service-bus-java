@@ -89,6 +89,11 @@ public class Util
 			return Short.BYTES;
 		}
 		
+		if (obj instanceof Boolean)
+		{
+			return 1;
+		}
+		
 		if (obj instanceof Character)
 		{
 			return 4;
