@@ -3,17 +3,13 @@ package com.microsoft.azure.servicebus;
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
 
+import com.microsoft.azure.servicebus.management.*;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.microsoft.azure.servicebus.management.EntityManager;
-import com.microsoft.azure.servicebus.management.ManagementException;
-import com.microsoft.azure.servicebus.management.QueueDescription;
-import com.microsoft.azure.servicebus.management.SubscriptionDescription;
-import com.microsoft.azure.servicebus.management.TopicDescription;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 public abstract class ClientTests extends Tests{
@@ -41,11 +37,12 @@ public abstract class ClientTests extends Tests{
         if(this.shouldCreateEntityForEveryTest() || ClientTests.entityNameCreatedForAllTests == null)
         {
              // Create entity
-            this.entityName = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
+            //this.entityName = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
+            this.entityName = "queue1";
             if(this.isEntityQueue())
             {
                 this.receiveEntityPath = this.entityName;
-                QueueDescription queueDescription = new QueueDescription(this.entityName);
+                QueueDescription2 queueDescription = new QueueDescription2(this.entityName);
                 queueDescription.setEnablePartitioning(this.isEntityPartitioned());
                 EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
                 if(!this.shouldCreateEntityForEveryTest())

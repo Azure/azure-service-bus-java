@@ -2,7 +2,7 @@ package com.microsoft.azure.servicebus.management;
 
 import java.time.Duration;
 
-public class QueueDescription extends ResourceDescripton{
+public class QueueDescription2 extends ResourceDescripton{
     // Supports only a limited set of properties, just for unit tests.. There are some quirks too. Order of xml elements also matters
     private static final String ATOM_XML_FORMAT = "<entry xmlns=\"http://www.w3.org/2005/Atom\">"
        + "<content type=\"application/xml\">"
@@ -32,7 +32,7 @@ public class QueueDescription extends ResourceDescripton{
     private Duration autoDeleteOnIdle;
     private Duration duplicateDetectionHistoryTimeWindow;
     
-    public QueueDescription(String path)
+    public QueueDescription2(String path)
     {
         this.path = path;
         this.defaultMessageTimeToLive = Duration.ofDays(7);

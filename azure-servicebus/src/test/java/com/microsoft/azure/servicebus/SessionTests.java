@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.microsoft.azure.servicebus.management.*;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -14,11 +15,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.microsoft.azure.servicebus.management.EntityManager;
-import com.microsoft.azure.servicebus.management.ManagementException;
-import com.microsoft.azure.servicebus.management.QueueDescription;
-import com.microsoft.azure.servicebus.management.SubscriptionDescription;
-import com.microsoft.azure.servicebus.management.TopicDescription;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.TimeoutException;
@@ -53,7 +49,7 @@ public abstract class SessionTests extends Tests {
             if(this.isEntityQueue())
             {
                 this.receiveEntityPath = this.entityName;
-                QueueDescription queueDescription = new QueueDescription(this.entityName);
+                QueueDescription2 queueDescription = new QueueDescription2(this.entityName);
                 queueDescription.setEnablePartitioning(this.isEntityPartitioned());
                 queueDescription.setRequiresSession(true);
                 EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);

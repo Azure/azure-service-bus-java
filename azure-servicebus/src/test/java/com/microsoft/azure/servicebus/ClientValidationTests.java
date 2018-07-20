@@ -4,16 +4,12 @@ import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.microsoft.azure.servicebus.management.*;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.Assert;
 
-import com.microsoft.azure.servicebus.management.EntityManager;
-import com.microsoft.azure.servicebus.management.ManagementException;
-import com.microsoft.azure.servicebus.management.QueueDescription;
-import com.microsoft.azure.servicebus.management.SubscriptionDescription;
-import com.microsoft.azure.servicebus.management.TopicDescription;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 public class ClientValidationTests
@@ -37,11 +33,11 @@ public class ClientValidationTests
 		URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
 		ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
 		
-		QueueDescription queueDescription = new QueueDescription(queuePath);
+		QueueDescription2 queueDescription = new QueueDescription2(queuePath);
 		queueDescription.setEnablePartitioning(false);
 		EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 		
-		QueueDescription queueDescription2 = new QueueDescription(sessionfulQueuePath);
+		QueueDescription2 queueDescription2 = new QueueDescription2(sessionfulQueuePath);
 		queueDescription2.setEnablePartitioning(false);
 		queueDescription2.setRequiresSession(true);
 		EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription2);
