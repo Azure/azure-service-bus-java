@@ -10,8 +10,6 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.*;
 
-import com.microsoft.azure.servicebus.security.SharedAccessSignatureTokenProvider;
-
 /**
  * This class can be used to construct a connection string which can establish communication with ServiceBus entities.
  * It can also be used to perform basic validation on an existing connection string.
@@ -48,7 +46,7 @@ public class ConnectionStringBuilder
 	private final static String ENDPOINT_CONFIG_NAME = "Endpoint";
 	private final static String SHARED_ACCESS_KEY_NAME_CONFIG_NAME = "SharedAccessKeyName";
 	private final static String SHARED_ACCESS_KEY_CONFIG_NAME = "SharedAccessKey";
-	private final static String DOT_NET_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME = "SharedAccessSignature";
+	private final static String ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME = "SharedAccessSignature";
 	private final static String SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME = "SharedAccessSignatureToken";
 	private final static String ENTITY_PATH_CONFIG_NAME = "EntityPath";
 	private final static String OPERATION_TIMEOUT_CONFIG_NAME = "OperationTimeout";
@@ -58,7 +56,7 @@ public class ConnectionStringBuilder
 
 	private static final String ALL_KEY_ENUMERATE_REGEX = "(" + HOSTNAME_CONFIG_NAME + "|" +  ENDPOINT_CONFIG_NAME + "|" + SHARED_ACCESS_KEY_NAME_CONFIG_NAME
 			+ "|" + SHARED_ACCESS_KEY_CONFIG_NAME + "|"  + SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + "|" + ENTITY_PATH_CONFIG_NAME + "|" + OPERATION_TIMEOUT_CONFIG_NAME
-			+ "|" + RETRY_POLICY_CONFIG_NAME + "|" + DOT_NET_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + ")";
+			+ "|" + RETRY_POLICY_CONFIG_NAME + "|" + ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + ")";
 
 	private static final String KEYS_WITH_DELIMITERS_REGEX = KEY_VALUE_PAIR_DELIMITER + ALL_KEY_ENUMERATE_REGEX	+ KEY_VALUE_SEPARATOR;
 
@@ -456,10 +454,10 @@ public class ConnectionStringBuilder
                 this.sharedAccessSingatureToken = values[valueIndex];
                 this.sharedAccessSignatureTokenKeyName = SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME;
             }
-			else if(key.equalsIgnoreCase(DOT_NET_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME))
+			else if(key.equalsIgnoreCase(ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME))
             {
                 this.sharedAccessSingatureToken = values[valueIndex];
-                this.sharedAccessSignatureTokenKeyName = DOT_NET_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME;
+                this.sharedAccessSignatureTokenKeyName = ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME;
             }
 			else if (key.equalsIgnoreCase(ENTITY_PATH_CONFIG_NAME))
 			{
