@@ -1,6 +1,9 @@
 package com.microsoft.azure.servicebus.management;
 
+import org.apache.commons.collections4.CollectionUtils;
+
 import java.time.Duration;
+import java.util.List;
 
 public class QueueDescription {
     Duration duplicationDetectionHistoryTimeWindow = Duration.ofMinutes(1);
@@ -18,9 +21,8 @@ public class QueueDescription {
     boolean requiresSession = false;
     boolean enableBatchedOperations = true;
     boolean enablePartitioning = false;
-
-    // TODO: AuthorizationRules
-    // TODO: Status
+    EntityStatus status = EntityStatus.Active;
+    List<AuthorizationRule> authorizationRules = null;
 
     public QueueDescription(String path)
     {
@@ -215,5 +217,57 @@ public class QueueDescription {
         }
 
         this.userMetadata = userMetadata;
+    }
+
+    public EntityStatus getEntityStatus() {
+        return this.status;
+    }
+
+    public void setEntityStatus(EntityStatus stats) {
+        this.status = status;
+    }
+
+    public List<AuthorizationRule> getAuthorizationRules() {
+        return authorizationRules;
+    }
+
+    public void setAuthorizationRules(List<AuthorizationRule> authorizationRules) {
+        this.authorizationRules = authorizationRules;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+
+        if (!(o instanceof QueueDescription)) {
+            return false;
+        }
+
+        QueueDescription other = (QueueDescription) o;
+        if (this.path.equalsIgnoreCase(other.path)
+                && this.autoDeleteOnIdle.equals(other.autoDeleteOnIdle)
+                && this.defaultMessageTimeToLive.equals(other.defaultMessageTimeToLive)
+                && (!this.requiresDuplicateDetection || this.duplicationDetectionHistoryTimeWindow.equals(other.duplicationDetectionHistoryTimeWindow))
+                && this.enableBatchedOperations == other.enableBatchedOperations
+                && this.enableDeadLetteringOnMessageExpiration == other.enableDeadLetteringOnMessageExpiration
+                && this.enablePartitioning == other.enablePartitioning
+                && ((this.forwardTo == null && other.forwardTo == null) || this.forwardTo.equalsIgnoreCase(other.forwardTo))
+                && ((this.forwardDeadLetteredMessagesTo == null && other.forwardDeadLetteredMessagesTo == null) || this.forwardDeadLetteredMessagesTo.equalsIgnoreCase(other.forwardDeadLetteredMessagesTo))
+                && this.lockDuration.equals(other.lockDuration)
+                && this.maxDeliveryCount == other.maxDeliveryCount
+                && this.maxSizeInMB == other.maxSizeInMB
+                && this.requiresDuplicateDetection == other.requiresDuplicateDetection
+                && this.requiresSession == other.requiresSession
+                && this.status.equals(other.status)
+                && ((this.userMetadata == null && other.userMetadata == null) || this.userMetadata.equals(other.userMetadata))
+                && (this.authorizationRules != null && other.authorizationRules != null
+                    || this.authorizationRules == null && other.authorizationRules == null)
+                && this.authorizationRules == null || CollectionUtils.isEqualCollection(this.authorizationRules, other.authorizationRules)) {
+            return true;
+        }
+
+        return false;
     }
 }

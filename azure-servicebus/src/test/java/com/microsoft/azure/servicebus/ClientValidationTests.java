@@ -35,31 +35,31 @@ public class ClientValidationTests
 		
 		QueueDescription2 queueDescription = new QueueDescription2(queuePath);
 		queueDescription.setEnablePartitioning(false);
-		EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 		
 		QueueDescription2 queueDescription2 = new QueueDescription2(sessionfulQueuePath);
 		queueDescription2.setEnablePartitioning(false);
 		queueDescription2.setRequiresSession(true);
-		EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription2);
+		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription2);
 		
 		TopicDescription topicDescription = new TopicDescription(topicPath);
 		topicDescription.setEnablePartitioning(false);
-		EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
+		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
 		SubscriptionDescription subDescription = new SubscriptionDescription(topicPath, TestUtils.FIRST_SUBSCRIPTION_NAME);
 		subscriptionPath = subDescription.getPath();
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
         SubscriptionDescription subDescription2 = new SubscriptionDescription(topicPath, "subscription2");
         subDescription2.setRequiresSession(true);
 		sessionfulSubscriptionPath = subDescription2.getPath();
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, subDescription2);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription2);
     }
 	
 	@AfterClass
 	public static void deleteEntities() throws ManagementException
 	{
-		EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), queuePath);
-		EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), sessionfulQueuePath);
-		EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), topicPath);
+		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), queuePath);
+		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), sessionfulQueuePath);
+		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), topicPath);
 	}
 	
 	@Test

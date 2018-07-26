@@ -1,14 +1,9 @@
 package com.microsoft.azure.servicebus;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.microsoft.azure.servicebus.management.*;
-import org.apache.qpid.proton.amqp.Binary;
-import org.apache.qpid.proton.amqp.messaging.AmqpValue;
-import org.apache.qpid.proton.amqp.transaction.Discharge;
 import org.junit.*;
 
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
@@ -47,7 +42,7 @@ public abstract class SendReceiveTests extends Tests {
 	            this.receiveEntityPath = this.entityName;
 	            QueueDescription2 queueDescription = new QueueDescription2(this.entityName);
 	            queueDescription.setEnablePartitioning(this.isEntityPartitioned());
-	            EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+	            ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 	            if(!this.shouldCreateEntityForEveryTest())
 	            {
 	                SendReceiveTests.entityNameCreatedForAllTests = entityName;
@@ -58,9 +53,9 @@ public abstract class SendReceiveTests extends Tests {
 	        {
 	            TopicDescription topicDescription = new TopicDescription(this.entityName);
                 topicDescription.setEnablePartitioning(this.isEntityPartitioned());
-                EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
+                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
                 SubscriptionDescription subDescription = new SubscriptionDescription(this.entityName, TestUtils.FIRST_SUBSCRIPTION_NAME);
-                EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
+                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
                 this.receiveEntityPath = subDescription.getPath();
                 if(!this.shouldCreateEntityForEveryTest())
                 {
@@ -94,7 +89,7 @@ public abstract class SendReceiveTests extends Tests {
 		
 		if(this.shouldCreateEntityForEveryTest())
         {
-		    EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+		    ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
         }
 	}
 	
@@ -103,7 +98,7 @@ public abstract class SendReceiveTests extends Tests {
 	{
 	    if(SendReceiveTests.entityNameCreatedForAllTests != null)
 	    {
-	        EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
+	        ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
 	    }
 	}
 

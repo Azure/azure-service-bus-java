@@ -45,7 +45,7 @@ public abstract class ClientSessionTests extends Tests
                 QueueDescription2 queueDescription = new QueueDescription2(this.entityName);
                 queueDescription.setEnablePartitioning(this.isEntityPartitioned());
                 queueDescription.setRequiresSession(true);
-                EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
                 if(!this.shouldCreateEntityForEveryTest())
                 {
                     ClientSessionTests.entityNameCreatedForAllTests = entityName;
@@ -56,10 +56,10 @@ public abstract class ClientSessionTests extends Tests
             {
                 TopicDescription topicDescription = new TopicDescription(this.entityName);
                 topicDescription.setEnablePartitioning(this.isEntityPartitioned());
-                EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
+                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
                 SubscriptionDescription subDescription = new SubscriptionDescription(this.entityName, TestUtils.FIRST_SUBSCRIPTION_NAME);
                 subDescription.setRequiresSession(true);
-                EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
+                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
                 this.receiveEntityPath = subDescription.getPath();
                 if(!this.shouldCreateEntityForEveryTest())
                 {
@@ -96,7 +96,7 @@ public abstract class ClientSessionTests extends Tests
         
         if(this.shouldCreateEntityForEveryTest())
         {
-            EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+            ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
         }
         else
         {
@@ -109,7 +109,7 @@ public abstract class ClientSessionTests extends Tests
     {
         if(ClientSessionTests.entityNameCreatedForAllTests != null)
         {
-            EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), ClientSessionTests.entityNameCreatedForAllTests);
+            ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), ClientSessionTests.entityNameCreatedForAllTests);
         }
     }
     

@@ -1,6 +1,9 @@
 package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
+import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import org.apache.commons.collections4.CollectionUtils;
+import org.asynchttpclient.uri.Uri;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -17,15 +20,23 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
 import java.io.StringWriter;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.time.Duration;
 
 public class QueueDescriptionUtil {
 
-    public static String serialize(QueueDescription queueDescription) throws ParserConfigurationException, TransformerException {
+    static String serialize(QueueDescription queueDescription) throws ServiceBusException {
         // todo: Reuse factory
         DocumentBuilderFactory dbFactory =
                 DocumentBuilderFactory.newInstance();
-        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+        DocumentBuilder dBuilder = null;
+        try {
+            dBuilder = dbFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            throw new ServiceBusException(false, e);
+        }
         Document doc = dBuilder.newDocument();
 
         Element rootElement = doc.createElementNS(ManagementClientConstants.ATOM_NS, "entry");
@@ -78,8 +89,13 @@ public class QueueDescriptionUtil {
                 doc.createElementNS(ManagementClientConstants.SB_NS, "EnableBatchedOperations")
                         .appendChild(doc.createTextNode(Boolean.toString(queueDescription.enableBatchedOperations))).getParentNode());
 
-        // todo: append auth rules
-        // todo: append status
+        if (queueDescription.authorizationRules != null) {
+            qdElement.appendChild(AuthorizationRuleUtil.serializeRules(queueDescription.authorizationRules, doc));
+        }
+
+        qdElement.appendChild(
+                doc.createElementNS(ManagementClientConstants.SB_NS, "Status")
+                        .appendChild(doc.createTextNode(queueDescription.status.name())).getParentNode());
 
         if (queueDescription.forwardTo != null) {
             qdElement.appendChild(
@@ -110,11 +126,16 @@ public class QueueDescriptionUtil {
         }
 
         // Convert dom document to string.
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
-        Transformer transformer = transformerFactory.newTransformer();
-        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
         StringWriter output = new StringWriter();
-        transformer.transform(new DOMSource(doc), new StreamResult(output));
+
+        try {
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+            transformer.transform(new DOMSource(doc), new StreamResult(output));
+        } catch (TransformerException e) {
+            throw new ServiceBusException(false, e);
+        }
         return output.toString();
     }
 
@@ -194,7 +215,7 @@ public class QueueDescriptionUtil {
                                         qd.enableBatchedOperations = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
                                         break;
                                     case "Status":
-                                        //qd.status = (EntityStatus)Enum.Parse(typeof(EntityStatus), element.getFirstChild().getNodeValue());
+                                        qd.status = EntityStatus.valueOf(element.getFirstChild().getNodeValue());
                                         break;
                                     case "AutoDeleteOnIdle":
                                         qd.autoDeleteOnIdle = Duration.parse(element.getFirstChild().getNodeValue());
@@ -218,7 +239,7 @@ public class QueueDescriptionUtil {
                                         }
                                         break;
                                     case "AuthorizationRules":
-                                        //qd.AuthorizationRules = AuthorizationRules.ParseFromXElement(element);
+                                        qd.authorizationRules = AuthorizationRuleUtil.parseAuthRules(element);
                                         break;
                                 }
                             }
@@ -229,5 +250,24 @@ public class QueueDescriptionUtil {
         }
 
         return qd;
+    }
+
+    static void normalizeDescription(QueueDescription queueDescription, URI baseAddress) {
+        if (queueDescription.getForwardTo() != null) {
+            queueDescription.setForwardTo(normalizeForwardToAddress(queueDescription.getForwardTo(), baseAddress));
+        }
+
+        if (queueDescription.getForwardDeadLetteredMessagesTo() != null) {
+            queueDescription.setForwardDeadLetteredMessagesTo(normalizeForwardToAddress(queueDescription.getForwardDeadLetteredMessagesTo(), baseAddress));
+        }
+    }
+
+    private static String normalizeForwardToAddress(String forwardTo, URI baseAddress) {
+        try {
+            URI url = new URI(forwardTo);
+            return forwardTo;
+        } catch (URISyntaxException e) {
+            return baseAddress.resolve(forwardTo).toString();
+        }
     }
 }

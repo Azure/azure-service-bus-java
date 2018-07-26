@@ -1,8 +1,7 @@
 package com.microsoft.azure.servicebus;
 
-import com.microsoft.azure.servicebus.management.EntityManager;
+import com.microsoft.azure.servicebus.management.ManagementClient;
 import com.microsoft.azure.servicebus.management.ManagementException;
-import com.microsoft.azure.servicebus.management.QueueDescription;
 import com.microsoft.azure.servicebus.management.QueueDescription2;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import org.junit.Assert;
@@ -152,7 +151,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
 
         URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
         ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 
         try {
             IMessageSender pSender = ClientFactory.createMessageSenderFromEntityPath(factory, partitionedEntityName);
@@ -197,7 +196,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
             this.factory.endTransactionAsync(transaction, false);
         }
         finally {
-            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, partitionedEntityName);
+            ManagementClient.deleteEntity(namespaceEndpointURI, managementClientSettings, partitionedEntityName);
         }
     }
 
@@ -234,14 +233,14 @@ public class QueueSendReceiveTests extends SendReceiveTests
         String intermediateQueue = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
         QueueDescription2 queueDescription = new QueueDescription2(intermediateQueue);
         queueDescription.setEnablePartitioning(true);
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
         IMessageSender intermediateSender = ClientFactory.createMessageSenderFromEntityPath(factory, intermediateQueue);
         IMessageReceiver intermediateReceiver = ClientFactory.createMessageReceiverFromEntityPath(factory, intermediateQueue, ReceiveMode.PEEKLOCK);
 
         String destination1 = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
         queueDescription = new QueueDescription2(destination1);
         queueDescription.setEnablePartitioning(true);
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
         IMessageSender destination1Sender = ClientFactory.createMessageSenderFromEntityPath(factory, destination1);
         IMessageSender destination1ViaSender = ClientFactory.createTransferMessageSenderFromEntityPathAsync(factory, destination1, intermediateQueue).get();
         IMessageReceiver destination1Receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destination1, ReceiveMode.PEEKLOCK);
@@ -249,7 +248,7 @@ public class QueueSendReceiveTests extends SendReceiveTests
         String destination2 = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
         queueDescription = new QueueDescription2(destination2);
         queueDescription.setEnablePartitioning(true);
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
         IMessageSender destination2ViaSender = ClientFactory.createTransferMessageSenderFromEntityPathAsync(factory, destination2, intermediateQueue).get();
         IMessageReceiver destination2Receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destination2, ReceiveMode.PEEKLOCK);
 
@@ -315,9 +314,9 @@ public class QueueSendReceiveTests extends SendReceiveTests
             destination1Receiver.close();
             destination2Receiver.close();
 
-            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, intermediateQueue);
-            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destination1);
-            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destination2);
+            ManagementClient.deleteEntity(namespaceEndpointURI, managementClientSettings, intermediateQueue);
+            ManagementClient.deleteEntity(namespaceEndpointURI, managementClientSettings, destination1);
+            ManagementClient.deleteEntity(namespaceEndpointURI, managementClientSettings, destination2);
         }
     }
 
@@ -328,11 +327,11 @@ public class QueueSendReceiveTests extends SendReceiveTests
 
         String viaQueue = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
         QueueDescription2 queueDescription = new QueueDescription2(viaQueue);
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 
         String destinationQ = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
         queueDescription = new QueueDescription2(destinationQ);
-        EntityManager.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
 
         IMessageSender destination1ViaSender = ClientFactory.createTransferMessageSenderFromEntityPathAsync(factory, destinationQ, viaQueue).get();
         IMessageReceiver destinationReceiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destinationQ, ReceiveMode.PEEKLOCK);
@@ -366,8 +365,8 @@ public class QueueSendReceiveTests extends SendReceiveTests
             destination1ViaSender.close();
             destinationReceiver.close();
 
-            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, viaQueue);
-            EntityManager.deleteEntity(namespaceEndpointURI, managementClientSettings, destinationQ);
+            ManagementClient.deleteEntity(namespaceEndpointURI, managementClientSettings, viaQueue);
+            ManagementClient.deleteEntity(namespaceEndpointURI, managementClientSettings, destinationQ);
         }
     }
 }
