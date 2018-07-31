@@ -1,61 +1,296 @@
 package com.microsoft.azure.servicebus.management;
 
-import java.time.Duration;
+import com.microsoft.azure.servicebus.IMessage;
 
-public class TopicDescription extends ResourceDescripton{
-    private static final String ATOM_XML_FORMAT = "<entry xmlns=\"http://www.w3.org/2005/Atom\">"
-            + "<content type=\"application/xml\">"
-                 + "<TopicDescription xmlns=\"http://schemas.microsoft.com/netservices/2010/10/servicebus/connect\" xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\">"
-                      + "<MaxSizeInMegabytes>%d</MaxSizeInMegabytes>"
-                      + "<EnablePartitioning>%b</EnablePartitioning>"
-                 + "</TopicDescription>"
-            + "</content>"
-          + "</entry>";
-    
-    private String path;
-    private int maxSizeInMegaBytes;
-    private boolean enablePartitioning;
-    private boolean enableSubscriptionPartitioning;
-    private boolean requiresDuplicateDetection;
-    private boolean enableExpress;
-    private boolean supportsOrdering;
-    private boolean enableFilteringMessagesBeforePublishing;
-    private Duration autoDeleteOnIdle;
-    private Duration duplicateDetectionHistoryTimeWindow;
-    
+import java.time.Duration;
+import java.util.List;
+
+/**
+ * Represents the metadata description of the topic.
+ */
+public class TopicDescription {
+    Duration duplicationDetectionHistoryTimeWindow = Duration.ofMinutes(1);
+    String path;
+    Duration defaultMessageTimeToLive = ManagementClientConstants.MAX_DURATION;
+    Duration autoDeleteOnIdle = ManagementClientConstants.MAX_DURATION;
+    String userMetadata = null;
+    long maxSizeInMB = 1024;
+    boolean requiresDuplicateDetection = false;
+    boolean enableBatchedOperations = true;
+    boolean enablePartitioning = false;
+    boolean supportOrdering = false;
+    EntityStatus status = EntityStatus.Active;
+    List<AuthorizationRule> authorizationRules = null;
+
+    /**
+     * Initializes a new instance of TopicDescription with the specified relative path.
+     * @param path
+     */
     public TopicDescription(String path)
     {
+        this.setPath(path);
+    }
+
+    /**
+     * Gets the path of the topic.
+     */
+    public String getPath()
+    {
+        return this.path;
+    }
+
+    /**
+     * Sets the path of topic.
+     * Max length is 260 chars. Cannot start or end with a slash.
+     * Cannot have restricted characters: '@','?','#','*'
+     */
+    public void setPath(String path)
+    {
+        EntityNameHelper.checkValidTopicName(path);
         this.path = path;
-        this.maxSizeInMegaBytes = 1024;
     }
 
-    @Override
-    public String getPath() {
-        return path;
+    /**
+     * Gets the maximum size of the topic in megabytes, which is the size of memory allocated for the topic.
+     * Default value is 1024.
+     */
+    public long getMaxSizeInMB() {
+        return this.maxSizeInMB;
     }
 
-    public void setPath(String path) {
-        this.path = path;
+    /**
+     * Sets the maximum size of the topic in megabytes, which is the size of memory allocated for the topic.
+     */
+    public void setMaxSizeInMB(long maxSize)
+    {
+        this.maxSizeInMB = maxSize;
     }
 
-    public int getMaxSizeInMegaBytes() {
-        return maxSizeInMegaBytes;
+    /**
+     * This value indicates if the topic requires guard against duplicate messages. If true, duplicate messages
+     * having same {@link IMessage#getMessageId()} and sent to topic within duration of {@link #getDuplicationDetectionHistoryTimeWindow}
+     * will be discarded.
+     */
+    public boolean isRequiresDuplicateDetection() {
+        return requiresDuplicateDetection;
     }
 
-    public void setMaxSizeInMegaBytes(int maxSizeInMegaBytes) {
-        this.maxSizeInMegaBytes = maxSizeInMegaBytes;
+    /**
+     * Set to true if duplicate detection needs to be enabled.
+     * See also - {@link #isRequiresDuplicateDetection()}
+     */
+    public void setRequiresDuplicateDetection(boolean requiresDuplicateDetection) {
+        this.requiresDuplicateDetection = requiresDuplicateDetection;
     }
 
+    /**
+     * The default time to live value for the messages. This is the duration after which the message expires, starting from when
+     * the message is sent to Service Bus.
+     * This is the default value used when {@link IMessage#getTimeToLive()} is not set on a message itself.
+     * Messages older than their TimeToLive value will expire and no longer be retained in the message store.
+     * Subscribers will be unable to receive expired messages.
+     * Default value is {@link ManagementClientConstants#MAX_DURATION}
+     */
+    public Duration getDefaultMessageTimeToLive() {
+        return defaultMessageTimeToLive;
+    }
+
+    /**
+     * Sets the default message time to live value.
+     * Value cannot be lower than 1 second.
+     * See {@link #getDefaultMessageTimeToLive()}
+     */
+    public void setDefaultMessageTimeToLive(Duration defaultMessageTimeToLive) {
+        if (defaultMessageTimeToLive != null &&
+                (defaultMessageTimeToLive.compareTo(ManagementClientConstants.MIN_ALLOWED_TTL) < 0 ||
+                        defaultMessageTimeToLive.compareTo(ManagementClientConstants.MAX_ALLOWED_TTL) > 0))
+        {
+            throw new IllegalArgumentException(
+                    String.format("The value must be between %s and %s.",
+                            ManagementClientConstants.MAX_ALLOWED_TTL,
+                            ManagementClientConstants.MIN_ALLOWED_TTL));
+        }
+
+        this.defaultMessageTimeToLive = defaultMessageTimeToLive;
+    }
+
+    /**
+     * The idle interval after which the topic is automatically deleted.
+     * Default value is {@link ManagementClientConstants#MAX_DURATION}
+     */
+    public Duration getAutoDeleteOnIdle() {
+        return autoDeleteOnIdle;
+    }
+
+    /**
+     * The idle interval after which the topic is automatically deleted.
+     * The minimum duration is 5 minutes.
+     */
+    public void setAutoDeleteOnIdle(Duration autoDeleteOnIdle) {
+        if (autoDeleteOnIdle != null &&
+                autoDeleteOnIdle.compareTo(ManagementClientConstants.MIN_ALLOWED_AUTODELETE_DURATION) < 0)
+        {
+            throw new IllegalArgumentException(
+                    String.format("The value must be greater than %s.",
+                            ManagementClientConstants.MIN_ALLOWED_AUTODELETE_DURATION));
+        }
+
+        this.autoDeleteOnIdle = autoDeleteOnIdle;
+    }
+
+    /**
+     * The duration of duplicate detection history that is maintained by the service.
+     * The default value is 1 minute.
+     */
+    public Duration getDuplicationDetectionHistoryTimeWindow() {
+        return duplicationDetectionHistoryTimeWindow;
+    }
+
+    /**
+     * The duration of duplicate detection history that is maintained by the service.
+     * Max value is 1 day and minimum is 20 seconds.
+     */
+    public void setDuplicationDetectionHistoryTimeWindow(Duration duplicationDetectionHistoryTimeWindow) {
+        if (duplicationDetectionHistoryTimeWindow != null &&
+                (duplicationDetectionHistoryTimeWindow.compareTo(ManagementClientConstants.MIN_DUPLICATE_HISTORY_DURATION) < 0 ||
+                        duplicationDetectionHistoryTimeWindow.compareTo(ManagementClientConstants.MAX_DUPLICATE_HISTORY_DURATION) > 0))
+        {
+            throw new IllegalArgumentException(
+                    String.format("The value must be between %s and %s.",
+                            ManagementClientConstants.MIN_DUPLICATE_HISTORY_DURATION,
+                            ManagementClientConstants.MAX_DUPLICATE_HISTORY_DURATION));
+        }
+
+        this.duplicationDetectionHistoryTimeWindow = duplicationDetectionHistoryTimeWindow;
+    }
+
+    /**
+     * Indicates whether server-side batched operations are enabled.
+     * Defaults to true.
+     */
+    public boolean isEnableBatchedOperations() {
+        return enableBatchedOperations;
+    }
+
+    /**
+     * Indicates whether server-side batched operations are enabled.
+     */
+    public void setEnableBatchedOperations(boolean enableBatchedOperations) {
+        this.enableBatchedOperations = enableBatchedOperations;
+    }
+
+    /**
+     * The {@link AuthorizationRule} on the topic to control user access at entity level.
+     */
+    public List<AuthorizationRule> getAuthorizationRules() {
+        return authorizationRules;
+    }
+
+    /**
+     * The {@link AuthorizationRule} on the topic to control user access at entity level.
+     */
+    public void setAuthorizationRules(List<AuthorizationRule> authorizationRules) {
+        this.authorizationRules = authorizationRules;
+    }
+
+    /**
+     * The current status of the topic (Enabled / Disabled).
+     * The default value is Enabled.
+     * When an entity is disabled, that entity cannot send or receive messages.
+     */
+    public EntityStatus getEntityStatus() {
+        return this.status;
+    }
+
+    /**
+     * Sets the status of the topic (Enabled / Disabled).
+     * When an entity is disabled, that entity cannot send or receive messages.
+     */
+    public void setEntityStatus(EntityStatus stats) {
+        this.status = status;
+    }
+
+    /**
+     * Indicates whether the topic is to be partitioned across multiple message brokers.
+     * Defaults to false
+     */
     public boolean isEnablePartitioning() {
         return enablePartitioning;
     }
 
+    /**
+     * Indicates whether the topic is to be partitioned across multiple message brokers.
+     */
     public void setEnablePartitioning(boolean enablePartitioning) {
         this.enablePartitioning = enablePartitioning;
     }
 
+    /**
+     * Defines whether ordering needs to be maintained. If true, messages sent to topic will be
+     * forwarded to the subscription in order.
+     * Defaults to false
+     */
+    public boolean isSupportOrdering() {
+        return supportOrdering;
+    }
+
+    /**
+     * Defines whether ordering needs to be maintained. If true, messages sent to topic will be
+     * forwarded to the subscription in order.
+     */
+    public void setSupportOrdering(boolean supportOrdering) {
+        this.supportOrdering = supportOrdering;
+    }
+
+    /**
+     * Custom metdata that user can associate with the description.
+     */
+    public String getUserMetadata() {
+        return userMetadata;
+    }
+
+    /**
+     * Custom metdata that user can associate with the description.
+     * Cannot be null. Max length is 1024 chars
+     */
+    public void setUserMetadata(String userMetadata) {
+        if (userMetadata == null) {
+            throw new IllegalArgumentException("Value cannot be null");
+        }
+
+        if (userMetadata.length() > ManagementClientConstants.MAX_USERMETADATA_LENGTH) {
+            throw new IllegalArgumentException("Length cannot cross " + ManagementClientConstants.MAX_USERMETADATA_LENGTH + " characters");
+        }
+
+        this.userMetadata = userMetadata;
+    }
+
     @Override
-    String getAtomXml() {
-        return String.format(ATOM_XML_FORMAT, this.maxSizeInMegaBytes, this.enablePartitioning);
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+
+        if (!(o instanceof TopicDescription)) {
+            return false;
+        }
+
+        TopicDescription other = (TopicDescription) o;
+        if (this.path.equalsIgnoreCase(other.path)
+                && this.autoDeleteOnIdle.equals(other.autoDeleteOnIdle)
+                && this.defaultMessageTimeToLive.equals(other.defaultMessageTimeToLive)
+                && (!this.requiresDuplicateDetection || this.duplicationDetectionHistoryTimeWindow.equals(other.duplicationDetectionHistoryTimeWindow))
+                && this.enableBatchedOperations == other.enableBatchedOperations
+                && this.enablePartitioning == other.enablePartitioning
+                && this.maxSizeInMB == other.maxSizeInMB
+                && this.requiresDuplicateDetection == other.requiresDuplicateDetection
+                && this.supportOrdering == other.supportOrdering
+                && this.status.equals(other.status)
+                && ((this.userMetadata == null && other.userMetadata == null) || this.userMetadata.equals(other.userMetadata))
+                && AuthorizationRuleUtil.equals(this.authorizationRules, other.authorizationRules)) {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -24,9 +24,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-class QueueDescriptionUtil {
+class SubscriptionDescriptionUtil {
 
-    static String serialize(QueueDescription queueDescription) throws ServiceBusException {
+    static String serialize(SubscriptionDescription subscriptionDescription) throws ServiceBusException {
         // todo: Reuse factory
         DocumentBuilderFactory dbFactory =
                 DocumentBuilderFactory.newInstance();
@@ -45,83 +45,65 @@ class QueueDescriptionUtil {
         rootElement.appendChild(contentElement);
         contentElement.setAttribute("type", "application/xml");
 
-        Element qdElement = doc.createElementNS(ManagementClientConstants.SB_NS, "QueueDescription");
-        contentElement.appendChild(qdElement);
+        Element sdElement = doc.createElementNS(ManagementClientConstants.SB_NS, "SubscriptionDescription");
+        contentElement.appendChild(sdElement);
 
-        qdElement.appendChild(
+        sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "LockDuration")
-                        .appendChild(doc.createTextNode(queueDescription.lockDuration.toString())).getParentNode());
+                        .appendChild(doc.createTextNode(subscriptionDescription.lockDuration.toString())).getParentNode());
 
-        qdElement.appendChild(
-                doc.createElementNS(ManagementClientConstants.SB_NS, "MaxSizeInMegabytes")
-                .appendChild(doc.createTextNode(Long.toString(queueDescription.maxSizeInMB))).getParentNode());
-
-        qdElement.appendChild(
-                doc.createElementNS(ManagementClientConstants.SB_NS, "RequiresDuplicateDetection")
-                        .appendChild(doc.createTextNode(Boolean.toString(queueDescription.requiresDuplicateDetection))).getParentNode());
-
-        qdElement.appendChild(
+        sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "RequiresSession")
-                        .appendChild(doc.createTextNode(Boolean.toString(queueDescription.requiresSession))).getParentNode());
+                        .appendChild(doc.createTextNode(Boolean.toString(subscriptionDescription.requiresSession))).getParentNode());
 
-        if (queueDescription.defaultMessageTimeToLive.compareTo(ManagementClientConstants.MAX_DURATION) < 0) {
-            qdElement.appendChild(
+        if (subscriptionDescription.defaultMessageTimeToLive.compareTo(ManagementClientConstants.MAX_DURATION) < 0) {
+            sdElement.appendChild(
                     doc.createElementNS(ManagementClientConstants.SB_NS, "DefaultMessageTimeToLive")
-                            .appendChild(doc.createTextNode(queueDescription.defaultMessageTimeToLive.toString())).getParentNode());
+                            .appendChild(doc.createTextNode(subscriptionDescription.defaultMessageTimeToLive.toString())).getParentNode());
         }
 
-        qdElement.appendChild(
+        sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "DeadLetteringOnMessageExpiration")
-                        .appendChild(doc.createTextNode(Boolean.toString(queueDescription.enableDeadLetteringOnMessageExpiration))).getParentNode());
+                        .appendChild(doc.createTextNode(Boolean.toString(subscriptionDescription.enableDeadLetteringOnMessageExpiration))).getParentNode());
 
-        if (queueDescription.requiresDuplicateDetection && queueDescription.duplicationDetectionHistoryTimeWindow.compareTo(Duration.ZERO) > 0) {
-            qdElement.appendChild(
-                    doc.createElementNS(ManagementClientConstants.SB_NS, "DuplicateDetectionHistoryTimeWindow")
-                            .appendChild(doc.createTextNode(queueDescription.duplicationDetectionHistoryTimeWindow.toString())).getParentNode());
-        }
+        sdElement.appendChild(
+                doc.createElementNS(ManagementClientConstants.SB_NS, "DeadLetteringOnFilterEvaluationExceptions")
+                        .appendChild(doc.createTextNode(Boolean.toString(subscriptionDescription.enableDeadLetteringOnFilterEvaluationException))).getParentNode());
 
-        qdElement.appendChild(
+        sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "MaxDeliveryCount")
-                        .appendChild(doc.createTextNode(Integer.toString(queueDescription.maxDeliveryCount))).getParentNode());
+                        .appendChild(doc.createTextNode(Integer.toString(subscriptionDescription.maxDeliveryCount))).getParentNode());
 
-        qdElement.appendChild(
+        sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "EnableBatchedOperations")
-                        .appendChild(doc.createTextNode(Boolean.toString(queueDescription.enableBatchedOperations))).getParentNode());
+                        .appendChild(doc.createTextNode(Boolean.toString(subscriptionDescription.enableBatchedOperations))).getParentNode());
 
-        if (queueDescription.authorizationRules != null) {
-            qdElement.appendChild(AuthorizationRuleUtil.serializeRules(queueDescription.authorizationRules, doc));
-        }
-
-        qdElement.appendChild(
+        sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "Status")
-                        .appendChild(doc.createTextNode(queueDescription.status.name())).getParentNode());
+                        .appendChild(doc.createTextNode(subscriptionDescription.status.name())).getParentNode());
 
-        if (queueDescription.forwardTo != null) {
-            qdElement.appendChild(
+        if (subscriptionDescription.forwardTo != null) {
+            sdElement.appendChild(
                     doc.createElementNS(ManagementClientConstants.SB_NS, "ForwardTo")
-                            .appendChild(doc.createTextNode(queueDescription.forwardTo)).getParentNode());
+                            .appendChild(doc.createTextNode(subscriptionDescription.forwardTo)).getParentNode());
         }
 
-        if (queueDescription.userMetadata != null) {
-            qdElement.appendChild(
+        if (subscriptionDescription.userMetadata != null) {
+            sdElement.appendChild(
                     doc.createElementNS(ManagementClientConstants.SB_NS, "UserMetadata")
-                            .appendChild(doc.createTextNode(queueDescription.userMetadata)).getParentNode());
+                            .appendChild(doc.createTextNode(subscriptionDescription.userMetadata)).getParentNode());
         }
 
-        if (queueDescription.autoDeleteOnIdle.compareTo(ManagementClientConstants.MAX_DURATION) < 0) {
-            qdElement.appendChild(
+        if (subscriptionDescription.autoDeleteOnIdle.compareTo(ManagementClientConstants.MAX_DURATION) < 0) {
+            sdElement.appendChild(
                     doc.createElementNS(ManagementClientConstants.SB_NS, "AutoDeleteOnIdle")
-                            .appendChild(doc.createTextNode(queueDescription.autoDeleteOnIdle.toString())).getParentNode());
+                            .appendChild(doc.createTextNode(subscriptionDescription.autoDeleteOnIdle.toString())).getParentNode());
         }
 
-        qdElement.appendChild(
-                doc.createElementNS(ManagementClientConstants.SB_NS, "EnablePartitioning")
-                        .appendChild(doc.createTextNode(Boolean.toString(queueDescription.enablePartitioning))).getParentNode());
-
-        if (queueDescription.forwardDeadLetteredMessagesTo != null) {
-            qdElement.appendChild(
+        if (subscriptionDescription.forwardDeadLetteredMessagesTo != null) {
+            sdElement.appendChild(
                     doc.createElementNS(ManagementClientConstants.SB_NS, "ForwardDeadLetteredMessagesTo")
-                            .appendChild(doc.createTextNode(queueDescription.forwardDeadLetteredMessagesTo)).getParentNode());
+                            .appendChild(doc.createTextNode(subscriptionDescription.forwardDeadLetteredMessagesTo)).getParentNode());
         }
 
         // Convert dom document to string.
@@ -138,8 +120,8 @@ class QueueDescriptionUtil {
         return output.toString();
     }
 
-    static List<QueueDescription> parseCollectionFromContent(String xml) {
-        ArrayList<QueueDescription> queueList = new ArrayList<>();
+    static List<SubscriptionDescription> parseCollectionFromContent(String topicName, String xml) {
+        ArrayList<SubscriptionDescription> subList = new ArrayList<>();
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
@@ -150,7 +132,7 @@ class QueueDescriptionUtil {
             for (int i = 0; i < entries.getLength(); i++) {
                 Node node = entries.item(i);
                 if (node.getNodeName().equals("entry")) {
-                    queueList.add(parseFromEntry(node));
+                    subList.add(parseFromEntry(topicName, node));
                 }
             }
         }
@@ -159,10 +141,10 @@ class QueueDescriptionUtil {
             // TODO: Log
         }
 
-        return queueList;
+        return subList;
     }
 
-    static QueueDescription parseFromContent(String xml) throws MessagingEntityNotFoundException {
+    static SubscriptionDescription parseFromContent(String topicName, String xml) throws MessagingEntityNotFoundException {
         // TODO: Reuse dbf
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
@@ -171,7 +153,7 @@ class QueueDescriptionUtil {
             Element doc = dom.getDocumentElement();
             doc.normalize();
             if (doc.getTagName() == "entry")
-            return parseFromEntry(doc);
+                return parseFromEntry(topicName, doc);
         }
         catch (Exception ex) {
             System.out.println(ex.getMessage());
@@ -188,8 +170,8 @@ class QueueDescriptionUtil {
         throw new MessagingEntityNotFoundException("Queue was not found");
     }
 
-    private static QueueDescription parseFromEntry(Node xEntry) {
-        QueueDescription qd = null;
+    private static SubscriptionDescription parseFromEntry(String topicName, Node xEntry) {
+        SubscriptionDescription sd = null;
         NodeList nList = xEntry.getChildNodes();
         for (int i = 0; i < nList.getLength(); i++) {
             Node node = nList.item(i);
@@ -198,7 +180,7 @@ class QueueDescriptionUtil {
                 switch(element.getTagName())
                 {
                     case "title":
-                        qd = new QueueDescription(element.getFirstChild().getNodeValue());
+                        sd = new SubscriptionDescription(topicName, element.getFirstChild().getNodeValue());
                         break;
                     case "content":
                         NodeList qdNodes = element.getFirstChild().getChildNodes();
@@ -209,60 +191,48 @@ class QueueDescriptionUtil {
                                 element = (Element) node;
                                 switch (element.getTagName())
                                 {
-                                    case "MaxSizeInMegabytes":
-                                        qd.maxSizeInMB = Long.parseLong(element.getFirstChild().getNodeValue());
-                                        break;
-                                    case "RequiresDuplicateDetection":
-                                        qd.requiresDuplicateDetection = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
-                                        break;
                                     case "RequiresSession":
-                                        qd.requiresSession = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
+                                        sd.requiresSession = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
                                         break;
                                     case "DeadLetteringOnMessageExpiration":
-                                        qd.enableDeadLetteringOnMessageExpiration = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
+                                        sd.enableDeadLetteringOnMessageExpiration = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
                                         break;
-                                    case "DuplicateDetectionHistoryTimeWindow":
-                                        qd.duplicationDetectionHistoryTimeWindow = Duration.parse(element.getFirstChild().getNodeValue());
+                                    case "DeadLetteringOnFilterEvaluationExceptions":
+                                        sd.enableDeadLetteringOnFilterEvaluationException = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
                                         break;
                                     case "LockDuration":
-                                        qd.lockDuration = Duration.parse(element.getFirstChild().getNodeValue());
+                                        sd.lockDuration = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "DefaultMessageTimeToLive":
                                         // TODO: Convert .net's MaxTimespan to Duration.Indefinite
-                                        qd.defaultMessageTimeToLive = Duration.parse(element.getFirstChild().getNodeValue());
+                                        sd.defaultMessageTimeToLive = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "MaxDeliveryCount":
-                                        qd.maxDeliveryCount = Integer.parseInt(element.getFirstChild().getNodeValue());
+                                        sd.maxDeliveryCount = Integer.parseInt(element.getFirstChild().getNodeValue());
                                         break;
                                     case "EnableBatchedOperations":
-                                        qd.enableBatchedOperations = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
+                                        sd.enableBatchedOperations = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
                                         break;
                                     case "Status":
-                                        qd.status = EntityStatus.valueOf(element.getFirstChild().getNodeValue());
+                                        sd.status = EntityStatus.valueOf(element.getFirstChild().getNodeValue());
                                         break;
                                     case "AutoDeleteOnIdle":
-                                        qd.autoDeleteOnIdle = Duration.parse(element.getFirstChild().getNodeValue());
-                                        break;
-                                    case "EnablePartitioning":
-                                        qd.enablePartitioning = Boolean.parseBoolean(element.getFirstChild().getNodeValue());
+                                        sd.autoDeleteOnIdle = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "UserMetadata":
-                                        qd.userMetadata = element.getFirstChild().getNodeValue();
+                                        sd.userMetadata = element.getFirstChild().getNodeValue();
                                         break;
                                     case "ForwardTo":
                                         Node fwd = element.getFirstChild();
                                         if (fwd != null) {
-                                            qd.forwardTo = fwd.getNodeValue();
+                                            sd.forwardTo = fwd.getNodeValue();
                                         }
                                         break;
                                     case "ForwardDeadLetteredMessagesTo":
                                         Node fwdDlq = element.getFirstChild();
                                         if (fwdDlq != null) {
-                                            qd.forwardDeadLetteredMessagesTo = fwdDlq.getNodeValue();
+                                            sd.forwardDeadLetteredMessagesTo = fwdDlq.getNodeValue();
                                         }
-                                        break;
-                                    case "AuthorizationRules":
-                                        qd.authorizationRules = AuthorizationRuleUtil.parseAuthRules(element);
                                         break;
                                 }
                             }
@@ -272,16 +242,16 @@ class QueueDescriptionUtil {
             }
         }
 
-        return qd;
+        return sd;
     }
 
-    static void normalizeDescription(QueueDescription queueDescription, URI baseAddress) {
-        if (queueDescription.getForwardTo() != null) {
-            queueDescription.setForwardTo(normalizeForwardToAddress(queueDescription.getForwardTo(), baseAddress));
+    static void normalizeDescription(SubscriptionDescription subscriptionDescription, URI baseAddress) {
+        if (subscriptionDescription.getForwardTo() != null) {
+            subscriptionDescription.setForwardTo(normalizeForwardToAddress(subscriptionDescription.getForwardTo(), baseAddress));
         }
 
-        if (queueDescription.getForwardDeadLetteredMessagesTo() != null) {
-            queueDescription.setForwardDeadLetteredMessagesTo(normalizeForwardToAddress(queueDescription.getForwardDeadLetteredMessagesTo(), baseAddress));
+        if (subscriptionDescription.getForwardDeadLetteredMessagesTo() != null) {
+            subscriptionDescription.setForwardDeadLetteredMessagesTo(normalizeForwardToAddress(subscriptionDescription.getForwardDeadLetteredMessagesTo(), baseAddress));
         }
     }
 
