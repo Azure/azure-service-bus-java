@@ -26,13 +26,13 @@ public abstract class SendReceiveTests extends Tests {
 	    SendReceiveTests.entityNameCreatedForAllTests = null;
 	    SendReceiveTests.receiveEntityPathForAllTest = null;
     }
-	
+
 	@Before
 	public void setup() throws InterruptedException, ExecutionException, ServiceBusException, ManagementException
 	{
 	    URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
         ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        
+        /*
 	    if(this.shouldCreateEntityForEveryTest() || SendReceiveTests.entityNameCreatedForAllTests == null)
 	    {
 	         // Create entity
@@ -69,6 +69,8 @@ public abstract class SendReceiveTests extends Tests {
 	        this.entityName = SendReceiveTests.entityNameCreatedForAllTests;
             this.receiveEntityPath = SendReceiveTests.receiveEntityPathForAllTest;
 	    }
+	    */
+        // todo ^
 	    
 	    this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceEndpointURI, TestUtils.getClientSettings());
         this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
@@ -89,7 +91,8 @@ public abstract class SendReceiveTests extends Tests {
 		
 		if(this.shouldCreateEntityForEveryTest())
         {
-		    ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+        	// todo
+		    //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
         }
 	}
 	
@@ -98,7 +101,8 @@ public abstract class SendReceiveTests extends Tests {
 	{
 	    if(SendReceiveTests.entityNameCreatedForAllTests != null)
 	    {
-	        ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
+	    	// todo
+	        //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
 	    }
 	}
 

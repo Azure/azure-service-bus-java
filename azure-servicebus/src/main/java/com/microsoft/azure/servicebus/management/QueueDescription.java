@@ -3,6 +3,7 @@ package com.microsoft.azure.servicebus.management;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
 
 public class QueueDescription {
@@ -26,7 +27,7 @@ public class QueueDescription {
 
     public QueueDescription(String path)
     {
-        this.path = path;
+        this.setPath(path);
     }
 
     public String getPath()
@@ -36,7 +37,7 @@ public class QueueDescription {
 
     public void setPath(String path)
     {
-        //TODO: EntityNameHelper.CheckValidQueueName
+        EntityNameHelper.checkValidQueueName(path);
         this.path = path;
     }
 
@@ -262,9 +263,7 @@ public class QueueDescription {
                 && this.requiresSession == other.requiresSession
                 && this.status.equals(other.status)
                 && ((this.userMetadata == null && other.userMetadata == null) || this.userMetadata.equals(other.userMetadata))
-                && (this.authorizationRules != null && other.authorizationRules != null
-                    || this.authorizationRules == null && other.authorizationRules == null)
-                && this.authorizationRules == null || CollectionUtils.isEqualCollection(this.authorizationRules, other.authorizationRules)) {
+                && AuthorizationRuleUtil.equals(this.authorizationRules, other.authorizationRules)) {
             return true;
         }
 

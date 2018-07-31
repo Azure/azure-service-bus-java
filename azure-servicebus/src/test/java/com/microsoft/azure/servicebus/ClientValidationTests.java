@@ -32,7 +32,8 @@ public class ClientValidationTests
 		topicPath = TestUtils.randomizeEntityName(ENTITY_NAME_PREFIX);
 		URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
 		ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-		
+		//todo
+		/*
 		QueueDescription2 queueDescription = new QueueDescription2(queuePath);
 		queueDescription.setEnablePartitioning(false);
 		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
@@ -52,8 +53,10 @@ public class ClientValidationTests
         subDescription2.setRequiresSession(true);
 		sessionfulSubscriptionPath = subDescription2.getPath();
         ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription2);
+        */
     }
-	
+    //todo
+	/*
 	@AfterClass
 	public static void deleteEntities() throws ManagementException
 	{
@@ -61,7 +64,7 @@ public class ClientValidationTests
 		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), sessionfulQueuePath);
 		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), topicPath);
 	}
-	
+	*/
 	@Test
 	public void testTopicClientCreationToQueue() throws InterruptedException, ServiceBusException
 	{				

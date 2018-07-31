@@ -20,6 +20,7 @@ public abstract class ClientTests extends Tests{
     private String receiveEntityPath;
     protected IMessageSender sendClient;
     protected IMessageAndSessionPump receiveClient;
+    protected ManagementClient managementClient;
     
     @BeforeClass
     public static void init()
@@ -33,7 +34,8 @@ public abstract class ClientTests extends Tests{
     {
         URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
         ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        
+        this.managementClient = new ManagementClient(namespaceEndpointURI, managementClientSettings);
+
         if(this.shouldCreateEntityForEveryTest() || ClientTests.entityNameCreatedForAllTests == null)
         {
              // Create entity
@@ -42,9 +44,9 @@ public abstract class ClientTests extends Tests{
             if(this.isEntityQueue())
             {
                 this.receiveEntityPath = this.entityName;
-                QueueDescription2 queueDescription = new QueueDescription2(this.entityName);
+                QueueDescription queueDescription = new QueueDescription(this.entityName);
                 queueDescription.setEnablePartitioning(this.isEntityPartitioned());
-                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+                this.managementClient.createQueueAsync(queueDescription);
                 if(!this.shouldCreateEntityForEveryTest())
                 {
                     ClientTests.entityNameCreatedForAllTests = entityName;
@@ -53,7 +55,8 @@ public abstract class ClientTests extends Tests{
             }
             else
             {
-                TopicDescription topicDescription = new TopicDescription(this.entityName);
+                // todo
+                /*TopicDescription topicDescription = new TopicDescription(this.entityName);
                 topicDescription.setEnablePartitioning(this.isEntityPartitioned());
                 ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
                 SubscriptionDescription subDescription = new SubscriptionDescription(this.entityName, TestUtils.FIRST_SUBSCRIPTION_NAME);
@@ -63,7 +66,7 @@ public abstract class ClientTests extends Tests{
                 {
                     ClientTests.entityNameCreatedForAllTests = entityName;
                     ClientTests.receiveEntityPathForAllTest = subDescription.getPath();
-                }
+                }*/
             }
         }
         else
@@ -94,7 +97,8 @@ public abstract class ClientTests extends Tests{
         
         if(this.shouldCreateEntityForEveryTest())
         {
-            ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+            // todo
+            //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
         }
         else
         {
@@ -107,7 +111,8 @@ public abstract class ClientTests extends Tests{
     {
         if(ClientTests.entityNameCreatedForAllTests != null)
         {
-            ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), ClientTests.entityNameCreatedForAllTests);
+            // todo
+            //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), ClientTests.entityNameCreatedForAllTests);
         }
     }
     

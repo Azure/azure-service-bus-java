@@ -2,8 +2,6 @@ package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
-import org.apache.commons.collections4.CollectionUtils;
-import org.asynchttpclient.uri.Uri;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -22,8 +20,9 @@ import java.io.ByteArrayInputStream;
 import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public class QueueDescriptionUtil {
 
@@ -137,6 +136,30 @@ public class QueueDescriptionUtil {
             throw new ServiceBusException(false, e);
         }
         return output.toString();
+    }
+
+    static List<QueueDescription> parseCollectionFromContent(String xml) {
+        ArrayList<QueueDescription> queueList = new ArrayList<>();
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        try {
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document dom = db.parse(new ByteArrayInputStream(xml.getBytes("utf-8")));
+            Element doc = dom.getDocumentElement();
+            doc.normalize();
+            NodeList entries = doc.getChildNodes();
+            for (int i = 0; i < entries.getLength(); i++) {
+                Node node = entries.item(i);
+                if (node.getNodeName().equals("entry")) {
+                    queueList.add(parseFromEntry(node));
+                }
+            }
+        }
+        catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            // TODO: Log
+        }
+
+        return queueList;
     }
 
     static QueueDescription parseFromContent(String xml) throws MessagingEntityNotFoundException {

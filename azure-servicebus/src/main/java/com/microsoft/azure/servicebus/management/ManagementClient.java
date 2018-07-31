@@ -1,59 +1,52 @@
 package com.microsoft.azure.servicebus.management;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
-import java.util.Dictionary;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import javax.net.ssl.HttpsURLConnection;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
-
 import com.microsoft.azure.servicebus.ClientSettings;
 import com.microsoft.azure.servicebus.primitives.*;
 import com.microsoft.azure.servicebus.security.SecurityToken;
 import com.microsoft.azure.servicebus.security.TokenProvider;
 import org.asynchttpclient.*;
 import org.asynchttpclient.util.HttpConstants;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static org.asynchttpclient.Dsl.asyncHttpClient;
+import static org.asynchttpclient.Dsl.trace;
 
 public class ManagementClient {
     private static final int ONE_BOX_HTTPS_PORT = 4446;
     private static final String API_VERSION_QUERY = "api-version=2017-04";
-    private static final String PUT_METHOD = "PUT";
-    private static final String DELETE_METHOD = "DELETE";
     private static final String USER_AGENT_HEADER_NAME = "User-Agent";
     private static final String AUTHORIZATION_HEADER_NAME = "Authorization";
     private static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     private static final String CONTENT_TYPE = "application/atom+xml";
     private static final Duration CONNECTION_TIMEOUT = Duration.ofMinutes(1);
-    private static final Duration READ_TIMEOUT = Duration.ofMinutes(2);
     private static final String USER_AGENT = String.format("%s/%s(%s)", ClientConstants.PRODUCT_NAME, ClientConstants.CURRENT_JAVACLIENT_VERSION, ClientConstants.PLATFORM_INFO);
 
     private ClientSettings clientSettings;
     private URI namespaceEndpointURI;
     private AsyncHttpClient asyncHttpClient;
 
-    public ManagementClient(URI namespaceEndpointURI, ClientSettings clientSettings)
-    {
+    public ManagementClient(URI namespaceEndpointURI, ClientSettings clientSettings) {
         this.namespaceEndpointURI = namespaceEndpointURI;
         this.clientSettings = clientSettings;
         DefaultAsyncHttpClientConfig.Builder clientBuilder = Dsl.config()
-                .setConnectTimeout((int)this.clientSettings.getOperationTimeout().toMillis())
+                .setConnectTimeout((int)CONNECTION_TIMEOUT.toMillis())
                 .setRequestTimeout((int)this.clientSettings.getOperationTimeout().toMillis());
         this.asyncHttpClient = asyncHttpClient(clientBuilder);
     }
@@ -63,6 +56,8 @@ public class ManagementClient {
     }
 
     public CompletableFuture<QueueDescription> getQueueAsync(String path) {
+        EntityNameHelper.checkValidQueueName(path);
+
         CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
         CompletableFuture<QueueDescription> qdFuture = new CompletableFuture<>();
         contentFuture.handleAsync((content, ex) -> {
@@ -74,6 +69,33 @@ public class ManagementClient {
                 } catch (MessagingEntityNotFoundException e) {
                     qdFuture.completeExceptionally(e);
                 }
+            }
+            return null;
+        });
+
+        return qdFuture;
+    }
+
+    public CompletableFuture<List<QueueDescription>> getQueuesAsync() {
+        return getQueuesAsync(100, 0);
+    }
+
+    public CompletableFuture<List<QueueDescription>> getQueuesAsync(int count, int skip) {
+        if (count > 100 || count < 1) {
+            throw new IllegalArgumentException("Count should be between 1 and 100");
+        }
+
+        if (skip < 0) {
+            throw new IllegalArgumentException("Skip cannot be negative");
+        }
+
+        CompletableFuture<String> contentFuture = getEntityAsync("$Resources/queues", String.format("$skip=%d&$top=%d", skip, count), false);
+        CompletableFuture<List<QueueDescription>> qdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                qdFuture.completeExceptionally(ex);
+            } else {
+                qdFuture.complete(QueueDescriptionUtil.parseCollectionFromContent(content));
             }
             return null;
         });
@@ -99,7 +121,19 @@ public class ManagementClient {
         return sendManagementHttpRequestAsync(HttpConstants.Methods.GET, entityURL, null, null);
     }
 
+    public CompletableFuture<QueueDescription> createQueueAsync(String queuePath) {
+        return this.createQueueAsync(new QueueDescription(queuePath));
+    }
+
     public CompletableFuture<QueueDescription> createQueueAsync(QueueDescription queueDescription) {
+        return putQueueAsync(queueDescription, false);
+    }
+
+    public CompletableFuture<QueueDescription> updateQueueAsync(QueueDescription queueDescription) {
+        return putQueueAsync(queueDescription, true);
+    }
+
+    private CompletableFuture<QueueDescription> putQueueAsync(QueueDescription queueDescription, boolean isUpdate) {
         if (queueDescription == null) {
             throw new IllegalArgumentException("queueDescription passed cannot be null");
         }
@@ -115,20 +149,20 @@ public class ManagementClient {
         }
 
         CompletableFuture<QueueDescription> responseFuture = new CompletableFuture<>();
-        putEntityAsync(queueDescription.path, atomRequest, false, queueDescription.getForwardTo(), queueDescription.getForwardDeadLetteredMessagesTo())
-            .handleAsync((content, ex) -> {
-                if (ex != null) {
-                    responseFuture.completeExceptionally(ex);
-                } else {
-                    try {
-                        responseFuture.complete(QueueDescriptionUtil.parseFromContent(content));
-                    } catch (MessagingEntityNotFoundException e) {
-                        responseFuture.completeExceptionally(e);
+        putEntityAsync(queueDescription.path, atomRequest, isUpdate, queueDescription.getForwardTo(), queueDescription.getForwardDeadLetteredMessagesTo())
+                .handleAsync((content, ex) -> {
+                    if (ex != null) {
+                        responseFuture.completeExceptionally(ex);
+                    } else {
+                        try {
+                            responseFuture.complete(QueueDescriptionUtil.parseFromContent(content));
+                        } catch (MessagingEntityNotFoundException e) {
+                            responseFuture.completeExceptionally(e);
+                        }
                     }
-                }
 
-                return null;
-        });
+                    return null;
+                });
 
         return responseFuture;
     }
@@ -173,44 +207,47 @@ public class ManagementClient {
         return sendManagementHttpRequestAsync(HttpConstants.Methods.PUT, entityURL, requestBody, additionalHeaders);
     }
 
-    public static void createEntity(URI namespaceEndpointURI, ClientSettings clientSettings, ResourceDescripton resourceDescription) throws ManagementException
-    {
-        try
-        {
-            URL entityURL = getManagementURL(namespaceEndpointURI, resourceDescription.getPath(), API_VERSION_QUERY);
-            String securityToken = getSecurityToken(clientSettings.getTokenProvider(), entityURL);
-            sendManagementHttpRequest(PUT_METHOD, entityURL, securityToken, resourceDescription.getAtomXml());
-        }
-        catch(ManagementException me)
-        {
-            throw me;
-        }
-        catch(Exception e)
-        {
-            throw new ManagementException("EntityCreation failed.", e);
-        }
+    public CompletableFuture<Boolean> queueExistsAsync(String path) {
+        EntityNameHelper.checkValidQueueName(path);
+
+        CompletableFuture<Boolean> existsFuture = new CompletableFuture<>();
+        this.getQueueAsync(path).handleAsync((qd, ex) -> {
+            if (ex != null) {
+                if (ex instanceof MessagingEntityNotFoundException) {
+                    existsFuture.complete(Boolean.FALSE);
+                    return false;
+                }
+
+                existsFuture.completeExceptionally(ex);
+                return false;
+            }
+
+            existsFuture.complete(Boolean.TRUE);
+            return true;
+        });
+
+        return existsFuture;
     }
 
-    public static void deleteEntity(URI namespaceEndpointURI, ClientSettings clientSettings, String entityPath) throws ManagementException
-    {
-        try
-        {
-            URL entityURL = getManagementURL(namespaceEndpointURI, entityPath, API_VERSION_QUERY);
-            String securityToken = getSecurityToken(clientSettings.getTokenProvider(), entityURL);
-            sendManagementHttpRequest(DELETE_METHOD, entityURL, securityToken, null);
-        }
-        catch(ManagementException me)
-        {
-            throw me;
-        }
-        catch(Exception e)
-        {
-            throw new ManagementException("Entity deletion failed.", e);
-        }
+    public CompletableFuture<Void> deleteQueueAsync(String path) {
+        EntityNameHelper.checkValidQueueName(path);
+        return deleteEntityAsync(path);
     }
-    
-    private static URL getManagementURL(URI namespaceEndpontURI, String entityPath, String query) throws ServiceBusException
-    {
+
+    private CompletableFuture<Void> deleteEntityAsync(String path) {
+        URL entityURL = null;
+        try {
+            entityURL = getManagementURL(this.namespaceEndpointURI, path, API_VERSION_QUERY);
+        } catch (ServiceBusException e) {
+            final CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
+            exceptionFuture.completeExceptionally(e);
+            return exceptionFuture;
+        }
+
+        return sendManagementHttpRequestAsync(HttpConstants.Methods.DELETE, entityURL, null, null).thenAccept(c -> {});
+    }
+
+    private static URL getManagementURL(URI namespaceEndpontURI, String entityPath, String query) throws ServiceBusException {
         try {
             URI httpURI = new URI("https", null, namespaceEndpontURI.getHost(), getPortNumberFromHost(namespaceEndpontURI.getHost()), "/"+entityPath, query, null);
             return httpURI.toURL();
@@ -329,7 +366,7 @@ public class ManagementClient {
                 break;
 
             default:
-                exception = new ServiceBusException(true, exceptionMessage = "; Status code: " + response.getStatusCode());
+                exception = new ServiceBusException(true, exceptionMessage + "; Status code: " + response.getStatusCode());
         }
 
         //todo: log
@@ -337,61 +374,38 @@ public class ManagementClient {
     }
 
     private static String parseDetailIfAvailable(String content) {
-        // todo
+        if (content == null || content.isEmpty()) {
+            return null;
+        }
+
+        // todo: reuse
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        try {
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document dom = db.parse(new ByteArrayInputStream(content.getBytes("utf-8")));
+            Element doc = dom.getDocumentElement();
+            doc.normalize();
+            NodeList entries = doc.getChildNodes();
+            for (int i = 0; i < entries.getLength(); i++) {
+                Node node = entries.item(i);
+                if (node.getNodeName().equals("Detail")) {
+                    return node.getFirstChild().getTextContent();
+                }
+            }
+        }
+        catch (Exception ex) {
+            // TODO: Log
+        }
+
         return null;
     }
 
-    private static String sendManagementHttpRequest(String httpMethod, URL url, String sasToken, String atomEntryString) throws IOException, ManagementException, NoSuchAlgorithmException, KeyManagementException, KeyStoreException
-    {
-        // No special handling of TLS here. Assuming the server cert is already trusted
-        HttpsURLConnection httpConnection = (HttpsURLConnection)url.openConnection();
-        httpConnection.setConnectTimeout((int)CONNECTION_TIMEOUT.toMillis());
-        httpConnection.setReadTimeout((int)READ_TIMEOUT.toMillis());
-        httpConnection.setDoOutput(true);
-        httpConnection.setRequestMethod(httpMethod);
-        httpConnection.setRequestProperty(USER_AGENT_HEADER_NAME, USER_AGENT);
-        httpConnection.setRequestProperty(AUTHORIZATION_HEADER_NAME, sasToken);
-        httpConnection.setRequestProperty(CONTENT_TYPE_HEADER_NAME, CONTENT_TYPE);
-        if(atomEntryString != null && !atomEntryString.isEmpty())
-        {
-            try(BufferedOutputStream bos = new BufferedOutputStream(httpConnection.getOutputStream()))
-            {
-                bos.write(atomEntryString.getBytes(StandardCharsets.UTF_8));
-                bos.flush();
-            }
-        }
-        
-        int responseCode = httpConnection.getResponseCode();
-        if(responseCode == HttpsURLConnection.HTTP_CREATED || responseCode == HttpsURLConnection.HTTP_ACCEPTED || responseCode == HttpsURLConnection.HTTP_OK)
-        {
-            try(BufferedInputStream bis = new BufferedInputStream(httpConnection.getInputStream()))
-            {
-                    StringBuffer response = new StringBuffer();
-                    byte[] readBytes = new byte[1024];
-                    int numRead = bis.read(readBytes);
-                    while(numRead != -1)
-                    {
-                        response.append(new String(readBytes, 0, numRead));
-                        numRead = bis.read(readBytes);
-                    }
-
-                    return response.toString();
-            }
-        }
-        else
-        {
-            throw new ManagementException("Management operation failed with response code:" + responseCode);
-        }
-    }
-    
-    private static String getSecurityToken(TokenProvider tokenProvider, URL url ) throws InterruptedException, ExecutionException
-    {
+    private static String getSecurityToken(TokenProvider tokenProvider, URL url ) throws InterruptedException, ExecutionException {
         SecurityToken token = tokenProvider.getSecurityTokenAsync(url.toString()).get();
         return token.getTokenValue();
     }
     
-    private static int getPortNumberFromHost(String host)
-    {
+    private static int getPortNumberFromHost(String host) {
         if(host.endsWith("onebox.windows-int.net"))
         {
             return ONE_BOX_HTTPS_PORT;

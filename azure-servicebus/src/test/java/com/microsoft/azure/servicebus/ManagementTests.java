@@ -8,12 +8,14 @@ import org.junit.Test;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ManagementTests {
 
-    ManagementClient managementClient;
+    private ManagementClient managementClient;
 
     @Before
     public void setup() {
@@ -43,13 +45,14 @@ public class ManagementTests {
 
         ArrayList<AuthorizationRule> rules = new ArrayList<>();
         ArrayList<AccessRights> rights = new ArrayList<>();
-        rights.add(AccessRights.SEND);
-        rights.add(AccessRights.LISTEN);
-        rights.add(AccessRights.MANAGE);
+        rights.add(AccessRights.Send);
+        rights.add(AccessRights.Listen);
+        rights.add(AccessRights.Manage);
         rules.add(new SharedAccessAuthorizationRule("allClaims", rights));
+        q.setAuthorizationRules(rules);
 
         QueueDescription qCreated = this.managementClient.createQueueAsync(q).get();
-        Assert.assertEquals(qCreated, q);
+        Assert.assertEquals(q, qCreated);
 
         QueueDescription queue = this.managementClient.getQueue(queueName);
         Assert.assertEquals(qCreated, queue);
@@ -58,10 +61,29 @@ public class ManagementTests {
         queue.setMaxDeliveryCount(9);
         queue.getAuthorizationRules().clear();
         rights = new ArrayList<>();
-        rights.add(AccessRights.SEND);
-        rights.add(AccessRights.LISTEN);
+        rights.add(AccessRights.Send);
+        rights.add(AccessRights.Listen);
         queue.getAuthorizationRules().add(new SharedAccessAuthorizationRule("noManage", rights));
 
-        QueueDescription updatedQ = this.managementClient.updateQueue(queue);
+        QueueDescription updatedQ = this.managementClient.updateQueueAsync(queue).get();
+        Assert.assertEquals(queue, updatedQ);
+
+        Boolean exists = this.managementClient.queueExistsAsync(queueName).get();
+        Assert.assertTrue(exists);
+
+        List<QueueDescription> queues = this.managementClient.getQueuesAsync().get();
+        Assert.assertTrue(queues.size() > 0);
+        AtomicBoolean found = new AtomicBoolean(false);
+        queues.forEach(queueDescription -> {
+            if (queueDescription.getPath().equalsIgnoreCase(queueName)) {
+                found.set(true);
+            }
+        });
+        Assert.assertTrue(found.get());
+
+        this.managementClient.deleteQueueAsync(queueName).get();
+
+        exists = this.managementClient.queueExistsAsync(queueName).get();
+        Assert.assertFalse(exists);
     }
 }

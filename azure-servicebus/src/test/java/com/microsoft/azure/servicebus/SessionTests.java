@@ -39,7 +39,7 @@ public abstract class SessionTests extends Tests {
 	{
 	    URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
         ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        
+        /*
 	    if(this.shouldCreateEntityForEveryTest() || SessionTests.entityNameCreatedForAllTests == null)
         {
              // Create entity
@@ -78,7 +78,8 @@ public abstract class SessionTests extends Tests {
             this.entityName = SessionTests.entityNameCreatedForAllTests;
             this.receiveEntityPath = SessionTests.receiveEntityPathForAllTest;
         }
-        
+        */
+        //todo^
         this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceEndpointURI, TestUtils.getClientSettings());
         this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
 	}
@@ -98,7 +99,8 @@ public abstract class SessionTests extends Tests {
         
         if(this.shouldCreateEntityForEveryTest())
         {
-            ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+        	// todo
+            //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
         }
 	}
 	
@@ -107,7 +109,8 @@ public abstract class SessionTests extends Tests {
     {
         if(SessionTests.entityNameCreatedForAllTests != null)
         {
-            ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SessionTests.entityNameCreatedForAllTests);
+        	//todo
+            //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SessionTests.entityNameCreatedForAllTests);
         }
     }
     
