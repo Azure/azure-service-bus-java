@@ -20,7 +20,7 @@ public abstract class ClientTests extends Tests{
     private String receiveEntityPath;
     protected IMessageSender sendClient;
     protected IMessageAndSessionPump receiveClient;
-    protected ManagementClient managementClient;
+    protected ManagementClientAsync managementClientAsync;
     
     @BeforeClass
     public static void init()
@@ -34,7 +34,7 @@ public abstract class ClientTests extends Tests{
     {
         URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
         ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        this.managementClient = new ManagementClient(namespaceEndpointURI, managementClientSettings);
+        this.managementClientAsync = new ManagementClientAsync(namespaceEndpointURI, managementClientSettings);
 
         if(this.shouldCreateEntityForEveryTest() || ClientTests.entityNameCreatedForAllTests == null)
         {
@@ -46,7 +46,7 @@ public abstract class ClientTests extends Tests{
                 this.receiveEntityPath = this.entityName;
                 QueueDescription queueDescription = new QueueDescription(this.entityName);
                 queueDescription.setEnablePartitioning(this.isEntityPartitioned());
-                this.managementClient.createQueueAsync(queueDescription);
+                this.managementClientAsync.createQueueAsync(queueDescription);
                 if(!this.shouldCreateEntityForEveryTest())
                 {
                     ClientTests.entityNameCreatedForAllTests = entityName;

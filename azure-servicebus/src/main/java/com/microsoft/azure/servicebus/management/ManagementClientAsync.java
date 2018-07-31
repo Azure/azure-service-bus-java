@@ -28,7 +28,11 @@ import java.util.concurrent.ExecutionException;
 import static org.asynchttpclient.Dsl.asyncHttpClient;
 import static org.asynchttpclient.Dsl.trace;
 
-public class ManagementClient {
+/**
+ * Asynchronous client to perform management operations on Service Bus entities.
+ * Operations return CompletableFuture which asynchronously return the responses.
+ */
+public class ManagementClientAsync {
     private static final int ONE_BOX_HTTPS_PORT = 4446;
     private static final String API_VERSION_QUERY = "api-version=2017-04";
     private static final String USER_AGENT_HEADER_NAME = "User-Agent";
@@ -42,7 +46,9 @@ public class ManagementClient {
     private URI namespaceEndpointURI;
     private AsyncHttpClient asyncHttpClient;
 
-    public ManagementClient(URI namespaceEndpointURI, ClientSettings clientSettings) {
+    // todo: expose other constructors
+    // todo: expose sync methods.
+    public ManagementClientAsync(URI namespaceEndpointURI, ClientSettings clientSettings) {
         this.namespaceEndpointURI = namespaceEndpointURI;
         this.clientSettings = clientSettings;
         DefaultAsyncHttpClientConfig.Builder clientBuilder = Dsl.config()
@@ -51,10 +57,17 @@ public class ManagementClient {
         this.asyncHttpClient = asyncHttpClient(clientBuilder);
     }
 
-    public QueueDescription getQueue(String path) throws ExecutionException, InterruptedException {
-        return this.getQueueAsync(path).get();
-    }
-
+    /**
+     * Retrieves a queue from the service namespace
+     * @param path - The path of the queue relative to service bus namespace.
+     * @return - QueueDescription containing information about the queue.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
     public CompletableFuture<QueueDescription> getQueueAsync(String path) {
         EntityNameHelper.checkValidQueueName(path);
 
@@ -76,10 +89,30 @@ public class ManagementClient {
         return qdFuture;
     }
 
+    /**
+     * Retrieves the list of queues present in the namespace.
+     * @return the first 100 queues.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
     public CompletableFuture<List<QueueDescription>> getQueuesAsync() {
         return getQueuesAsync(100, 0);
     }
 
+    /**
+     * Retrieves the list of queues present in the namespace.
+     * You can simulate pages of list of entities by manipulating count and skip parameters.
+     * skip(0)+count(100) gives first 100 entities. skip(100)+count(100) gives the next 100 entities.
+     * @return the list of queues.
+     * @param count - The number of queues to fetch. Defaults to 100. Maximum value allowed is 100.
+     * @param skip - The number of queues to skip. Defaults to 0. Cannot be negative.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
     public CompletableFuture<List<QueueDescription>> getQueuesAsync(int count, int skip) {
         if (count > 100 || count < 1) {
             throw new IllegalArgumentException("Count should be between 1 and 100");
@@ -121,14 +154,51 @@ public class ManagementClient {
         return sendManagementHttpRequestAsync(HttpConstants.Methods.GET, entityURL, null, null);
     }
 
+    /**
+     * Creates a new queue in the service namespace with the given name.
+     * See {@link QueueDescription} for default values of queue properties.
+     * @param queuePath - The name of the queue relative to the service namespace base address.
+     * @return {@link QueueDescription} of the newly created queue.
+     * @throws IllegalArgumentException - Entity name is null, empty, too long or uses illegal characters.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
     public CompletableFuture<QueueDescription> createQueueAsync(String queuePath) {
         return this.createQueueAsync(new QueueDescription(queuePath));
     }
 
+    /**
+     * Creates a new queue in the service namespace with the given name.
+     * See {@link QueueDescription} for default values of queue properties.
+     * @param queueDescription - A {@link QueueDescription} object describing the attributes with which the new queue will be created.
+     * @return {@link QueueDescription} of the newly created queue.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
     public CompletableFuture<QueueDescription> createQueueAsync(QueueDescription queueDescription) {
         return putQueueAsync(queueDescription, false);
     }
 
+    /**
+     * Updates an existing queue.
+     * @param queueDescription - A {@link QueueDescription} object describing the attributes with which the queue will be updated.
+     * @return {@link QueueDescription} of the updated queue.
+     * @throws MessagingEntityNotFoundException - Described entity was not found.
+     * @throws IllegalArgumentException - descriptor is null.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
     public CompletableFuture<QueueDescription> updateQueueAsync(QueueDescription queueDescription) {
         return putQueueAsync(queueDescription, true);
     }
@@ -207,6 +277,16 @@ public class ManagementClient {
         return sendManagementHttpRequestAsync(HttpConstants.Methods.PUT, entityURL, requestBody, additionalHeaders);
     }
 
+    /**
+     * Checks whether a given queue exists or not.
+     * @param path - Path of the entity to check
+     * @return - True if the entity exists. False otherwise.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
     public CompletableFuture<Boolean> queueExistsAsync(String path) {
         EntityNameHelper.checkValidQueueName(path);
 
@@ -229,6 +309,16 @@ public class ManagementClient {
         return existsFuture;
     }
 
+    /**
+     * Deletes the queue described by the path relative to the service namespace base address.
+     * @param path - The name of the entity relative to the service namespace base address.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws MessagingEntityNotFoundException - An entity with this name does not exist.
+     */
     public CompletableFuture<Void> deleteQueueAsync(String path) {
         EntityNameHelper.checkValidQueueName(path);
         return deleteEntityAsync(path);
