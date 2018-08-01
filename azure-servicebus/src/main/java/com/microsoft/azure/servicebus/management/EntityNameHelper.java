@@ -30,7 +30,7 @@ public class EntityNameHelper {
      * @param subscriptionName - The name of the subscription.
      */
     public static String formatSubscriptionPath(String topicPath, String subscriptionName) {
-        return String.join(topicPath, pathDelimiter, subscriptionsSubPath, pathDelimiter, subscriptionName);
+        return String.join(pathDelimiter, topicPath, subscriptionsSubPath, subscriptionName);
     }
 
     /**
@@ -40,10 +40,12 @@ public class EntityNameHelper {
      * @param ruleName - The name of the rule.
      */
     public static String formatRulePath(String topicPath, String subscriptionName, String ruleName) {
-        return String.join(topicPath, pathDelimiter,
-                subscriptionsSubPath, pathDelimiter,
-                subscriptionName, pathDelimiter,
-                rulesSubPath, pathDelimiter, ruleName);
+        return String.join(pathDelimiter,
+                topicPath,
+                subscriptionsSubPath,
+                subscriptionName,
+                rulesSubPath,
+                ruleName);
     }
 
     /**
@@ -51,7 +53,7 @@ public class EntityNameHelper {
      * @param entityPath - Path of the entity whose transfer dead letter needs to be formatted.
      */
     public static String formatTransferDeadLetterPath(String entityPath) {
-        return String.join(entityPath, pathDelimiter, transferDeadLetterQueueName);
+        return String.join(pathDelimiter, entityPath, transferDeadLetterQueueName);
     }
 
     static String formatSubQueuePath(String entityPath, String subQueueName) {

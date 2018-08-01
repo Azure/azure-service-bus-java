@@ -263,6 +263,7 @@ public class SubscriptionDescription {
     public void setForwardTo(String forwardTo) {
         if (forwardTo == null || forwardTo.isEmpty()) {
             this.forwardTo = forwardTo;
+            return;
         }
 
         EntityNameHelper.checkValidQueueName(forwardTo);
@@ -290,6 +291,7 @@ public class SubscriptionDescription {
     public void setForwardDeadLetteredMessagesTo(String forwardDeadLetteredMessagesTo) {
         if (forwardDeadLetteredMessagesTo == null || forwardDeadLetteredMessagesTo.isEmpty()) {
             this.forwardDeadLetteredMessagesTo = forwardDeadLetteredMessagesTo;
+            return;
         }
 
         EntityNameHelper.checkValidQueueName(forwardDeadLetteredMessagesTo);

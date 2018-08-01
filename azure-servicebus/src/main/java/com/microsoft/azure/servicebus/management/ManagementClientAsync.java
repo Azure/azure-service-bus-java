@@ -440,7 +440,7 @@ public class ManagementClientAsync {
      * @throws ServiceBusException - An internal error or an unexpected exception occured.
      * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
      */
-    public CompletableFuture<TopicDescription> updateQueueAsync(TopicDescription topicDescription) {
+    public CompletableFuture<TopicDescription> updateTopicAsync(TopicDescription topicDescription) {
         return putTopicAsync(topicDescription, true);
     }
 
@@ -510,6 +510,8 @@ public class ManagementClientAsync {
     public CompletableFuture<SubscriptionDescription> createSubscriptionAsync(SubscriptionDescription subscriptionDescription) {
         return putSubscriptionAsync(subscriptionDescription, false);
     }
+
+    // todo: Create subscription with default rule.
 
     /**
      * Updates an existing subscription.
@@ -741,7 +743,7 @@ public class ManagementClientAsync {
      * @throws ServiceBusException - An internal error or an unexpected exception occured.
      * @throws MessagingEntityNotFoundException - An entity with this name does not exist.
      */
-    public CompletableFuture<Void> deleteQueueAsync(String topicPath, String subscriptionName) {
+    public CompletableFuture<Void> deleteSubscriptionAsync(String topicPath, String subscriptionName) {
         EntityNameHelper.checkValidTopicName(topicPath);
         EntityNameHelper.checkValidSubscriptionName(subscriptionName);
         String path = EntityNameHelper.formatSubscriptionPath(topicPath, subscriptionName);
