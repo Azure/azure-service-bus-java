@@ -6,10 +6,7 @@ import com.microsoft.azure.servicebus.security.SecurityToken;
 import com.microsoft.azure.servicebus.security.TokenProvider;
 import org.asynchttpclient.*;
 import org.asynchttpclient.util.HttpConstants;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
+import org.w3c.dom.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -90,6 +87,73 @@ public class ManagementClientAsync {
     }
 
     /**
+     * Retrieves a topic from the service namespace
+     * @param path - The path of the queue relative to service bus namespace.
+     * @return - Description containing information about the topic.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<TopicDescription> getTopicAsync(String path) {
+        EntityNameHelper.checkValidTopicName(path);
+
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<TopicDescription> tdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                tdFuture.completeExceptionally(ex);
+            } else {
+                try {
+                    tdFuture.complete(TopicDescriptionUtil.parseFromContent(content));
+                } catch (MessagingEntityNotFoundException e) {
+                    tdFuture.completeExceptionally(e);
+                }
+            }
+            return null;
+        });
+
+        return tdFuture;
+    }
+
+    /**
+     * Retrieves a subscription for a given topic from the service namespace
+     * @param topicPath - The path of the topic relative to service bus namespace.
+     * @param subscriptionName - The name of the subscription
+     * @return - SubscriptionDescription containing information about the subscription.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<SubscriptionDescription> getSubscriptionAsync(String topicPath, String subscriptionName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+
+        String path = EntityNameHelper.formatSubscriptionPath(topicPath, subscriptionName);
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<SubscriptionDescription> sdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                sdFuture.completeExceptionally(ex);
+            } else {
+                try {
+                    sdFuture.complete(SubscriptionDescriptionUtil.parseFromContent(topicPath, content));
+                } catch (MessagingEntityNotFoundException e) {
+                    sdFuture.completeExceptionally(e);
+                }
+            }
+            return null;
+        });
+
+        return sdFuture;
+    }
+
+    /**
      * Retrieves the list of queues present in the namespace.
      * @return the first 100 queues.
      * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
@@ -134,6 +198,100 @@ public class ManagementClientAsync {
         });
 
         return qdFuture;
+    }
+
+    /**
+     * Retrieves the list of topics present in the namespace.
+     * @return the first 100 topics.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<List<TopicDescription>> getTopicsAsync() {
+        return getTopicsAsync(100, 0);
+    }
+
+    /**
+     * Retrieves the list of topics present in the namespace.
+     * You can simulate pages of list of entities by manipulating count and skip parameters.
+     * skip(0)+count(100) gives first 100 entities. skip(100)+count(100) gives the next 100 entities.
+     * @return the list of topics.
+     * @param count - The number of topics to fetch. Defaults to 100. Maximum value allowed is 100.
+     * @param skip - The number of topics to skip. Defaults to 0. Cannot be negative.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<List<TopicDescription>> getTopicsAsync(int count, int skip) {
+        if (count > 100 || count < 1) {
+            throw new IllegalArgumentException("Count should be between 1 and 100");
+        }
+
+        if (skip < 0) {
+            throw new IllegalArgumentException("Skip cannot be negative");
+        }
+
+        CompletableFuture<String> contentFuture = getEntityAsync("$Resources/topics", String.format("$skip=%d&$top=%d", skip, count), false);
+        CompletableFuture<List<TopicDescription>> tdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                tdFuture.completeExceptionally(ex);
+            } else {
+                tdFuture.complete(TopicDescriptionUtil.parseCollectionFromContent(content));
+            }
+            return null;
+        });
+
+        return tdFuture;
+    }
+
+    /**
+     * Retrieves the list of subscriptions for a given topic in the namespace.
+     * @return the first 100 subscriptions.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<List<SubscriptionDescription>> getSubscriptionsAsync(String topicName) {
+        return getSubscriptionsAsync(topicName, 100, 0);
+    }
+
+    /**
+     * Retrieves the list of subscriptions for a given topic in the namespace.
+     * You can simulate pages of list of entities by manipulating count and skip parameters.
+     * skip(0)+count(100) gives first 100 entities. skip(100)+count(100) gives the next 100 entities.
+     * @return the list of subscriptions.
+     * @param count - The number of subscriptions to fetch. Defaults to 100. Maximum value allowed is 100.
+     * @param skip - The number of subscriptions to skip. Defaults to 0. Cannot be negative.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<List<SubscriptionDescription>> getSubscriptionsAsync(String topicName, int count, int skip) {
+        if (count > 100 || count < 1) {
+            throw new IllegalArgumentException("Count should be between 1 and 100");
+        }
+
+        if (skip < 0) {
+            throw new IllegalArgumentException("Skip cannot be negative");
+        }
+
+        CompletableFuture<String> contentFuture = getEntityAsync(String.format("%s/Subscriptions", topicName), String.format("$skip=%d&$top=%d", skip, count), false);
+        CompletableFuture<List<SubscriptionDescription>> sdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                sdFuture.completeExceptionally(ex);
+            } else {
+                sdFuture.complete(SubscriptionDescriptionUtil.parseCollectionFromContent(topicName, content));
+            }
+            return null;
+        });
+
+        return sdFuture;
     }
 
     private CompletableFuture<String> getEntityAsync(String path, String query, boolean enrich) {
@@ -237,6 +395,173 @@ public class ManagementClientAsync {
         return responseFuture;
     }
 
+    /**
+     * Creates a new topic in the service namespace with the given name.
+     * See {@link TopicDescription} for default values of topic properties.
+     * @param topicPath - The name of the topic relative to the service namespace base address.
+     * @return {@link TopicDescription} of the newly created topic.
+     * @throws IllegalArgumentException - Entity name is null, empty, too long or uses illegal characters.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<TopicDescription> createTopicAsync(String topicPath) {
+        return this.createTopicAsync(new TopicDescription(topicPath));
+    }
+
+    /**
+     * Creates a new topic in the service namespace with the given name.
+     * See {@link TopicDescription} for default values of topic properties.
+     * @param topicDescription - A {@link QueueDescription} object describing the attributes with which the new topic will be created.
+     * @return {@link TopicDescription} of the newly created topic.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<TopicDescription> createTopicAsync(TopicDescription topicDescription) {
+        return putTopicAsync(topicDescription, false);
+    }
+
+    /**
+     * Updates an existing topic.
+     * @param topicDescription - A {@link TopicDescription} object describing the attributes with which the topic will be updated.
+     * @return {@link TopicDescription} of the updated topic.
+     * @throws MessagingEntityNotFoundException - Described entity was not found.
+     * @throws IllegalArgumentException - descriptor is null.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<TopicDescription> updateQueueAsync(TopicDescription topicDescription) {
+        return putTopicAsync(topicDescription, true);
+    }
+
+    private CompletableFuture<TopicDescription> putTopicAsync(TopicDescription topicDescription, boolean isUpdate) {
+        if (topicDescription == null) {
+            throw new IllegalArgumentException("topicDescription passed cannot be null");
+        }
+
+        String atomRequest = null;
+        try {
+            atomRequest = TopicDescriptionUtil.serialize(topicDescription);
+        } catch (ServiceBusException e) {
+            final CompletableFuture<TopicDescription> exceptionFuture = new CompletableFuture<>();
+            exceptionFuture.completeExceptionally(e);
+            return exceptionFuture;
+        }
+
+        CompletableFuture<TopicDescription> responseFuture = new CompletableFuture<>();
+        putEntityAsync(topicDescription.path, atomRequest, isUpdate, null, null)
+                .handleAsync((content, ex) -> {
+                    if (ex != null) {
+                        responseFuture.completeExceptionally(ex);
+                    } else {
+                        try {
+                            responseFuture.complete(TopicDescriptionUtil.parseFromContent(content));
+                        } catch (MessagingEntityNotFoundException e) {
+                            responseFuture.completeExceptionally(e);
+                        }
+                    }
+
+                    return null;
+                });
+
+        return responseFuture;
+    }
+
+    /**
+     * Creates a new subscription for a given topic in the service namespace with the given name.
+     * See {@link SubscriptionDescription} for default values of subscription properties.
+     * @param topicPath - The name of the topic relative to the service namespace base address.
+     * @param subscriptionName - The name of the subscription.
+     * @return {@link SubscriptionDescription} of the newly created subscription.
+     * @throws IllegalArgumentException - Entity name is null, empty, too long or uses illegal characters.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<SubscriptionDescription> createSubscriptionAsync(String topicPath, String subscriptionName) {
+        return this.createSubscriptionAsync(new SubscriptionDescription(topicPath, subscriptionName));
+    }
+
+    /**
+     * Creates a new subscription in the service namespace with the given name.
+     * See {@link SubscriptionDescription} for default values of subscription properties.
+     * @param subscriptionDescription - A {@link SubscriptionDescription} object describing the attributes with which the new subscription will be created.
+     * @return {@link SubscriptionDescription} of the newly created subscription.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<SubscriptionDescription> createSubscriptionAsync(SubscriptionDescription subscriptionDescription) {
+        return putSubscriptionAsync(subscriptionDescription, false);
+    }
+
+    /**
+     * Updates an existing subscription.
+     * @param subscriptionDescription - A {@link SubscriptionDescription} object describing the attributes with which the subscription will be updated.
+     * @return {@link SubscriptionDescription} of the updated subscription.
+     * @throws MessagingEntityNotFoundException - Described entity was not found.
+     * @throws IllegalArgumentException - descriptor is null.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<SubscriptionDescription> updateSubscriptionAsync(SubscriptionDescription subscriptionDescription) {
+        return putSubscriptionAsync(subscriptionDescription, true);
+    }
+
+    private CompletableFuture<SubscriptionDescription> putSubscriptionAsync(SubscriptionDescription subscriptionDescription, boolean isUpdate) {
+        if (subscriptionDescription == null) {
+            throw new IllegalArgumentException("queueDescription passed cannot be null");
+        }
+
+        SubscriptionDescriptionUtil.normalizeDescription(subscriptionDescription, this.namespaceEndpointURI);
+        String atomRequest = null;
+        try {
+            atomRequest = SubscriptionDescriptionUtil.serialize(subscriptionDescription);
+        } catch (ServiceBusException e) {
+            final CompletableFuture<SubscriptionDescription> exceptionFuture = new CompletableFuture<>();
+            exceptionFuture.completeExceptionally(e);
+            return exceptionFuture;
+        }
+
+        CompletableFuture<SubscriptionDescription> responseFuture = new CompletableFuture<>();
+        String path = EntityNameHelper.formatSubscriptionPath(subscriptionDescription.getTopicPath(), subscriptionDescription.getSubscriptionName());
+        putEntityAsync(path, atomRequest, isUpdate, subscriptionDescription.getForwardTo(), subscriptionDescription.getForwardDeadLetteredMessagesTo())
+                .handleAsync((content, ex) -> {
+                    if (ex != null) {
+                        responseFuture.completeExceptionally(ex);
+                    } else {
+                        try {
+                            responseFuture.complete(SubscriptionDescriptionUtil.parseFromContent(subscriptionDescription.getTopicPath(), content));
+                        } catch (MessagingEntityNotFoundException e) {
+                            responseFuture.completeExceptionally(e);
+                        }
+                    }
+
+                    return null;
+                });
+
+        return responseFuture;
+    }
+
     private CompletableFuture<String> putEntityAsync(String path, String requestBody, boolean isUpdate, String forwardTo, String fwdDeadLetterTo) {
         URL entityURL = null;
         try {
@@ -310,6 +635,72 @@ public class ManagementClientAsync {
     }
 
     /**
+     * Checks whether a given topic exists or not.
+     * @param path - Path of the entity to check
+     * @return - True if the entity exists. False otherwise.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<Boolean> topicExistsAsync(String path) {
+        EntityNameHelper.checkValidTopicName(path);
+
+        CompletableFuture<Boolean> existsFuture = new CompletableFuture<>();
+        this.getTopicAsync(path).handleAsync((qd, ex) -> {
+            if (ex != null) {
+                if (ex instanceof MessagingEntityNotFoundException) {
+                    existsFuture.complete(Boolean.FALSE);
+                    return false;
+                }
+
+                existsFuture.completeExceptionally(ex);
+                return false;
+            }
+
+            existsFuture.complete(Boolean.TRUE);
+            return true;
+        });
+
+        return existsFuture;
+    }
+
+    /**
+     * Checks whether a given subscription exists or not.
+     * @param topicPath - Path of the topic
+     * @param subscriptionName - Name of the subscription.
+     * @return - True if the entity exists. False otherwise.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<Boolean> subscriptionExistsAsync(String topicPath, String subscriptionName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+
+        CompletableFuture<Boolean> existsFuture = new CompletableFuture<>();
+        this.getSubscriptionAsync(topicPath, subscriptionName).handleAsync((qd, ex) -> {
+            if (ex != null) {
+                if (ex instanceof MessagingEntityNotFoundException) {
+                    existsFuture.complete(Boolean.FALSE);
+                    return false;
+                }
+
+                existsFuture.completeExceptionally(ex);
+                return false;
+            }
+
+            existsFuture.complete(Boolean.TRUE);
+            return true;
+        });
+
+        return existsFuture;
+    }
+
+    /**
      * Deletes the queue described by the path relative to the service namespace base address.
      * @param path - The name of the entity relative to the service namespace base address.
      * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
@@ -321,6 +712,39 @@ public class ManagementClientAsync {
      */
     public CompletableFuture<Void> deleteQueueAsync(String path) {
         EntityNameHelper.checkValidQueueName(path);
+        return deleteEntityAsync(path);
+    }
+
+    /**
+     * Deletes the topic described by the path relative to the service namespace base address.
+     * @param path - The name of the entity relative to the service namespace base address.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws MessagingEntityNotFoundException - An entity with this name does not exist.
+     */
+    public CompletableFuture<Void> deleteTopicAsync(String path) {
+        EntityNameHelper.checkValidTopicName(path);
+        return deleteEntityAsync(path);
+    }
+
+    /**
+     * Deletes the subscription described by the topicPath and the subscriptionName.
+     * @param topicPath - The name of the topic.
+     * @param subscriptionName - The name of the subscription.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws MessagingEntityNotFoundException - An entity with this name does not exist.
+     */
+    public CompletableFuture<Void> deleteQueueAsync(String topicPath, String subscriptionName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+        String path = EntityNameHelper.formatSubscriptionPath(topicPath, subscriptionName);
         return deleteEntityAsync(path);
     }
 
