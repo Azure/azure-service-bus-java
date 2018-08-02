@@ -1,6 +1,7 @@
 package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.IMessage;
+import com.microsoft.azure.servicebus.rules.RuleDescription;
 
 import java.time.Duration;
 
@@ -22,6 +23,7 @@ public class SubscriptionDescription {
     boolean requiresSession = false;
     boolean enableBatchedOperations = true;
     EntityStatus status = EntityStatus.Active;
+    RuleDescription defaultRule = null;
 
     /**
      * Initializes a new instance of SubscriptionDescription with the specified relative path.

@@ -70,6 +70,10 @@ class SubscriptionDescriptionUtil {
                 doc.createElementNS(ManagementClientConstants.SB_NS, "DeadLetteringOnFilterEvaluationExceptions")
                         .appendChild(doc.createTextNode(Boolean.toString(subscriptionDescription.enableDeadLetteringOnFilterEvaluationException))).getParentNode());
 
+        if (subscriptionDescription.defaultRule != null) {
+            sdElement.appendChild(RuleDescriptionUtil.serializeRule(doc, subscriptionDescription.defaultRule, "DefaultRuleDescription"));
+        }
+
         sdElement.appendChild(
                 doc.createElementNS(ManagementClientConstants.SB_NS, "MaxDeliveryCount")
                         .appendChild(doc.createTextNode(Integer.toString(subscriptionDescription.maxDeliveryCount))).getParentNode());

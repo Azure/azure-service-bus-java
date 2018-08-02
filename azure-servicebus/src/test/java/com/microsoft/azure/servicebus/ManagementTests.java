@@ -1,8 +1,11 @@
 package com.microsoft.azure.servicebus;
 
 import com.microsoft.azure.servicebus.management.*;
+import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
+import com.microsoft.azure.servicebus.rules.*;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.net.URI;
@@ -188,9 +191,74 @@ public class ManagementTests {
         exists = this.managementClientAsync.subscriptionExistsAsync(topicName, subscriptionName).get();
         Assert.assertFalse(exists);
 
-        this.managementClientAsync.deleteTopicAsync(topicName);
+        this.managementClientAsync.deleteTopicAsync(topicName).get();
 
         exists = this.managementClientAsync.subscriptionExistsAsync(topicName, subscriptionName).get();
         Assert.assertFalse(exists);
+    }
+
+    @Test
+    public void basicRulesCrudTest() throws InterruptedException, ExecutionException {
+        String topicName = UUID.randomUUID().toString().substring(0, 8);
+        String subscriptionName = UUID.randomUUID().toString().substring(0, 8);
+
+        this.managementClientAsync.createTopicAsync(topicName).get();
+        this.managementClientAsync.createSubscriptionAsync(
+                new SubscriptionDescription(topicName, subscriptionName),
+                new RuleDescription("rule0", new FalseFilter())).get();
+
+        //SqlFilter sqlFilter = new SqlFilter("stringValue = @stringParam AND intValue = @intParam AND longValue = @longParam AND dateValue = @dateParam");
+        SqlFilter sqlFilter = new SqlFilter("1=1");
+        /*
+        todo
+        sqlFilter.Parameters.Add("@stringParam", "string");
+            sqlFilter.Parameters.Add("@intParam", (int)1);
+            sqlFilter.Parameters.Add("@longParam", (long)12);
+            sqlFilter.Parameters.Add("@dateParam", DateTime.UtcNow);
+         */
+        RuleDescription rule1 = new RuleDescription("rule1");
+        rule1.setFilter(sqlFilter);
+        rule1.setAction(new SqlRuleAction("SET a='b'"));
+        this.managementClientAsync.createRuleAsync(topicName, subscriptionName, rule1).get();
+
+        CorrelationFilter correlationFilter = new CorrelationFilter();
+        correlationFilter.setContentType("contentType");
+        correlationFilter.setCorrelationId("correlationId");
+        correlationFilter.setLabel("label");
+        correlationFilter.setMessageId("messageId");
+        correlationFilter.setReplyTo("replyTo");
+        correlationFilter.setReplyToSessionId("replyToSessionId");
+        correlationFilter.setSessionId("sessionId");
+        correlationFilter.setTo("to");
+        // todo
+        // correlationFilter.Properties.Add("customKey", "customValue");
+        RuleDescription rule2 = new RuleDescription("rule2");
+        rule2.setFilter(correlationFilter);
+        this.managementClientAsync.createRuleAsync(topicName, subscriptionName, rule2).get();
+
+        List<RuleDescription> rules = this.managementClientAsync.getRulesAsync(topicName, subscriptionName).get();
+        Assert.assertEquals(3, rules.size());
+        Assert.assertEquals("rule0", rules.get(0).getName());
+        Assert.assertEquals(rule1, rules.get(1));
+        Assert.assertEquals(rule2, rules.get(2));
+
+        ((CorrelationFilter)(rule2.getFilter())).setCorrelationId("correlationIdModified");
+        RuleDescription updatedRule2 = this.managementClientAsync.updateRuleAsync(topicName, subscriptionName, rule2).get();
+        Assert.assertEquals(rule2, updatedRule2);
+
+        RuleDescription defaultRule = this.managementClientAsync.getRuleAsync(topicName, subscriptionName, "rule0").get();
+        Assert.assertNotNull(defaultRule);
+        this.managementClientAsync.deleteRuleAsync(topicName, subscriptionName, "rule0").get();
+        try {
+            this.managementClientAsync.getRuleAsync(topicName, subscriptionName, "rule0").get();
+            Assert.fail("Get rule0 should have thrown.");
+        } catch (Exception ex) {
+            Assert.assertTrue(ex instanceof ExecutionException);
+            Throwable cause = ex.getCause();
+            Assert.assertTrue(cause instanceof MessagingEntityNotFoundException);
+        }
+
+        Assert.assertFalse(this.managementClientAsync.ruleExistsAsync(topicName, subscriptionName, "rule0").get());
+        this.managementClientAsync.deleteTopicAsync(topicName).get();
     }
 }

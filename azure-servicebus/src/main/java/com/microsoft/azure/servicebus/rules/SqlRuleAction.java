@@ -28,4 +28,14 @@ public class SqlRuleAction extends RuleAction {
     public String getSqlExpression() {
         return this.sqlExpression;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof SqlRuleAction)) {
+            return false;
+        }
+
+        SqlRuleAction other = (SqlRuleAction)o;
+        return (this.sqlExpression == null ? other.sqlExpression == null : this.sqlExpression.equals(other.sqlExpression));
+    }
 }

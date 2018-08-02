@@ -2,10 +2,12 @@ package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.ClientSettings;
 import com.microsoft.azure.servicebus.primitives.*;
+import com.microsoft.azure.servicebus.rules.RuleDescription;
 import com.microsoft.azure.servicebus.security.SecurityToken;
 import com.microsoft.azure.servicebus.security.TokenProvider;
 import org.asynchttpclient.*;
 import org.asynchttpclient.util.HttpConstants;
+import org.omg.IOP.ENCODING_CDR_ENCAPS;
 import org.w3c.dom.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -154,6 +156,43 @@ public class ManagementClientAsync {
     }
 
     /**
+     * Retrieves a rule for a given topic and subscription from the service namespace
+     * @param topicPath - The path of the topic relative to service bus namespace.
+     * @param subscriptionName - The name of the subscription.
+     * @param ruleName - The name of the rule.
+     * @return - RuleDescription containing information about the subscription.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<RuleDescription> getRuleAsync(String topicPath, String subscriptionName, String ruleName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+        EntityNameHelper.checkValidRuleName(ruleName);
+
+        String path = EntityNameHelper.formatRulePath(topicPath, subscriptionName, ruleName);
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<RuleDescription> rdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                rdFuture.completeExceptionally(ex);
+            } else {
+                try {
+                    rdFuture.complete(RuleDescriptionUtil.parseFromContent(content));
+                } catch (MessagingEntityNotFoundException e) {
+                    rdFuture.completeExceptionally(e);
+                }
+            }
+            return null;
+        });
+
+        return rdFuture;
+    }
+
+    /**
      * Retrieves the list of queues present in the namespace.
      * @return the first 100 queues.
      * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
@@ -280,6 +319,8 @@ public class ManagementClientAsync {
             throw new IllegalArgumentException("Skip cannot be negative");
         }
 
+        EntityNameHelper.checkValidTopicName(topicName);
+
         CompletableFuture<String> contentFuture = getEntityAsync(String.format("%s/Subscriptions", topicName), String.format("$skip=%d&$top=%d", skip, count), false);
         CompletableFuture<List<SubscriptionDescription>> sdFuture = new CompletableFuture<>();
         contentFuture.handleAsync((content, ex) -> {
@@ -292,6 +333,59 @@ public class ManagementClientAsync {
         });
 
         return sdFuture;
+    }
+
+    /**
+     * Retrieves the list of rules for a given topic-subscription in the namespace.
+     * @return the first 100 rules.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<List<RuleDescription>> getRulesAsync(String topicName, String subscriptionName) {
+        return getRulesAsync(topicName, subscriptionName, 100, 0);
+    }
+
+    /**
+     * Retrieves the list of rules for a given topic-subscription in the namespace.
+     * You can simulate pages of list of entities by manipulating count and skip parameters.
+     * skip(0)+count(100) gives first 100 entities. skip(100)+count(100) gives the next 100 entities.
+     * @return the list of rules.
+     * @param count - The number of rules to fetch. Defaults to 100. Maximum value allowed is 100.
+     * @param skip - The number of rules to skip. Defaults to 0. Cannot be negative.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<List<RuleDescription>> getRulesAsync(String topicName, String subscriptionName, int count, int skip) {
+        if (count > 100 || count < 1) {
+            throw new IllegalArgumentException("Count should be between 1 and 100");
+        }
+
+        if (skip < 0) {
+            throw new IllegalArgumentException("Skip cannot be negative");
+        }
+
+        EntityNameHelper.checkValidTopicName(topicName);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+
+        CompletableFuture<String> contentFuture = getEntityAsync(
+                String.format("%s/Subscriptions/%s/rules", topicName, subscriptionName),
+                String.format("$skip=%d&$top=%d", skip, count),
+                false);
+        CompletableFuture<List<RuleDescription>> rulesFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                rulesFuture.completeExceptionally(ex);
+            } else {
+                rulesFuture.complete(RuleDescriptionUtil.parseCollectionFromContent(content));
+            }
+            return null;
+        });
+
+        return rulesFuture;
     }
 
     private CompletableFuture<String> getEntityAsync(String path, String query, boolean enrich) {
@@ -508,10 +602,26 @@ public class ManagementClientAsync {
      * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
      */
     public CompletableFuture<SubscriptionDescription> createSubscriptionAsync(SubscriptionDescription subscriptionDescription) {
-        return putSubscriptionAsync(subscriptionDescription, false);
+        return this.createSubscriptionAsync(subscriptionDescription, null);
     }
 
-    // todo: Create subscription with default rule.
+    /**
+     * Creates a new subscription in the service namespace with the provided default rule.
+     * See {@link SubscriptionDescription} for default values of subscription properties.
+     * @param subscriptionDescription - A {@link SubscriptionDescription} object describing the attributes with which the new subscription will be created.
+     * @param defaultRule - A {@link RuleDescription} object describing the default rule. If null, then pass-through filter will be created.
+     * @return {@link SubscriptionDescription} of the newly created subscription.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<SubscriptionDescription> createSubscriptionAsync(SubscriptionDescription subscriptionDescription, RuleDescription defaultRule) {
+        subscriptionDescription.defaultRule = defaultRule;
+        return putSubscriptionAsync(subscriptionDescription, false);
+    }
 
     /**
      * Updates an existing subscription.
@@ -553,6 +663,78 @@ public class ManagementClientAsync {
                     } else {
                         try {
                             responseFuture.complete(SubscriptionDescriptionUtil.parseFromContent(subscriptionDescription.getTopicPath(), content));
+                        } catch (MessagingEntityNotFoundException e) {
+                            responseFuture.completeExceptionally(e);
+                        }
+                    }
+
+                    return null;
+                });
+
+        return responseFuture;
+    }
+
+    /**
+     * Creates a new rule for a given topic - subscription.
+     * See {@link RuleDescription} for default values of subscription properties.
+     * @param topicName - Name of the topic.
+     * @param subscriptionName - Name of the subscription.
+     * @param ruleDescription - A {@link RuleDescription} object describing the attributes with which the new rule will be created.
+     * @return {@link RuleDescription} of the newly created rule.
+     * @throws MessagingEntityAlreadyExistsException - An entity with the same name exists under the same service namespace.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<RuleDescription> createRuleAsync(String topicName, String subscriptionName, RuleDescription ruleDescription) {
+        return putRuleAsync(topicName, subscriptionName, ruleDescription, false);
+    }
+
+    /**
+     * Updates an existing rule.
+     * @param topicName - Name of the topic.
+     * @param subscriptionName - Name of the subscription.
+     * @param ruleDescription - A {@link RuleDescription} object describing the attributes with which the rule will be updated.
+     * @return {@link RuleDescription} of the updated rule.
+     * @throws MessagingEntityNotFoundException - Described entity was not found.
+     * @throws IllegalArgumentException - descriptor is null.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws QuotaExceededException - Either the specified size in the description is not supported or the maximum allowed quota has been reached.
+     */
+    public CompletableFuture<RuleDescription> updateRuleAsync(String topicName, String subscriptionName, RuleDescription ruleDescription) {
+        return putRuleAsync(topicName, subscriptionName, ruleDescription, true);
+    }
+
+    private CompletableFuture<RuleDescription> putRuleAsync(String topicName, String subscriptionName, RuleDescription ruleDescription, boolean isUpdate) {
+        EntityNameHelper.checkValidTopicName(topicName);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+        if (ruleDescription == null) {
+            throw new IllegalArgumentException("queueDescription passed cannot be null");
+        }
+
+        String atomRequest = null;
+        try {
+            atomRequest = RuleDescriptionUtil.serialize(ruleDescription);
+        } catch (ServiceBusException e) {
+            final CompletableFuture<RuleDescription> exceptionFuture = new CompletableFuture<>();
+            exceptionFuture.completeExceptionally(e);
+            return exceptionFuture;
+        }
+
+        CompletableFuture<RuleDescription> responseFuture = new CompletableFuture<>();
+        String path = EntityNameHelper.formatRulePath(topicName, subscriptionName, ruleDescription.getName());
+        putEntityAsync(path, atomRequest, isUpdate, null, null)
+                .handleAsync((content, ex) -> {
+                    if (ex != null) {
+                        responseFuture.completeExceptionally(ex);
+                    } else {
+                        try {
+                            responseFuture.complete(RuleDescriptionUtil.parseFromContent(content));
                         } catch (MessagingEntityNotFoundException e) {
                             responseFuture.completeExceptionally(e);
                         }
@@ -703,6 +885,42 @@ public class ManagementClientAsync {
     }
 
     /**
+     * Checks whether a given rule exists or not for a given subscription.
+     * @param topicPath - Path of the topic
+     * @param subscriptionName - Name of the subscription.
+     * @param ruleName - Name of the rule
+     * @return - True if the entity exists. False otherwise.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<Boolean> ruleExistsAsync(String topicPath, String subscriptionName, String ruleName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+        EntityNameHelper.checkValidRuleName(ruleName);
+
+        CompletableFuture<Boolean> existsFuture = new CompletableFuture<>();
+        this.getRuleAsync(topicPath, subscriptionName, ruleName).handleAsync((qd, ex) -> {
+            if (ex != null) {
+                if (ex instanceof MessagingEntityNotFoundException) {
+                    existsFuture.complete(Boolean.FALSE);
+                    return false;
+                }
+
+                existsFuture.completeExceptionally(ex);
+                return false;
+            }
+
+            existsFuture.complete(Boolean.TRUE);
+            return true;
+        });
+
+        return existsFuture;
+    }
+
+    /**
      * Deletes the queue described by the path relative to the service namespace base address.
      * @param path - The name of the entity relative to the service namespace base address.
      * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
@@ -747,6 +965,26 @@ public class ManagementClientAsync {
         EntityNameHelper.checkValidTopicName(topicPath);
         EntityNameHelper.checkValidSubscriptionName(subscriptionName);
         String path = EntityNameHelper.formatSubscriptionPath(topicPath, subscriptionName);
+        return deleteEntityAsync(path);
+    }
+
+    /**
+     * Deletes the rule for a given topic-subscription.
+     * @param topicPath - The name of the topic.
+     * @param subscriptionName - The name of the subscription.
+     * @param ruleName - The name of the rule.
+     * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     * @throws MessagingEntityNotFoundException - An entity with this name does not exist.
+     */
+    public CompletableFuture<Void> deleteRuleAsync(String topicPath, String subscriptionName, String ruleName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+        EntityNameHelper.checkValidRuleName(ruleName);
+        String path = EntityNameHelper.formatRulePath(topicPath, subscriptionName, ruleName);
         return deleteEntityAsync(path);
     }
 

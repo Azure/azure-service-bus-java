@@ -404,6 +404,7 @@ public class QueueDescription {
                 && this.enableBatchedOperations == other.enableBatchedOperations
                 && this.enableDeadLetteringOnMessageExpiration == other.enableDeadLetteringOnMessageExpiration
                 && this.enablePartitioning == other.enablePartitioning
+                // todo: update string.equals logic based on sqlFilter
                 && ((this.forwardTo == null && other.forwardTo == null) || this.forwardTo.equalsIgnoreCase(other.forwardTo))
                 && ((this.forwardDeadLetteredMessagesTo == null && other.forwardDeadLetteredMessagesTo == null) || this.forwardDeadLetteredMessagesTo.equalsIgnoreCase(other.forwardDeadLetteredMessagesTo))
                 && this.lockDuration.equals(other.lockDuration)
