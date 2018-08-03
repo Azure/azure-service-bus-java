@@ -89,6 +89,38 @@ public class ManagementClientAsync {
     }
 
     /**
+     * Retrieves the runtime information of a queue.
+     * @param path - The path of the queue relative to service bus namespace.
+     * @return - QueueRuntimeInfo containing runtime information about the queue.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<QueueRuntimeInfo> getQueueRuntimeInfoAsync(String path) {
+        EntityNameHelper.checkValidQueueName(path);
+
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<QueueRuntimeInfo> qdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                qdFuture.completeExceptionally(ex);
+            } else {
+                try {
+                    qdFuture.complete(QueueRuntimeInfoUtil.parseFromContent(content));
+                } catch (MessagingEntityNotFoundException e) {
+                    qdFuture.completeExceptionally(e);
+                }
+            }
+            return null;
+        });
+
+        return qdFuture;
+    }
+
+    /**
      * Retrieves a topic from the service namespace
      * @param path - The path of the queue relative to service bus namespace.
      * @return - Description containing information about the topic.
@@ -110,6 +142,38 @@ public class ManagementClientAsync {
             } else {
                 try {
                     tdFuture.complete(TopicDescriptionUtil.parseFromContent(content));
+                } catch (MessagingEntityNotFoundException e) {
+                    tdFuture.completeExceptionally(e);
+                }
+            }
+            return null;
+        });
+
+        return tdFuture;
+    }
+
+    /**
+     * Retrieves the runtime information of a topic
+     * @param path - The path of the queue relative to service bus namespace.
+     * @return - TopicRuntimeInfo containing runtime information about the topic.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<TopicRuntimeInfo> getTopicRuntimeInfoAsync(String path) {
+        EntityNameHelper.checkValidTopicName(path);
+
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<TopicRuntimeInfo> tdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                tdFuture.completeExceptionally(ex);
+            } else {
+                try {
+                    tdFuture.complete(TopicRuntimeInfoUtil.parseFromContent(content));
                 } catch (MessagingEntityNotFoundException e) {
                     tdFuture.completeExceptionally(e);
                 }
@@ -145,6 +209,41 @@ public class ManagementClientAsync {
             } else {
                 try {
                     sdFuture.complete(SubscriptionDescriptionUtil.parseFromContent(topicPath, content));
+                } catch (MessagingEntityNotFoundException e) {
+                    sdFuture.completeExceptionally(e);
+                }
+            }
+            return null;
+        });
+
+        return sdFuture;
+    }
+
+    /**
+     * Retrieves the runtime information of a subscription in a given topic
+     * @param topicPath - The path of the topic relative to service bus namespace.
+     * @param subscriptionName - The name of the subscription
+     * @return - SubscriptionRuntimeInfo containing the runtime information about the subscription.
+     * @throws IllegalArgumentException - Thrown if path is null, empty, or not in right format or length.
+     * @throws TimeoutException - The operation times out. The timeout period is initiated through ClientSettings.operationTimeout
+     * @throws MessagingEntityNotFoundException - Entity with this name doesn't exist.
+     * @throws AuthorizationFailedException - No sufficient permission to perform this operation. Please check ClientSettings.tokenProvider has correct details.
+     * @throws ServerBusyException - The server is busy. You should wait before you retry the operation.
+     * @throws ServiceBusException - An internal error or an unexpected exception occured.
+     */
+    public CompletableFuture<SubscriptionRuntimeInfo> getSubscriptionRuntimeInfoAsync(String topicPath, String subscriptionName) {
+        EntityNameHelper.checkValidTopicName(topicPath);
+        EntityNameHelper.checkValidSubscriptionName(subscriptionName);
+
+        String path = EntityNameHelper.formatSubscriptionPath(topicPath, subscriptionName);
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<SubscriptionRuntimeInfo> sdFuture = new CompletableFuture<>();
+        contentFuture.handleAsync((content, ex) -> {
+            if (ex != null) {
+                sdFuture.completeExceptionally(ex);
+            } else {
+                try {
+                    sdFuture.complete(SubscriptionRuntimeInfoUtil.parseFromContent(topicPath, content));
                 } catch (MessagingEntityNotFoundException e) {
                     sdFuture.completeExceptionally(e);
                 }

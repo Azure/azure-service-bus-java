@@ -2,14 +2,17 @@ package com.microsoft.azure.servicebus;
 
 import com.microsoft.azure.servicebus.management.*;
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
+import com.microsoft.azure.servicebus.primitives.MessagingFactory;
+import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.rules.*;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -261,4 +264,107 @@ public class ManagementTests {
         Assert.assertFalse(this.managementClientAsync.ruleExistsAsync(topicName, subscriptionName, "rule0").get());
         this.managementClientAsync.deleteTopicAsync(topicName).get();
     }
+
+    @Test
+    public void getQueueRuntimeInfoTest() throws ExecutionException, InterruptedException, ServiceBusException {
+        String queueName = UUID.randomUUID().toString().substring(0, 8);
+
+        // Setting created time
+        QueueDescription qd = this.managementClientAsync.createQueueAsync(queueName).get();
+
+        // Changing last updated time
+        qd.setAutoDeleteOnIdle(Duration.ofHours(2));
+        QueueDescription updatedQd = this.managementClientAsync.updateQueueAsync(qd).get();
+
+        // Populating 1 active, 1 dead and 1 scheduled message.
+        // Changing last accessed time.
+        MessagingFactory factory = MessagingFactory.createFromNamespaceEndpointURI(TestUtils.getNamespaceEndpointURI(), TestUtils.getClientSettings());
+        IMessageSender sender = ClientFactory.createMessageSenderFromEntityPath(factory, queueName);
+        IMessageReceiver receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, queueName);
+
+        sender.send(new Message("m1"));
+        sender.send(new Message("m2"));
+        sender.scheduleMessage(new Message("m3"), Instant.now().plusSeconds(1000));
+
+        IMessage msg = receiver.receive();
+        receiver.deadLetter(msg.getLockToken());
+
+        QueueRuntimeInfo runtimeInfo = this.managementClientAsync.getQueueRuntimeInfoAsync(queueName).get();
+
+        Assert.assertEquals(queueName, runtimeInfo.getPath());
+        Assert.assertTrue(runtimeInfo.getCreatedAt().isBefore(runtimeInfo.getUpdatedAt()));
+        Assert.assertTrue(runtimeInfo.getUpdatedAt().isBefore(runtimeInfo.getAccessedAt()));
+        Assert.assertEquals(1, runtimeInfo.getMessageCountDetails().getActiveMessageCount());
+        Assert.assertEquals(1, runtimeInfo.getMessageCountDetails().getDeadLetterMessageCount());
+        Assert.assertEquals(1, runtimeInfo.getMessageCountDetails().getScheduledMessageCount());
+        Assert.assertEquals(3, runtimeInfo.getMessageCount());
+        Assert.assertTrue(runtimeInfo.getSizeInBytes() > 0);
+
+        this.managementClientAsync.deleteQueueAsync(queueName).get();
+        receiver.close();
+        sender.close();
+        factory.close();
+    }
+
+    @Test
+    public void getTopicAndSubscriptionRuntimeInfoTest() throws ExecutionException, InterruptedException, ServiceBusException {
+        String topicName = UUID.randomUUID().toString().substring(0, 8);
+        String subscriptionName = UUID.randomUUID().toString().substring(0, 8);
+
+        // Setting created time
+        TopicDescription td = this.managementClientAsync.createTopicAsync(topicName).get();
+
+        // Changing last updated time
+        td.setAutoDeleteOnIdle(Duration.ofHours(2));
+        TopicDescription updatedTd = this.managementClientAsync.updateTopicAsync(td).get();
+
+        SubscriptionDescription sd = this.managementClientAsync.createSubscriptionAsync(topicName, subscriptionName).get();
+
+        // Changing Last updated time for subscription.
+        sd.setAutoDeleteOnIdle(Duration.ofHours(2));
+        SubscriptionDescription updatedSd = this.managementClientAsync.updateSubscriptionAsync(sd).get();
+
+        // Populating 1 active, 1 dead and 1 scheduled message.
+        // Changing last accessed time.
+        MessagingFactory factory = MessagingFactory.createFromNamespaceEndpointURI(TestUtils.getNamespaceEndpointURI(), TestUtils.getClientSettings());
+        IMessageSender sender = ClientFactory.createMessageSenderFromEntityPath(factory, topicName);
+        IMessageReceiver receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, EntityNameHelper.formatSubscriptionPath(topicName, subscriptionName));
+
+        sender.send(new Message("m1"));
+        sender.send(new Message("m2"));
+        sender.scheduleMessage(new Message("m3"), Instant.now().plusSeconds(1000));
+
+        IMessage msg = receiver.receive();
+        receiver.deadLetter(msg.getLockToken());
+
+        TopicRuntimeInfo topicRuntimeInfo = this.managementClientAsync.getTopicRuntimeInfoAsync(topicName).get();
+        SubscriptionRuntimeInfo subscriptionRuntimeInfo = this.managementClientAsync.getSubscriptionRuntimeInfoAsync(topicName, subscriptionName).get();
+
+        Assert.assertEquals(topicName, topicRuntimeInfo.getPath());
+        Assert.assertEquals(topicName, subscriptionRuntimeInfo.getTopicPath());
+        Assert.assertEquals(subscriptionName, subscriptionRuntimeInfo.getSubscriptionName());
+
+        Assert.assertEquals(0, topicRuntimeInfo.getMessageCountDetails().getActiveMessageCount());
+        Assert.assertEquals(0, topicRuntimeInfo.getMessageCountDetails().getDeadLetterMessageCount());
+        Assert.assertEquals(1, topicRuntimeInfo.getMessageCountDetails().getScheduledMessageCount());
+        Assert.assertEquals(1, subscriptionRuntimeInfo.getMessageCountDetails().getActiveMessageCount());
+        Assert.assertEquals(1, subscriptionRuntimeInfo.getMessageCountDetails().getDeadLetterMessageCount());
+        Assert.assertEquals(0, subscriptionRuntimeInfo.getMessageCountDetails().getScheduledMessageCount());
+        Assert.assertEquals(2, subscriptionRuntimeInfo.getMessageCount());
+        Assert.assertEquals(1, topicRuntimeInfo.getSubscriptionCount());
+        Assert.assertTrue(topicRuntimeInfo.getSizeInBytes() > 0);
+
+        Assert.assertTrue(topicRuntimeInfo.getCreatedAt().isBefore(topicRuntimeInfo.getUpdatedAt()));
+        Assert.assertTrue(topicRuntimeInfo.getUpdatedAt().isBefore(topicRuntimeInfo.getAccessedAt()));
+        Assert.assertTrue(subscriptionRuntimeInfo.getCreatedAt().isBefore(subscriptionRuntimeInfo.getUpdatedAt()));
+        Assert.assertTrue(subscriptionRuntimeInfo.getUpdatedAt().isBefore(subscriptionRuntimeInfo.getAccessedAt()));
+        Assert.assertTrue(topicRuntimeInfo.getUpdatedAt().isBefore(subscriptionRuntimeInfo.getUpdatedAt()));
+
+        this.managementClientAsync.deleteSubscriptionAsync(topicName, subscriptionName).get();
+        this.managementClientAsync.deleteTopicAsync(topicName).get();
+        receiver.close();
+        sender.close();
+        factory.close();
+    }
+
 }

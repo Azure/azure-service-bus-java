@@ -159,7 +159,7 @@ class TopicDescriptionUtil {
             System.err.println(ioe.getMessage());
         }*/
 
-        throw new MessagingEntityNotFoundException("Queue was not found");
+        throw new MessagingEntityNotFoundException("Topic was not found");
     }
 
     private static TopicDescription parseFromEntry(Node xEntry) {

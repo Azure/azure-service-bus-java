@@ -171,7 +171,7 @@ class SubscriptionDescriptionUtil {
             System.err.println(ioe.getMessage());
         }*/
 
-        throw new MessagingEntityNotFoundException("Queue was not found");
+        throw new MessagingEntityNotFoundException("Subscription was not found");
     }
 
     private static SubscriptionDescription parseFromEntry(String topicName, Node xEntry) {
