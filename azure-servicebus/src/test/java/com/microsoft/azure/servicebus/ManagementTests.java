@@ -1,9 +1,7 @@
 package com.microsoft.azure.servicebus;
 
 import com.microsoft.azure.servicebus.management.*;
-import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
-import com.microsoft.azure.servicebus.primitives.MessagingFactory;
-import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import com.microsoft.azure.servicebus.primitives.*;
 import com.microsoft.azure.servicebus.rules.*;
 import org.junit.Assert;
 import org.junit.Before;
@@ -14,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -367,4 +366,146 @@ public class ManagementTests {
         factory.close();
     }
 
+    @Test
+    public void messagingEntityNotFoundExceptionTest() throws ServiceBusException, InterruptedException, ExecutionException {
+        try {
+            Utils.completeFuture(this.managementClientAsync.getQueueAsync("NonExistingPath"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.getTopicAsync("NonExistingPath"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.getSubscriptionAsync("NonExistingTopic", "NonExistingPath"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.updateQueueAsync(new QueueDescription("NonExistingPath")));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.updateTopicAsync(new TopicDescription("NonExistingPath")));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.updateSubscriptionAsync(new SubscriptionDescription("NonExistingTopic", "NonExistingPath")));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.deleteQueueAsync("NonExistingPath"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.deleteTopicAsync("NonExistingPath"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.deleteSubscriptionAsync("nonExistingTopic", "NonExistingPath"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        String queueName = UUID.randomUUID().toString().substring(0, 8);
+        String topicName = UUID.randomUUID().toString().substring(0, 8);
+
+        this.managementClientAsync.createQueueAsync(queueName).get();
+        this.managementClientAsync.createTopicAsync(topicName).get();
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.getQueueAsync(topicName));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.getTopicAsync(queueName));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.getSubscriptionAsync(topicName, "NonExistingSubscription"));
+        } catch (MessagingEntityNotFoundException e) {}
+
+        this.managementClientAsync.deleteQueueAsync(queueName).get();
+        this.managementClientAsync.deleteTopicAsync(topicName).get();
+    }
+
+    @Test
+    public void messagingEntityAlreadyExistsExceptionTest() throws ServiceBusException, InterruptedException, ExecutionException {
+        String queueName = UUID.randomUUID().toString().substring(0, 8);
+        String topicName = UUID.randomUUID().toString().substring(0, 8);
+        String subscriptionName = UUID.randomUUID().toString().substring(0, 8);
+        this.managementClientAsync.createQueueAsync(queueName).get();
+        this.managementClientAsync.createTopicAsync(topicName).get();
+        this.managementClientAsync.createSubscriptionAsync(topicName, subscriptionName).get();
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.createQueueAsync(queueName));
+        } catch (MessagingEntityAlreadyExistsException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.createTopicAsync(topicName));
+        } catch (MessagingEntityAlreadyExistsException e) {}
+
+        try {
+            Utils.completeFuture(this.managementClientAsync.createSubscriptionAsync(topicName, subscriptionName));
+        } catch (MessagingEntityAlreadyExistsException e) {}
+
+        this.managementClientAsync.deleteQueueAsync(queueName).get();
+        this.managementClientAsync.deleteSubscriptionAsync(topicName, subscriptionName).get();
+        this.managementClientAsync.deleteTopicAsync(topicName).get();
+    }
+
+    @Test
+    public void forwardingEntitySetupTest() throws ServiceBusException, InterruptedException {
+        // queueName -- fwdTo --> destinationName -- fwd dlqTo --> dlqDestinationName
+        String queueName = UUID.randomUUID().toString().substring(0, 8);
+        String destinationName = UUID.randomUUID().toString().substring(0, 8);
+        String dlqDestinationName = UUID.randomUUID().toString().substring(0, 8);
+
+        QueueDescription dqlDestinationQ = Utils.completeFuture(this.managementClientAsync.createQueueAsync(dlqDestinationName));
+        QueueDescription destinationQToCreate = new QueueDescription(destinationName);
+        destinationQToCreate.setForwardDeadLetteredMessagesTo(dlqDestinationName);
+        QueueDescription destinationQ = Utils.completeFuture(this.managementClientAsync.createQueueAsync(destinationQToCreate));
+
+        QueueDescription qd = new QueueDescription(queueName);
+        qd.setForwardTo(destinationName);
+        QueueDescription baseQ = Utils.completeFuture(this.managementClientAsync.createQueueAsync(qd));
+
+        MessagingFactory factory = MessagingFactory.createFromNamespaceEndpointURI(TestUtils.getNamespaceEndpointURI(), TestUtils.getClientSettings());
+        IMessageSender sender = ClientFactory.createMessageSenderFromEntityPath(factory, queueName);
+        IMessage message = new Message();
+        message.setMessageId("mid");
+        sender.send(message);
+        sender.close();
+
+        IMessageReceiver receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, destinationName);
+        IMessage msg = receiver.receive();
+        Assert.assertNotNull(msg);
+        Assert.assertEquals("mid", msg.getMessageId());
+        receiver.deadLetter(msg.getLockToken());
+        receiver.close();
+
+        receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, dlqDestinationName);
+        msg = receiver.receive();
+        Assert.assertNotNull(msg);
+        Assert.assertEquals("mid", msg.getMessageId());
+        receiver.complete(msg.getLockToken());
+        receiver.close();
+
+        this.managementClientAsync.deleteQueueAsync(queueName);
+        this.managementClientAsync.deleteQueueAsync(destinationName);
+        this.managementClientAsync.deleteQueueAsync(dlqDestinationName);
+    }
+
+    @Test
+    public void authRulesEqualityCheckTest() {
+        QueueDescription qd = new QueueDescription("a");
+        SharedAccessAuthorizationRule rule1 = new SharedAccessAuthorizationRule("sendListen", new ArrayList<>(Arrays.asList(AccessRights.Listen, AccessRights.Send)));
+        SharedAccessAuthorizationRule rule2 = new SharedAccessAuthorizationRule("manage", new ArrayList<>(Arrays.asList(AccessRights.Listen, AccessRights.Send, AccessRights.Manage)));
+        qd.setAuthorizationRules(new ArrayList<>(Arrays.asList(rule1, rule2)));
+
+        QueueDescription qd2 = new QueueDescription("a");
+        AuthorizationRule rule11 = new SharedAccessAuthorizationRule(rule2.getKeyName(), rule2.getPrimaryKey(), rule2.getSecondaryKey(),  rule2.getRights());
+        AuthorizationRule rule22 = new SharedAccessAuthorizationRule(rule1.getKeyName(), rule1.getPrimaryKey(), rule1.getSecondaryKey(), rule1.getRights());
+        qd2.setAuthorizationRules(new ArrayList<>(Arrays.asList(rule11, rule22)));
+
+        Assert.assertTrue(qd.equals(qd2));
+    }
 }

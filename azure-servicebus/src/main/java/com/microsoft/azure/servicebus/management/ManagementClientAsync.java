@@ -862,9 +862,9 @@ public class ManagementClientAsync {
 
         if (forwardTo != null && !forwardTo.isEmpty()) {
             try {
-                String securityToken = getSecurityToken(this.clientSettings.getTokenProvider(), new URL(forwardTo));
+                String securityToken = getSecurityToken(this.clientSettings.getTokenProvider(), forwardTo);
                 additionalHeaders.put(ManagementClientConstants.ServiceBusSupplementartyAuthorizationHeaderName, securityToken);
-            } catch (InterruptedException | ExecutionException | MalformedURLException e) {
+            } catch (InterruptedException | ExecutionException e) {
                 final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
                 exceptionFuture.completeExceptionally(e);
                 return exceptionFuture;
@@ -873,9 +873,9 @@ public class ManagementClientAsync {
 
         if (fwdDeadLetterTo != null && !fwdDeadLetterTo.isEmpty()) {
             try {
-                String securityToken = getSecurityToken(this.clientSettings.getTokenProvider(), new URL(fwdDeadLetterTo));
+                String securityToken = getSecurityToken(this.clientSettings.getTokenProvider(), fwdDeadLetterTo);
                 additionalHeaders.put(ManagementClientConstants.ServiceBusDlqSupplementaryAuthorizationHeaderName, securityToken);
-            } catch (InterruptedException | ExecutionException | MalformedURLException e) {
+            } catch (InterruptedException | ExecutionException e) {
                 final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
                 exceptionFuture.completeExceptionally(e);
                 return exceptionFuture;
@@ -1112,7 +1112,7 @@ public class ManagementClientAsync {
     private CompletableFuture<String> sendManagementHttpRequestAsync(String httpMethod, URL url, String atomEntryString, HashMap<String, String> additionalHeaders) {
         String securityToken = null;
         try {
-            securityToken = getSecurityToken(this.clientSettings.getTokenProvider(), url);
+            securityToken = getSecurityToken(this.clientSettings.getTokenProvider(), url.toString());
         } catch (InterruptedException | ExecutionException e) {
             final CompletableFuture<String> exceptionFuture = new CompletableFuture<>();
             exceptionFuture.completeExceptionally(e);
@@ -1253,8 +1253,8 @@ public class ManagementClientAsync {
         return null;
     }
 
-    private static String getSecurityToken(TokenProvider tokenProvider, URL url ) throws InterruptedException, ExecutionException {
-        SecurityToken token = tokenProvider.getSecurityTokenAsync(url.toString()).get();
+    private static String getSecurityToken(TokenProvider tokenProvider, String url ) throws InterruptedException, ExecutionException {
+        SecurityToken token = tokenProvider.getSecurityTokenAsync(url).get();
         return token.getTokenValue();
     }
     
