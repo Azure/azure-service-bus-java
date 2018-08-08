@@ -59,7 +59,7 @@ class RuleDescriptionSerializer {
         return output.toString();
     }
 
-    static Element serializeRule(Document doc, RuleDescription ruleDescription, String rootName) {
+    static Element serializeRule(Document doc, RuleDescription ruleDescription, String rootName) throws ServiceBusException {
         Element rdElement = doc.createElementNS(ManagementClientConstants.SB_NS, rootName);
 
         if (ruleDescription.getFilter() != null) {
@@ -79,7 +79,7 @@ class RuleDescriptionSerializer {
         return rdElement;
     }
 
-    private static Element serializeFilter(Document doc, Filter filter) {
+    private static Element serializeFilter(Document doc, Filter filter) throws ServiceBusException {
         if (filter instanceof TrueFilter) {
             return serializeSqlFilter(doc, (SqlFilter)filter, "TrueFilter");
         } else if (filter instanceof FalseFilter) {
@@ -103,7 +103,12 @@ class RuleDescriptionSerializer {
         return filterElement;
     }
 
-    private static Element serializeCorrelationFilter(Document doc, CorrelationFilter filter) {
+    private static Element serializeCorrelationFilter(Document doc, CorrelationFilter filter) throws ServiceBusException {
+        if (filter.getProperties() != null) {
+            throw new ServiceBusException(false, new UnsupportedOperationException("Correlation rules with custom properties " +
+                    "is not yet implemented with ManagementClient"));
+        }
+
         Element filterElement = doc.createElementNS(ManagementClientConstants.SB_NS, "Filter");
         filterElement.setAttributeNS(ManagementClientConstants.XML_SCHEMA_INSTANCE_NS, "type", "CorrelationFilter");
 
