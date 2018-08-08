@@ -136,6 +136,9 @@ public class TopicDescription {
         }
 
         this.autoDeleteOnIdle = autoDeleteOnIdle;
+        if (this.autoDeleteOnIdle.compareTo(ManagementClientConstants.MAX_DURATION) > 0) {
+            this.autoDeleteOnIdle = ManagementClientConstants.MAX_DURATION;
+        }
     }
 
     /**
@@ -162,6 +165,9 @@ public class TopicDescription {
         }
 
         this.duplicationDetectionHistoryTimeWindow = duplicationDetectionHistoryTimeWindow;
+        if (this.duplicationDetectionHistoryTimeWindow.compareTo(ManagementClientConstants.MAX_DURATION) > 0) {
+            this.duplicationDetectionHistoryTimeWindow = ManagementClientConstants.MAX_DURATION;
+        }
     }
 
     /**
@@ -286,7 +292,7 @@ public class TopicDescription {
                 && this.requiresDuplicateDetection == other.requiresDuplicateDetection
                 && this.supportOrdering == other.supportOrdering
                 && this.status.equals(other.status)
-                && ((this.userMetadata == null && other.userMetadata == null) || this.userMetadata.equals(other.userMetadata))
+                && (this.userMetadata == null ? other.userMetadata == null : this.userMetadata.equals(other.userMetadata))
                 && AuthorizationRuleSerializer.equals(this.authorizationRules, other.authorizationRules)) {
             return true;
         }

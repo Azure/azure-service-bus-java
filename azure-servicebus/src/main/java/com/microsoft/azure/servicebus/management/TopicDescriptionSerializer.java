@@ -30,9 +30,8 @@ class TopicDescriptionSerializer {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(TopicDescriptionSerializer.class);
 
     static String serialize(TopicDescription topicDescription) throws ServiceBusException {
-        DocumentBuilderFactory dbFactory =
-                DocumentBuilderFactory.newInstance();
-        DocumentBuilder dBuilder = null;
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder dBuilder;
         try {
             dBuilder = dbFactory.newDocumentBuilder();
         } catch (ParserConfigurationException e) {
@@ -197,7 +196,6 @@ class TopicDescriptionSerializer {
                                         td.duplicationDetectionHistoryTimeWindow = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "DefaultMessageTimeToLive":
-                                        // TODO: Convert .net's MaxTimespan to Duration.Indefinite
                                         td.defaultMessageTimeToLive = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "EnableBatchedOperations":

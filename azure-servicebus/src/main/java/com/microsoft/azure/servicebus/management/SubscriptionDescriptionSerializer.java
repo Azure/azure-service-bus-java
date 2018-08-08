@@ -213,7 +213,6 @@ class SubscriptionDescriptionSerializer {
                                         sd.lockDuration = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "DefaultMessageTimeToLive":
-                                        // TODO: Convert .net's MaxTimespan to Duration.Indefinite
                                         sd.defaultMessageTimeToLive = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "MaxDeliveryCount":

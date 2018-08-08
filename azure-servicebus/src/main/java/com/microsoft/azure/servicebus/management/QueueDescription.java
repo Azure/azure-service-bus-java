@@ -72,6 +72,9 @@ public class QueueDescription {
     public void setLockDuration(Duration lockDuration)
     {
         this.lockDuration = lockDuration;
+        if (this.lockDuration.compareTo(ManagementClientConstants.MAX_DURATION) > 0) {
+            this.lockDuration = ManagementClientConstants.MAX_DURATION;
+        }
     }
 
     /**
@@ -151,6 +154,9 @@ public class QueueDescription {
         }
 
         this.defaultMessageTimeToLive = defaultMessageTimeToLive;
+        if (this.defaultMessageTimeToLive.compareTo(ManagementClientConstants.MAX_DURATION) > 0) {
+            this.defaultMessageTimeToLive = ManagementClientConstants.MAX_DURATION;
+        }
     }
 
     /**
@@ -175,6 +181,9 @@ public class QueueDescription {
         }
 
         this.autoDeleteOnIdle = autoDeleteOnIdle;
+        if (this.autoDeleteOnIdle.compareTo(ManagementClientConstants.MAX_DURATION) > 0) {
+            this.autoDeleteOnIdle = ManagementClientConstants.MAX_DURATION;
+        }
     }
 
     /**
@@ -217,6 +226,9 @@ public class QueueDescription {
         }
 
         this.duplicationDetectionHistoryTimeWindow = duplicationDetectionHistoryTimeWindow;
+        if (this.duplicationDetectionHistoryTimeWindow.compareTo(ManagementClientConstants.MAX_DURATION) > 0) {
+            this.duplicationDetectionHistoryTimeWindow = ManagementClientConstants.MAX_DURATION;
+        }
     }
 
     /**
@@ -404,16 +416,15 @@ public class QueueDescription {
                 && this.enableBatchedOperations == other.enableBatchedOperations
                 && this.enableDeadLetteringOnMessageExpiration == other.enableDeadLetteringOnMessageExpiration
                 && this.enablePartitioning == other.enablePartitioning
-                // todo: update string.equals logic based on sqlFilter
-                && ((this.forwardTo == null && other.forwardTo == null) || this.forwardTo.equalsIgnoreCase(other.forwardTo))
-                && ((this.forwardDeadLetteredMessagesTo == null && other.forwardDeadLetteredMessagesTo == null) || this.forwardDeadLetteredMessagesTo.equalsIgnoreCase(other.forwardDeadLetteredMessagesTo))
+                && (this.forwardTo == null ? other.forwardTo == null : this.forwardTo.equalsIgnoreCase(other.forwardTo))
+                && (this.forwardDeadLetteredMessagesTo == null ? other.forwardDeadLetteredMessagesTo == null : this.forwardDeadLetteredMessagesTo.equalsIgnoreCase(other.forwardDeadLetteredMessagesTo))
                 && this.lockDuration.equals(other.lockDuration)
                 && this.maxDeliveryCount == other.maxDeliveryCount
                 && this.maxSizeInMB == other.maxSizeInMB
                 && this.requiresDuplicateDetection == other.requiresDuplicateDetection
                 && this.requiresSession == other.requiresSession
                 && this.status.equals(other.status)
-                && ((this.userMetadata == null && other.userMetadata == null) || this.userMetadata.equals(other.userMetadata))
+                && (this.userMetadata == null ? other.userMetadata == null : this.userMetadata.equals(other.userMetadata))
                 && AuthorizationRuleSerializer.equals(this.authorizationRules, other.authorizationRules)) {
             return true;
         }

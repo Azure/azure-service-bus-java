@@ -32,9 +32,7 @@ import java.util.List;
 class QueueDescriptionSerializer {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(QueueDescriptionSerializer.class);
     static String serialize(QueueDescription queueDescription) throws ServiceBusException {
-        // todo: Reuse factory
-        DocumentBuilderFactory dbFactory =
-                DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = null;
         try {
             dBuilder = dbFactory.newDocumentBuilder();
@@ -233,7 +231,6 @@ class QueueDescriptionSerializer {
                                         qd.lockDuration = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "DefaultMessageTimeToLive":
-                                        // TODO: Convert .net's MaxTimespan to Duration.Indefinite
                                         qd.defaultMessageTimeToLive = Duration.parse(element.getFirstChild().getNodeValue());
                                         break;
                                     case "MaxDeliveryCount":

@@ -27,7 +27,6 @@ class RuleDescriptionSerializer {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(RuleDescriptionSerializer.class);
 
     static String serialize(RuleDescription ruleDescription) throws ServiceBusException {
-        // todo: Reuse factory
         DocumentBuilderFactory dbFactory =
                 DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = null;
@@ -203,7 +202,6 @@ class RuleDescriptionSerializer {
     }
 
     static RuleDescription parseFromContent(String xml) throws MessagingEntityNotFoundException {
-        // TODO: Reuse dbf
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
@@ -212,18 +210,15 @@ class RuleDescriptionSerializer {
             doc.normalize();
             if (doc.getTagName() == "entry")
                 return parseFromEntry(doc);
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
-        }
-        /*catch (ParserConfigurationException pce) {
-            System.out.println(pce.getMessage());
-        } catch (SAXException se) {
-            System.out.println(se.getMessage());
-        } catch (IOException ioe) {
-            System.err.println(ioe.getMessage());
-        }*/
 
         throw new MessagingEntityNotFoundException("Rule was not found");
     }
