@@ -414,7 +414,7 @@ public class QueueDescription {
                 && this.requiresSession == other.requiresSession
                 && this.status.equals(other.status)
                 && ((this.userMetadata == null && other.userMetadata == null) || this.userMetadata.equals(other.userMetadata))
-                && AuthorizationRuleUtil.equals(this.authorizationRules, other.authorizationRules)) {
+                && AuthorizationRuleSerializer.equals(this.authorizationRules, other.authorizationRules)) {
             return true;
         }
 

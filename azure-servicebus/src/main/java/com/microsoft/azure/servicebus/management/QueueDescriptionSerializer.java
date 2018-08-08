@@ -2,10 +2,13 @@ package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -17,17 +20,17 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-class QueueDescriptionUtil {
-
+class QueueDescriptionSerializer {
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(QueueDescriptionSerializer.class);
     static String serialize(QueueDescription queueDescription) throws ServiceBusException {
         // todo: Reuse factory
         DocumentBuilderFactory dbFactory =
@@ -91,7 +94,7 @@ class QueueDescriptionUtil {
                         .appendChild(doc.createTextNode(Boolean.toString(queueDescription.enableBatchedOperations))).getParentNode());
 
         if (queueDescription.authorizationRules != null) {
-            qdElement.appendChild(AuthorizationRuleUtil.serializeRules(queueDescription.authorizationRules, doc));
+            qdElement.appendChild(AuthorizationRuleSerializer.serializeRules(queueDescription.authorizationRules, doc));
         }
 
         qdElement.appendChild(
@@ -155,17 +158,20 @@ class QueueDescriptionUtil {
                     queueList.add(parseFromEntry(node));
                 }
             }
-        }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
 
         return queueList;
     }
 
     static QueueDescription parseFromContent(String xml) throws MessagingEntityNotFoundException {
-        // TODO: Reuse dbf
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
@@ -174,18 +180,15 @@ class QueueDescriptionUtil {
             doc.normalize();
             if (doc.getTagName() == "entry")
             return parseFromEntry(doc);
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
-        }
-        /*catch (ParserConfigurationException pce) {
-            System.out.println(pce.getMessage());
-        } catch (SAXException se) {
-            System.out.println(se.getMessage());
-        } catch (IOException ioe) {
-            System.err.println(ioe.getMessage());
-        }*/
 
         throw new MessagingEntityNotFoundException("Queue was not found");
     }
@@ -264,7 +267,7 @@ class QueueDescriptionUtil {
                                         }
                                         break;
                                     case "AuthorizationRules":
-                                        qd.authorizationRules = AuthorizationRuleUtil.parseAuthRules(element);
+                                        qd.authorizationRules = AuthorizationRuleSerializer.parseAuthRules(element);
                                         break;
                                 }
                             }

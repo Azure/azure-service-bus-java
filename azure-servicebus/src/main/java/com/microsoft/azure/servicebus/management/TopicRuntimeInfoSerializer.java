@@ -1,6 +1,8 @@
 package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -14,9 +16,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
 
-public class TopicRuntimeInfoUtil {
+public class TopicRuntimeInfoSerializer {
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(TopicRuntimeInfoSerializer.class);
+
     static TopicRuntimeInfo parseFromContent(String xml) throws MessagingEntityNotFoundException {
-        // TODO: Reuse dbf
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
@@ -26,8 +29,13 @@ public class TopicRuntimeInfoUtil {
             if (doc.getTagName() == "entry")
                 return parseFromEntry(doc);
         } catch (ParserConfigurationException | IOException | SAXException e) {
-            e.printStackTrace();
-            // todo log
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
 
         throw new MessagingEntityNotFoundException("Topic was not found");

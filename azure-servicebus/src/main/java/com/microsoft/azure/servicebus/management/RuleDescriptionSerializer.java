@@ -3,7 +3,10 @@ package com.microsoft.azure.servicebus.management;
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.rules.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.*;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -15,12 +18,14 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.StringWriter;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-class RuleDescriptionUtil {
+class RuleDescriptionSerializer {
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(RuleDescriptionSerializer.class);
+
     static String serialize(RuleDescription ruleDescription) throws ServiceBusException {
         // todo: Reuse factory
         DocumentBuilderFactory dbFactory =
@@ -184,10 +189,14 @@ class RuleDescriptionUtil {
                     ruleList.add(parseFromEntry(node));
                 }
             }
-        }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
 
         return ruleList;

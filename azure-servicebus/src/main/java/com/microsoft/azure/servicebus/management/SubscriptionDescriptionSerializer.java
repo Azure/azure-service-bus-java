@@ -2,10 +2,13 @@ package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -17,6 +20,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -24,13 +28,14 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-class SubscriptionDescriptionUtil {
+import static javax.xml.parsers.DocumentBuilderFactory.*;
+
+class SubscriptionDescriptionSerializer {
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(SubscriptionDescriptionSerializer.class);
 
     static String serialize(SubscriptionDescription subscriptionDescription) throws ServiceBusException {
-        // todo: Reuse factory
-        DocumentBuilderFactory dbFactory =
-                DocumentBuilderFactory.newInstance();
-        DocumentBuilder dBuilder = null;
+        DocumentBuilderFactory dbFactory = newInstance();
+        DocumentBuilder dBuilder;
         try {
             dBuilder = dbFactory.newDocumentBuilder();
         } catch (ParserConfigurationException e) {
@@ -71,7 +76,7 @@ class SubscriptionDescriptionUtil {
                         .appendChild(doc.createTextNode(Boolean.toString(subscriptionDescription.enableDeadLetteringOnFilterEvaluationException))).getParentNode());
 
         if (subscriptionDescription.defaultRule != null) {
-            sdElement.appendChild(RuleDescriptionUtil.serializeRule(doc, subscriptionDescription.defaultRule, "DefaultRuleDescription"));
+            sdElement.appendChild(RuleDescriptionSerializer.serializeRule(doc, subscriptionDescription.defaultRule, "DefaultRuleDescription"));
         }
 
         sdElement.appendChild(
@@ -126,7 +131,7 @@ class SubscriptionDescriptionUtil {
 
     static List<SubscriptionDescription> parseCollectionFromContent(String topicName, String xml) {
         ArrayList<SubscriptionDescription> subList = new ArrayList<>();
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory dbf = newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
             Document dom = db.parse(new ByteArrayInputStream(xml.getBytes("utf-8")));
@@ -139,18 +144,21 @@ class SubscriptionDescriptionUtil {
                     subList.add(parseFromEntry(topicName, node));
                 }
             }
-        }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
 
         return subList;
     }
 
     static SubscriptionDescription parseFromContent(String topicName, String xml) throws MessagingEntityNotFoundException {
-        // TODO: Reuse dbf
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory dbf = newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
             Document dom = db.parse(new ByteArrayInputStream(xml.getBytes("utf-8")));
@@ -158,18 +166,15 @@ class SubscriptionDescriptionUtil {
             doc.normalize();
             if (doc.getTagName() == "entry")
                 return parseFromEntry(topicName, doc);
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
-        }
-        /*catch (ParserConfigurationException pce) {
-            System.out.println(pce.getMessage());
-        } catch (SAXException se) {
-            System.out.println(se.getMessage());
-        } catch (IOException ioe) {
-            System.err.println(ioe.getMessage());
-        }*/
 
         throw new MessagingEntityNotFoundException("Subscription was not found");
     }

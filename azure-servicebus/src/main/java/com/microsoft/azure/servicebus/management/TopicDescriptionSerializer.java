@@ -2,10 +2,13 @@ package com.microsoft.azure.servicebus.management;
 
 import com.microsoft.azure.servicebus.primitives.MessagingEntityNotFoundException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -17,15 +20,16 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-class TopicDescriptionUtil {
+class TopicDescriptionSerializer {
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(TopicDescriptionSerializer.class);
 
     static String serialize(TopicDescription topicDescription) throws ServiceBusException {
-        // todo: Reuse factory
         DocumentBuilderFactory dbFactory =
                 DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = null;
@@ -71,7 +75,7 @@ class TopicDescriptionUtil {
                         .appendChild(doc.createTextNode(Boolean.toString(topicDescription.enableBatchedOperations))).getParentNode());
 
         if (topicDescription.authorizationRules != null) {
-            tdElement.appendChild(AuthorizationRuleUtil.serializeRules(topicDescription.authorizationRules, doc));
+            tdElement.appendChild(AuthorizationRuleSerializer.serializeRules(topicDescription.authorizationRules, doc));
         }
 
         tdElement.appendChild(
@@ -127,17 +131,20 @@ class TopicDescriptionUtil {
                     topicList.add(parseFromEntry(node));
                 }
             }
-        }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
 
         return topicList;
     }
 
     static TopicDescription parseFromContent(String xml) throws MessagingEntityNotFoundException {
-        // TODO: Reuse dbf
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
@@ -146,18 +153,15 @@ class TopicDescriptionUtil {
             doc.normalize();
             if (doc.getTagName() == "entry")
                 return parseFromEntry(doc);
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", xml);
+            }
         }
-        catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            // TODO: Log
-        }
-        /*catch (ParserConfigurationException pce) {
-            System.out.println(pce.getMessage());
-        } catch (SAXException se) {
-            System.out.println(se.getMessage());
-        } catch (IOException ioe) {
-            System.err.println(ioe.getMessage());
-        }*/
 
         throw new MessagingEntityNotFoundException("Topic was not found");
     }
@@ -212,7 +216,7 @@ class TopicDescriptionUtil {
                                         td.userMetadata = element.getFirstChild().getNodeValue();
                                         break;
                                     case "AuthorizationRules":
-                                        td.authorizationRules = AuthorizationRuleUtil.parseAuthRules(element);
+                                        td.authorizationRules = AuthorizationRuleSerializer.parseAuthRules(element);
                                         break;
                                     case "SupportOrdering":
                                         td.supportOrdering = Boolean.parseBoolean(element.getFirstChild().getNodeValue());

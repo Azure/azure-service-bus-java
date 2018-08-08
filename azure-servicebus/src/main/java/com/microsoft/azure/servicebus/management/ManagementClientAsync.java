@@ -7,7 +7,6 @@ import com.microsoft.azure.servicebus.security.SecurityToken;
 import com.microsoft.azure.servicebus.security.TokenProvider;
 import org.asynchttpclient.*;
 import org.asynchttpclient.util.HttpConstants;
-import org.omg.IOP.ENCODING_CDR_ENCAPS;
 import org.w3c.dom.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -26,7 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static org.asynchttpclient.Dsl.asyncHttpClient;
-import static org.asynchttpclient.Dsl.trace;
 
 /**
  * Asynchronous client to perform management operations on Service Bus entities.
@@ -78,7 +76,7 @@ public class ManagementClientAsync {
                 qdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    qdFuture.complete(QueueDescriptionUtil.parseFromContent(content));
+                    qdFuture.complete(QueueDescriptionSerializer.parseFromContent(content));
                 } catch (MessagingEntityNotFoundException e) {
                     qdFuture.completeExceptionally(e);
                 }
@@ -110,7 +108,7 @@ public class ManagementClientAsync {
                 qdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    qdFuture.complete(QueueRuntimeInfoUtil.parseFromContent(content));
+                    qdFuture.complete(QueueRuntimeInfoSerializer.parseFromContent(content));
                 } catch (MessagingEntityNotFoundException e) {
                     qdFuture.completeExceptionally(e);
                 }
@@ -142,7 +140,7 @@ public class ManagementClientAsync {
                 tdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    tdFuture.complete(TopicDescriptionUtil.parseFromContent(content));
+                    tdFuture.complete(TopicDescriptionSerializer.parseFromContent(content));
                 } catch (MessagingEntityNotFoundException e) {
                     tdFuture.completeExceptionally(e);
                 }
@@ -174,7 +172,7 @@ public class ManagementClientAsync {
                 tdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    tdFuture.complete(TopicRuntimeInfoUtil.parseFromContent(content));
+                    tdFuture.complete(TopicRuntimeInfoSerializer.parseFromContent(content));
                 } catch (MessagingEntityNotFoundException e) {
                     tdFuture.completeExceptionally(e);
                 }
@@ -209,7 +207,7 @@ public class ManagementClientAsync {
                 sdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    sdFuture.complete(SubscriptionDescriptionUtil.parseFromContent(topicPath, content));
+                    sdFuture.complete(SubscriptionDescriptionSerializer.parseFromContent(topicPath, content));
                 } catch (MessagingEntityNotFoundException e) {
                     sdFuture.completeExceptionally(e);
                 }
@@ -244,7 +242,7 @@ public class ManagementClientAsync {
                 sdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    sdFuture.complete(SubscriptionRuntimeInfoUtil.parseFromContent(topicPath, content));
+                    sdFuture.complete(SubscriptionRuntimeInfoSerializer.parseFromContent(topicPath, content));
                 } catch (MessagingEntityNotFoundException e) {
                     sdFuture.completeExceptionally(e);
                 }
@@ -281,7 +279,7 @@ public class ManagementClientAsync {
                 rdFuture.completeExceptionally(ex);
             } else {
                 try {
-                    rdFuture.complete(RuleDescriptionUtil.parseFromContent(content));
+                    rdFuture.complete(RuleDescriptionSerializer.parseFromContent(content));
                 } catch (MessagingEntityNotFoundException e) {
                     rdFuture.completeExceptionally(e);
                 }
@@ -331,7 +329,7 @@ public class ManagementClientAsync {
             if (ex != null) {
                 qdFuture.completeExceptionally(ex);
             } else {
-                qdFuture.complete(QueueDescriptionUtil.parseCollectionFromContent(content));
+                qdFuture.complete(QueueDescriptionSerializer.parseCollectionFromContent(content));
             }
             return null;
         });
@@ -378,7 +376,7 @@ public class ManagementClientAsync {
             if (ex != null) {
                 tdFuture.completeExceptionally(ex);
             } else {
-                tdFuture.complete(TopicDescriptionUtil.parseCollectionFromContent(content));
+                tdFuture.complete(TopicDescriptionSerializer.parseCollectionFromContent(content));
             }
             return null;
         });
@@ -427,7 +425,7 @@ public class ManagementClientAsync {
             if (ex != null) {
                 sdFuture.completeExceptionally(ex);
             } else {
-                sdFuture.complete(SubscriptionDescriptionUtil.parseCollectionFromContent(topicName, content));
+                sdFuture.complete(SubscriptionDescriptionSerializer.parseCollectionFromContent(topicName, content));
             }
             return null;
         });
@@ -480,7 +478,7 @@ public class ManagementClientAsync {
             if (ex != null) {
                 rulesFuture.completeExceptionally(ex);
             } else {
-                rulesFuture.complete(RuleDescriptionUtil.parseCollectionFromContent(content));
+                rulesFuture.complete(RuleDescriptionSerializer.parseCollectionFromContent(content));
             }
             return null;
         });
@@ -560,10 +558,10 @@ public class ManagementClientAsync {
             throw new IllegalArgumentException("queueDescription passed cannot be null");
         }
 
-        QueueDescriptionUtil.normalizeDescription(queueDescription, this.namespaceEndpointURI);
+        QueueDescriptionSerializer.normalizeDescription(queueDescription, this.namespaceEndpointURI);
         String atomRequest = null;
         try {
-            atomRequest = QueueDescriptionUtil.serialize(queueDescription);
+            atomRequest = QueueDescriptionSerializer.serialize(queueDescription);
         } catch (ServiceBusException e) {
             final CompletableFuture<QueueDescription> exceptionFuture = new CompletableFuture<>();
             exceptionFuture.completeExceptionally(e);
@@ -577,7 +575,7 @@ public class ManagementClientAsync {
                         responseFuture.completeExceptionally(ex);
                     } else {
                         try {
-                            responseFuture.complete(QueueDescriptionUtil.parseFromContent(content));
+                            responseFuture.complete(QueueDescriptionSerializer.parseFromContent(content));
                         } catch (MessagingEntityNotFoundException e) {
                             responseFuture.completeExceptionally(e);
                         }
@@ -645,7 +643,7 @@ public class ManagementClientAsync {
 
         String atomRequest = null;
         try {
-            atomRequest = TopicDescriptionUtil.serialize(topicDescription);
+            atomRequest = TopicDescriptionSerializer.serialize(topicDescription);
         } catch (ServiceBusException e) {
             final CompletableFuture<TopicDescription> exceptionFuture = new CompletableFuture<>();
             exceptionFuture.completeExceptionally(e);
@@ -659,7 +657,7 @@ public class ManagementClientAsync {
                         responseFuture.completeExceptionally(ex);
                     } else {
                         try {
-                            responseFuture.complete(TopicDescriptionUtil.parseFromContent(content));
+                            responseFuture.complete(TopicDescriptionSerializer.parseFromContent(content));
                         } catch (MessagingEntityNotFoundException e) {
                             responseFuture.completeExceptionally(e);
                         }
@@ -744,10 +742,10 @@ public class ManagementClientAsync {
             throw new IllegalArgumentException("queueDescription passed cannot be null");
         }
 
-        SubscriptionDescriptionUtil.normalizeDescription(subscriptionDescription, this.namespaceEndpointURI);
+        SubscriptionDescriptionSerializer.normalizeDescription(subscriptionDescription, this.namespaceEndpointURI);
         String atomRequest = null;
         try {
-            atomRequest = SubscriptionDescriptionUtil.serialize(subscriptionDescription);
+            atomRequest = SubscriptionDescriptionSerializer.serialize(subscriptionDescription);
         } catch (ServiceBusException e) {
             final CompletableFuture<SubscriptionDescription> exceptionFuture = new CompletableFuture<>();
             exceptionFuture.completeExceptionally(e);
@@ -762,7 +760,7 @@ public class ManagementClientAsync {
                         responseFuture.completeExceptionally(ex);
                     } else {
                         try {
-                            responseFuture.complete(SubscriptionDescriptionUtil.parseFromContent(subscriptionDescription.getTopicPath(), content));
+                            responseFuture.complete(SubscriptionDescriptionSerializer.parseFromContent(subscriptionDescription.getTopicPath(), content));
                         } catch (MessagingEntityNotFoundException e) {
                             responseFuture.completeExceptionally(e);
                         }
@@ -819,7 +817,7 @@ public class ManagementClientAsync {
 
         String atomRequest = null;
         try {
-            atomRequest = RuleDescriptionUtil.serialize(ruleDescription);
+            atomRequest = RuleDescriptionSerializer.serialize(ruleDescription);
         } catch (ServiceBusException e) {
             final CompletableFuture<RuleDescription> exceptionFuture = new CompletableFuture<>();
             exceptionFuture.completeExceptionally(e);
@@ -834,7 +832,7 @@ public class ManagementClientAsync {
                         responseFuture.completeExceptionally(ex);
                     } else {
                         try {
-                            responseFuture.complete(RuleDescriptionUtil.parseFromContent(content));
+                            responseFuture.complete(RuleDescriptionSerializer.parseFromContent(content));
                         } catch (MessagingEntityNotFoundException e) {
                             responseFuture.completeExceptionally(e);
                         }

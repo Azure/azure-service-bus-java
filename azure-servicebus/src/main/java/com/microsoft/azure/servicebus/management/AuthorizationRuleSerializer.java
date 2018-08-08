@@ -5,12 +5,10 @@ import org.w3c.dom.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
-public class AuthorizationRuleUtil {
-
+public class AuthorizationRuleSerializer {
     static Element serializeRules(List<AuthorizationRule> authorizationRules, Document doc) throws ServiceBusException {
         if (authorizationRules == null) {
             return null;
