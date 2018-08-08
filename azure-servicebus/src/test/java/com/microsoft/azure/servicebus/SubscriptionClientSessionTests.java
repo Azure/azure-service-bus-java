@@ -1,6 +1,4 @@
 package com.microsoft.azure.servicebus;
-//todo
-/*
 public class SubscriptionClientSessionTests extends ClientSessionTests{
     @Override
     public String getEntityNamePrefix() {
@@ -22,4 +20,3 @@ public class SubscriptionClientSessionTests extends ClientSessionTests{
         return false;
     }
 }
-*/

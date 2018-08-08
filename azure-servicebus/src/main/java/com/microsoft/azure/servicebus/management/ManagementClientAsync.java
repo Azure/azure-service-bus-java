@@ -13,6 +13,7 @@ import org.w3c.dom.*;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -1098,6 +1099,14 @@ public class ManagementClientAsync {
         }
 
         return sendManagementHttpRequestAsync(HttpConstants.Methods.DELETE, entityURL, null, null).thenAccept(c -> {});
+    }
+
+    /**
+     * Disposes and closes the managementClient.
+     * @throws IOException
+     */
+    public void close() throws IOException {
+        this.asyncHttpClient.close();
     }
 
     private static URL getManagementURL(URI namespaceEndpontURI, String entityPath, String query) throws ServiceBusException {

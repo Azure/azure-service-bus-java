@@ -1,5 +1,6 @@
 package com.microsoft.azure.servicebus;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
 
@@ -10,29 +11,31 @@ import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
 public abstract class SendReceiveTests extends Tests {
-    private static String entityNameCreatedForAllTests = null;
+    static ManagementClientAsync managementClient = null;
+	private static String entityNameCreatedForAllTests = null;
     private static String receiveEntityPathForAllTest = null;
     
-	protected MessagingFactory factory;
-	protected IMessageSender sender;
-	protected IMessageReceiver receiver;
-	protected String entityName;
-	protected final String sessionId = null;
-	protected String receiveEntityPath;
+	MessagingFactory factory;
+	IMessageSender sender;
+	IMessageReceiver receiver;
+    String receiveEntityPath;
+
+	private String entityName;
+	private final String sessionId = null;
 	
 	@BeforeClass
     public static void init()
     {
 	    SendReceiveTests.entityNameCreatedForAllTests = null;
 	    SendReceiveTests.receiveEntityPathForAllTest = null;
+		URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
+		ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
+		managementClient = new ManagementClientAsync(namespaceEndpointURI, managementClientSettings);
     }
 
 	@Before
-	public void setup() throws InterruptedException, ExecutionException, ServiceBusException, ManagementException
+	public void setup() throws InterruptedException, ExecutionException, ServiceBusException
 	{
-	    URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
-        ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        /*
 	    if(this.shouldCreateEntityForEveryTest() || SendReceiveTests.entityNameCreatedForAllTests == null)
 	    {
 	         // Create entity
@@ -40,9 +43,9 @@ public abstract class SendReceiveTests extends Tests {
 	        if(this.isEntityQueue())
 	        {
 	            this.receiveEntityPath = this.entityName;
-	            QueueDescription2 queueDescription = new QueueDescription2(this.entityName);
+	            QueueDescription queueDescription = new QueueDescription(this.entityName);
 	            queueDescription.setEnablePartitioning(this.isEntityPartitioned());
-	            ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+	            managementClient.createQueueAsync(queueDescription).get();
 	            if(!this.shouldCreateEntityForEveryTest())
 	            {
 	                SendReceiveTests.entityNameCreatedForAllTests = entityName;
@@ -53,9 +56,9 @@ public abstract class SendReceiveTests extends Tests {
 	        {
 	            TopicDescription topicDescription = new TopicDescription(this.entityName);
                 topicDescription.setEnablePartitioning(this.isEntityPartitioned());
-                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
+                managementClient.createTopicAsync(topicDescription).get();
                 SubscriptionDescription subDescription = new SubscriptionDescription(this.entityName, TestUtils.FIRST_SUBSCRIPTION_NAME);
-                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
+                managementClient.createSubscriptionAsync(subDescription).get();
                 this.receiveEntityPath = subDescription.getPath();
                 if(!this.shouldCreateEntityForEveryTest())
                 {
@@ -69,15 +72,13 @@ public abstract class SendReceiveTests extends Tests {
 	        this.entityName = SendReceiveTests.entityNameCreatedForAllTests;
             this.receiveEntityPath = SendReceiveTests.receiveEntityPathForAllTest;
 	    }
-	    */
-        // todo ^
 	    
-	    this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceEndpointURI, TestUtils.getClientSettings());
+	    this.factory = MessagingFactory.createFromNamespaceEndpointURI(TestUtils.getNamespaceEndpointURI(), TestUtils.getClientSettings());
         this.sender = ClientFactory.createMessageSenderFromEntityPath(this.factory, this.entityName);
 	}
 	
 	@After
-	public void tearDown() throws ServiceBusException, InterruptedException, ExecutionException, ManagementException
+	public void tearDown() throws ServiceBusException, InterruptedException, ExecutionException
 	{
 	    if(!this.shouldCreateEntityForEveryTest())
 	    {
@@ -91,18 +92,16 @@ public abstract class SendReceiveTests extends Tests {
 		
 		if(this.shouldCreateEntityForEveryTest())
         {
-        	// todo
-		    //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+		    managementClient.deleteQueueAsync(this.entityName).get();
         }
 	}
 	
 	@AfterClass
-	public static void cleanupAfterAllTest() throws ManagementException
-	{
+	public static void cleanupAfterAllTest() throws ExecutionException, InterruptedException, IOException {
 	    if(SendReceiveTests.entityNameCreatedForAllTests != null)
 	    {
-	    	// todo
-	        //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
+	        managementClient.deleteQueueAsync(SendReceiveTests.entityNameCreatedForAllTests).get();
+	        managementClient.close();
 	    }
 	}
 

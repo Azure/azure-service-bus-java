@@ -70,6 +70,13 @@ public class SubscriptionDescription {
     }
 
     /**
+     * Gets the path of the subscription, including the topic.
+     */
+    public String getPath() {
+        return EntityNameHelper.formatSubscriptionPath(this.topicPath, this.subscriptionName);
+    }
+
+    /**
      * Gets the duration of a peek lock receive. i.e., the amount of time that the message is locked by a given receiver
      * so that no other receiver receives the same message.
      * Default value is 60 seconds.

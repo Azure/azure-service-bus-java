@@ -1,7 +1,9 @@
 package com.microsoft.azure.servicebus;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.microsoft.azure.servicebus.management.*;
@@ -21,50 +23,48 @@ public class ClientValidationTests
 	private static String sessionfulQueuePath;
 	private static String topicPath;
 	private static String subscriptionPath;
-	private static String sessionfulSubscriptionPath;	
+	private static String sessionfulSubscriptionPath;
+	private static ManagementClientAsync managementClient;
 	
 	@BeforeClass
-    public static void createEntities() throws ManagementException
-    {
+    public static void createEntities() throws ExecutionException, InterruptedException {
 		// Create a queue, a topic and a subscription
 		queuePath = TestUtils.randomizeEntityName(ENTITY_NAME_PREFIX);
 		sessionfulQueuePath = TestUtils.randomizeEntityName(ENTITY_NAME_PREFIX);
 		topicPath = TestUtils.randomizeEntityName(ENTITY_NAME_PREFIX);
 		URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
 		ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-		//todo
-		/*
-		QueueDescription2 queueDescription = new QueueDescription2(queuePath);
+		managementClient = new ManagementClientAsync(namespaceEndpointURI, managementClientSettings);
+
+		QueueDescription queueDescription = new QueueDescription(queuePath);
 		queueDescription.setEnablePartitioning(false);
-		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription);
+		managementClient.createQueueAsync(queueDescription).get();
 		
-		QueueDescription2 queueDescription2 = new QueueDescription2(sessionfulQueuePath);
+		QueueDescription queueDescription2 = new QueueDescription(sessionfulQueuePath);
 		queueDescription2.setEnablePartitioning(false);
 		queueDescription2.setRequiresSession(true);
-		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, queueDescription2);
+		managementClient.createQueueAsync(queueDescription2).get();
 		
 		TopicDescription topicDescription = new TopicDescription(topicPath);
 		topicDescription.setEnablePartitioning(false);
-		ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
+		managementClient.createTopicAsync(topicDescription).get();
 		SubscriptionDescription subDescription = new SubscriptionDescription(topicPath, TestUtils.FIRST_SUBSCRIPTION_NAME);
 		subscriptionPath = subDescription.getPath();
-        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
+        managementClient.createSubscriptionAsync(subDescription).get();
         SubscriptionDescription subDescription2 = new SubscriptionDescription(topicPath, "subscription2");
         subDescription2.setRequiresSession(true);
 		sessionfulSubscriptionPath = subDescription2.getPath();
-        ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription2);
-        */
+        managementClient.createSubscriptionAsync(subDescription2).get();
     }
-    //todo
-	/*
+
 	@AfterClass
-	public static void deleteEntities() throws ManagementException
-	{
-		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), queuePath);
-		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), sessionfulQueuePath);
-		ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), topicPath);
+	public static void deleteEntities() throws ExecutionException, InterruptedException, IOException {
+		managementClient.deleteQueueAsync(queuePath).get();
+		managementClient.deleteQueueAsync(sessionfulQueuePath).get();
+		managementClient.deleteTopicAsync(topicPath).get();
+		managementClient.close();
 	}
-	*/
+
 	@Test
 	public void testTopicClientCreationToQueue() throws InterruptedException, ServiceBusException
 	{				

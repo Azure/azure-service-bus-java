@@ -1,5 +1,6 @@
 package com.microsoft.azure.servicebus;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
 
@@ -15,38 +16,35 @@ import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 public abstract class ClientTests extends Tests{
     private static String entityNameCreatedForAllTests = null;
     private static String receiveEntityPathForAllTest = null;
-    
+    protected static ManagementClientAsync managementClientAsync;
+
     private String entityName;
     private String receiveEntityPath;
     protected IMessageSender sendClient;
     protected IMessageAndSessionPump receiveClient;
-    protected ManagementClientAsync managementClientAsync;
     
     @BeforeClass
     public static void init()
     {
         ClientTests.entityNameCreatedForAllTests = null;
         ClientTests.receiveEntityPathForAllTest = null;
+        URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
+        ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
+        managementClientAsync = new ManagementClientAsync(namespaceEndpointURI, managementClientSettings);
     }
     
     @Before
-    public void setup() throws InterruptedException, ExecutionException, ServiceBusException, ManagementException
-    {
-        URI namespaceEndpointURI = TestUtils.getNamespaceEndpointURI();
-        ClientSettings managementClientSettings = TestUtils.getManagementClientSettings();
-        this.managementClientAsync = new ManagementClientAsync(namespaceEndpointURI, managementClientSettings);
-
+    public void setup() throws ExecutionException, InterruptedException {
         if(this.shouldCreateEntityForEveryTest() || ClientTests.entityNameCreatedForAllTests == null)
         {
              // Create entity
-            //this.entityName = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
-            this.entityName = "queue1";
+            this.entityName = TestUtils.randomizeEntityName(this.getEntityNamePrefix());
             if(this.isEntityQueue())
             {
                 this.receiveEntityPath = this.entityName;
                 QueueDescription queueDescription = new QueueDescription(this.entityName);
                 queueDescription.setEnablePartitioning(this.isEntityPartitioned());
-                this.managementClientAsync.createQueueAsync(queueDescription);
+                managementClientAsync.createQueueAsync(queueDescription).get();
                 if(!this.shouldCreateEntityForEveryTest())
                 {
                     ClientTests.entityNameCreatedForAllTests = entityName;
@@ -55,18 +53,17 @@ public abstract class ClientTests extends Tests{
             }
             else
             {
-                // todo
-                /*TopicDescription topicDescription = new TopicDescription(this.entityName);
+                TopicDescription topicDescription = new TopicDescription(this.entityName);
                 topicDescription.setEnablePartitioning(this.isEntityPartitioned());
-                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, topicDescription);
+                managementClientAsync.createTopicAsync(topicDescription).get();
                 SubscriptionDescription subDescription = new SubscriptionDescription(this.entityName, TestUtils.FIRST_SUBSCRIPTION_NAME);
-                ManagementClient.createEntity(namespaceEndpointURI, managementClientSettings, subDescription);
-                this.receiveEntityPath = subDescription.getPath();
+                managementClientAsync.createSubscriptionAsync(subDescription).get();
+                this.receiveEntityPath = EntityNameHelper.formatSubscriptionPath(subDescription.getTopicPath(), subDescription.getSubscriptionName());
                 if(!this.shouldCreateEntityForEveryTest())
                 {
                     ClientTests.entityNameCreatedForAllTests = entityName;
-                    ClientTests.receiveEntityPathForAllTest = subDescription.getPath();
-                }*/
+                    ClientTests.receiveEntityPathForAllTest = this.receiveEntityPath;
+                }
             }
         }
         else
@@ -77,8 +74,7 @@ public abstract class ClientTests extends Tests{
     }
     
     @After
-    public void tearDown() throws ServiceBusException, InterruptedException, ExecutionException, ManagementException
-    {
+    public void tearDown() throws ServiceBusException, InterruptedException, ExecutionException {
         if(this.sendClient != null)
         {
             this.sendClient.close();
@@ -97,8 +93,7 @@ public abstract class ClientTests extends Tests{
         
         if(this.shouldCreateEntityForEveryTest())
         {
-            // todo
-            //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), this.entityName);
+            managementClientAsync.deleteQueueAsync(this.entityName).get();
         }
         else
         {
@@ -107,13 +102,13 @@ public abstract class ClientTests extends Tests{
     }
     
     @AfterClass
-    public static void cleanupAfterAllTest() throws ManagementException
-    {
+    public static void cleanupAfterAllTest() throws ExecutionException, InterruptedException, IOException {
         if(ClientTests.entityNameCreatedForAllTests != null)
         {
-            // todo
-            //ManagementClient.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), ClientTests.entityNameCreatedForAllTests);
+            managementClientAsync.deleteQueueAsync(ClientTests.entityNameCreatedForAllTests).get();
         }
+
+        managementClientAsync.close();
     }
     
     protected void createClients(ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
