@@ -44,8 +44,10 @@ public class ManagementClientAsync {
     private URI namespaceEndpointURI;
     private AsyncHttpClient asyncHttpClient;
 
-    // todo: expose other constructors
-    // todo: expose sync methods.
+    public ManagementClientAsync(ConnectionStringBuilder connectionStringBuilder) {
+        this(connectionStringBuilder.getEndpoint(), Util.getClientSettingsFromConnectionStringBuilder(connectionStringBuilder));
+    }
+
     public ManagementClientAsync(URI namespaceEndpointURI, ClientSettings clientSettings) {
         this.namespaceEndpointURI = namespaceEndpointURI;
         this.clientSettings = clientSettings;
