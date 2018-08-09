@@ -7,10 +7,14 @@ import com.microsoft.azure.servicebus.security.SecurityToken;
 import com.microsoft.azure.servicebus.security.TokenProvider;
 import org.asynchttpclient.*;
 import org.asynchttpclient.util.HttpConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.*;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -31,6 +35,8 @@ import static org.asynchttpclient.Dsl.asyncHttpClient;
  * Operations return CompletableFuture which asynchronously return the responses.
  */
 public class ManagementClientAsync {
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ManagementClientAsync.class);
+
     private static final int ONE_BOX_HTTPS_PORT = 4446;
     private static final String API_VERSION_QUERY = "api-version=2017-04";
     private static final String USER_AGENT_HEADER_NAME = "User-Agent";
@@ -1240,7 +1246,6 @@ public class ManagementClientAsync {
             return null;
         }
 
-        // todo: reuse
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder db = dbf.newDocumentBuilder();
@@ -1254,9 +1259,14 @@ public class ManagementClientAsync {
                     return node.getFirstChild().getTextContent();
                 }
             }
-        }
-        catch (Exception ex) {
-            // TODO: Log
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            if (TRACE_LOGGER.isErrorEnabled()) {
+                TRACE_LOGGER.error("Exception while parsing response.", e);
+            }
+
+            if (TRACE_LOGGER.isDebugEnabled()) {
+                TRACE_LOGGER.debug("XML which failed to parse: \n %s", content);
+            }
         }
 
         return null;
