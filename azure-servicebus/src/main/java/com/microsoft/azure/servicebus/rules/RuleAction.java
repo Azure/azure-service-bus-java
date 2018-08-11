@@ -9,6 +9,6 @@ package com.microsoft.azure.servicebus.rules;
  *
  * @since 1.0
  */
-public abstract class RuleAction {
+public class RuleAction {
     // No methods. Just a skeleton root class for actions
 }
