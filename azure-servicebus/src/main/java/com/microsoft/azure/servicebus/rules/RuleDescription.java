@@ -119,4 +119,19 @@ public class RuleDescription {
 
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 13;
+
+        if (this.filter != null) {
+            hash = hash * 7 + this.filter.hashCode();
+        }
+
+        if (this.action != null) {
+            hash = hash * 7 + this.action.hashCode();
+        }
+
+        return hash;
+    }
 }

@@ -26,6 +26,13 @@ public class ManagementClientConstants {
     static String ForbiddenInvalidOperationSubCode =
         String.format(HttpErrorSubCodeFormatString, ExceptionErrorCodes.ForbiddenInvalidOperation);
 
+    // Defaults
+    static Duration DEFAULT_HISTORY_DEDUP_WINDOW = Duration.ofMinutes(1);
+    static Duration DEFAULT_LOCK_DURATION = Duration.ofSeconds(60);
+    static int DEFAULT_MAX_DELIVERY_COUNT = 10;
+    static long DEFAULT_MAX_SIZE_IN_MB = 1024;
+
+    // Limits to values
     static Duration MIN_ALLOWED_TTL = Duration.ofSeconds(1);
     static Duration MAX_ALLOWED_TTL = MAX_DURATION;
     static Duration MIN_LOCK_DURATION = Duration.ofSeconds(5);

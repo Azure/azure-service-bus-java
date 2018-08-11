@@ -38,4 +38,13 @@ public class SqlRuleAction extends RuleAction {
         SqlRuleAction other = (SqlRuleAction)o;
         return (this.sqlExpression == null ? other.sqlExpression == null : this.sqlExpression.equals(other.sqlExpression));
     }
+
+    @Override
+    public int hashCode() {
+        if (this.sqlExpression != null) {
+            return this.sqlExpression.hashCode();
+        }
+
+        return super.hashCode();
+    }
 }

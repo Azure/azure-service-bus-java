@@ -42,10 +42,12 @@ public class SharedAccessAuthorizationRule extends AuthorizationRule {
         return "None";
     }
 
+    @Override
     public String getKeyName() {
         return keyName;
     }
 
+    @Override
     public void setKeyName(String keyName) {
         if (keyName == null || keyName.isEmpty()) {
             throw new IllegalArgumentException("Argument cannot be null");
@@ -90,10 +92,12 @@ public class SharedAccessAuthorizationRule extends AuthorizationRule {
         this.secondaryKey = secondaryKey;
     }
 
+    @Override
     public List<AccessRights> getRights() {
         return rights;
     }
 
+    @Override
     public void setRights(List<AccessRights> rights) {
         if (rights == null || rights.size() <= 0 || rights.size() > ManagementClientConstants.SupportedClaimsCount) {
             throw new IllegalArgumentException("Rights cannot be null, empty or greater than " + ManagementClientConstants.SupportedClaimsCount);
@@ -145,6 +149,28 @@ public class SharedAccessAuthorizationRule extends AuthorizationRule {
         }
 
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 13;
+        if (this.keyName != null) {
+            hash = (hash * 7) + this.keyName.hashCode();
+        }
+
+        if (this.primaryKey != null) {
+            hash = (hash * 7) + this.primaryKey.hashCode();
+        }
+
+        if (this.secondaryKey != null) {
+            hash = (hash * 7) + this.secondaryKey.hashCode();
+        }
+
+        if (this.rights != null) {
+            hash = (hash * 7) + this.rights.hashCode();
+        }
+
+        return hash;
     }
 
     private static String generateRandomKey() {

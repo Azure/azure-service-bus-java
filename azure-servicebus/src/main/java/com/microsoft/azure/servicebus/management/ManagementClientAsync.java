@@ -50,10 +50,21 @@ public class ManagementClientAsync {
     private URI namespaceEndpointURI;
     private AsyncHttpClient asyncHttpClient;
 
+    /**
+     * Creates a new {@link ManagementClientAsync}.
+     * User should call {@link ManagementClientAsync#close()} at the end of life of the client.
+     * @param connectionStringBuilder - connectionStringBuilder containing namespace information and client settings.
+     */
     public ManagementClientAsync(ConnectionStringBuilder connectionStringBuilder) {
         this(connectionStringBuilder.getEndpoint(), Util.getClientSettingsFromConnectionStringBuilder(connectionStringBuilder));
     }
 
+    /**
+     * Creates a new {@link ManagementClientAsync}.
+     * User should call {@link ManagementClientAsync#close()} at the end of life of the client.
+     * @param namespaceEndpointURI - URI of the namespace connecting to.
+     * @param clientSettings - client settings.
+     */
     public ManagementClientAsync(URI namespaceEndpointURI, ClientSettings clientSettings) {
         this.namespaceEndpointURI = namespaceEndpointURI;
         this.clientSettings = clientSettings;
@@ -109,7 +120,7 @@ public class ManagementClientAsync {
     public CompletableFuture<QueueRuntimeInfo> getQueueRuntimeInfoAsync(String path) {
         EntityNameHelper.checkValidQueueName(path);
 
-        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, true);
         CompletableFuture<QueueRuntimeInfo> qdFuture = new CompletableFuture<>();
         contentFuture.handleAsync((content, ex) -> {
             if (ex != null) {
@@ -173,7 +184,7 @@ public class ManagementClientAsync {
     public CompletableFuture<TopicRuntimeInfo> getTopicRuntimeInfoAsync(String path) {
         EntityNameHelper.checkValidTopicName(path);
 
-        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, true);
         CompletableFuture<TopicRuntimeInfo> tdFuture = new CompletableFuture<>();
         contentFuture.handleAsync((content, ex) -> {
             if (ex != null) {
@@ -243,7 +254,7 @@ public class ManagementClientAsync {
         EntityNameHelper.checkValidSubscriptionName(subscriptionName);
 
         String path = EntityNameHelper.formatSubscriptionPath(topicPath, subscriptionName);
-        CompletableFuture<String> contentFuture = getEntityAsync(path, null, false);
+        CompletableFuture<String> contentFuture = getEntityAsync(path, null, true);
         CompletableFuture<SubscriptionRuntimeInfo> sdFuture = new CompletableFuture<>();
         contentFuture.handleAsync((content, ex) -> {
             if (ex != null) {

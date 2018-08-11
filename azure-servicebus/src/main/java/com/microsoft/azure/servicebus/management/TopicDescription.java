@@ -9,12 +9,12 @@ import java.util.List;
  * Represents the metadata description of the topic.
  */
 public class TopicDescription {
-    Duration duplicationDetectionHistoryTimeWindow = Duration.ofMinutes(1);
+    Duration duplicationDetectionHistoryTimeWindow = ManagementClientConstants.DEFAULT_HISTORY_DEDUP_WINDOW;
     String path;
     Duration defaultMessageTimeToLive = ManagementClientConstants.MAX_DURATION;
     Duration autoDeleteOnIdle = ManagementClientConstants.MAX_DURATION;
     String userMetadata = null;
-    long maxSizeInMB = 1024;
+    long maxSizeInMB = ManagementClientConstants.DEFAULT_MAX_SIZE_IN_MB;
     boolean requiresDuplicateDetection = false;
     boolean enableBatchedOperations = true;
     boolean enablePartitioning = false;
@@ -24,7 +24,9 @@ public class TopicDescription {
 
     /**
      * Initializes a new instance of TopicDescription with the specified relative path.
-     * @param path
+     * @param path - Path of the topic.
+     *             Max length is 260 chars. Cannot start or end with a slash.
+     *             Cannot have restricted characters: '@','?','#','*'
      */
     public TopicDescription(String path)
     {
@@ -44,7 +46,7 @@ public class TopicDescription {
      * Max length is 260 chars. Cannot start or end with a slash.
      * Cannot have restricted characters: '@','?','#','*'
      */
-    public void setPath(String path)
+    private void setPath(String path)
     {
         EntityNameHelper.checkValidTopicName(path);
         this.path = path;
@@ -298,5 +300,10 @@ public class TopicDescription {
         }
 
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return this.path.hashCode();
     }
 }

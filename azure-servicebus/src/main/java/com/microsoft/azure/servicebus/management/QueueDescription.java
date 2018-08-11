@@ -9,16 +9,16 @@ import java.util.List;
  * Represents the metadata description of the queue.
  */
 public class QueueDescription {
-    Duration duplicationDetectionHistoryTimeWindow = Duration.ofMinutes(1);
+    Duration duplicationDetectionHistoryTimeWindow = ManagementClientConstants.DEFAULT_HISTORY_DEDUP_WINDOW;
     String path;
-    Duration lockDuration = Duration.ofSeconds(60);
+    Duration lockDuration = ManagementClientConstants.DEFAULT_LOCK_DURATION;
     Duration defaultMessageTimeToLive = ManagementClientConstants.MAX_DURATION;
     Duration autoDeleteOnIdle = ManagementClientConstants.MAX_DURATION;
-    int maxDeliveryCount = 10;
+    int maxDeliveryCount = ManagementClientConstants.DEFAULT_MAX_DELIVERY_COUNT;
     String forwardTo = null;
     String forwardDeadLetteredMessagesTo = null;
     String userMetadata = null;
-    long maxSizeInMB = 1024;
+    long maxSizeInMB = ManagementClientConstants.DEFAULT_MAX_SIZE_IN_MB;
     boolean requiresDuplicateDetection = false;
     boolean enableDeadLetteringOnMessageExpiration = false;
     boolean requiresSession = false;
@@ -29,7 +29,9 @@ public class QueueDescription {
 
     /**
      * Initializes a new instance of QueueDescription with the specified relative path.
-     * @param path
+     * @param path - Path of the topic.
+     *             Max length is 260 chars. Cannot start or end with a slash.
+     *             Cannot have restricted characters: '@','?','#','*'
      */
     public QueueDescription(String path)
     {
@@ -37,7 +39,7 @@ public class QueueDescription {
     }
 
     /**
-     * Gets the path of the queue.
+     * @return Gets the path of the queue.
      */
     public String getPath()
     {
@@ -45,20 +47,21 @@ public class QueueDescription {
     }
 
     /**
-     * Sets the path of queue.
+     * @param path - Sets the path of queue.
      * Max length is 260 chars. Cannot start or end with a slash.
      * Cannot have restricted characters: '@','?','#','*'
      */
-    public void setPath(String path)
+    private void setPath(String path)
     {
         EntityNameHelper.checkValidQueueName(path);
         this.path = path;
     }
 
     /**
-     * Gets the duration of a peek lock receive. i.e., the amount of time that the message is locked by a given receiver
+     * The amount of time that the message is locked by a given receiver
      * so that no other receiver receives the same message.
      * Default value is 60 seconds.
+     * @return Gets the duration of a peek lock receive
      */
     public Duration getLockDuration()
     {
@@ -430,5 +433,10 @@ public class QueueDescription {
         }
 
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return this.path.hashCode();
     }
 }

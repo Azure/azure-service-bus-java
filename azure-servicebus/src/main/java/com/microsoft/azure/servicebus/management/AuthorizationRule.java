@@ -4,8 +4,6 @@ import java.time.Instant;
 import java.util.List;
 
 public abstract class AuthorizationRule {
-    AuthorizationRule() {}
-
     private Instant createdTime;
     private Instant modifiedTime;
 
@@ -36,7 +34,4 @@ public abstract class AuthorizationRule {
     }
 
     abstract String getClaimValue();
-
-    @Override
-    public abstract boolean equals(Object o);
 }

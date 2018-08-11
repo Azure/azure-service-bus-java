@@ -227,4 +227,23 @@ public class CorrelationFilter extends Filter {
 
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 13;
+
+        if (this.correlationId != null) {
+            hash = (hash * 7) + this.correlationId.hashCode();
+        }
+
+        if (this.messageId != null) {
+            hash = (hash * 7) + this.messageId.hashCode();
+        }
+
+        if (this.sessionId != null) {
+            hash = (hash * 7) + this.sessionId.hashCode();
+        }
+
+        return hash;
+    }
 }

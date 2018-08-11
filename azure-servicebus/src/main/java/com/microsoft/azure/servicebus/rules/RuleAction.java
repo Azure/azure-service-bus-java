@@ -11,7 +11,4 @@ package com.microsoft.azure.servicebus.rules;
  */
 public abstract class RuleAction {
     // No methods. Just a skeleton root class for actions
-
-    @Override
-    public abstract boolean equals(Object other);
 }

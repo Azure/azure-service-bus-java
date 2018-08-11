@@ -9,12 +9,12 @@ import java.time.Duration;
  * Represents the metadata description of the subscription.
  */
 public class SubscriptionDescription {
-    String topicPath;
-    String subscriptionName;
-    Duration lockDuration = Duration.ofSeconds(60);
+    private String topicPath;
+    private String subscriptionName;
+    Duration lockDuration = ManagementClientConstants.DEFAULT_LOCK_DURATION;
     Duration defaultMessageTimeToLive = ManagementClientConstants.MAX_DURATION;
     Duration autoDeleteOnIdle = ManagementClientConstants.MAX_DURATION;
-    int maxDeliveryCount = 10;
+    int maxDeliveryCount = ManagementClientConstants.DEFAULT_MAX_DELIVERY_COUNT;
     String forwardTo = null;
     String forwardDeadLetteredMessagesTo = null;
     String userMetadata = null;
@@ -28,7 +28,10 @@ public class SubscriptionDescription {
     /**
      * Initializes a new instance of SubscriptionDescription with the specified relative path.
      * @param topicPath - Path of the topic
+     *                  Max length is 260 chars. Cannot start or end with a slash.
+     *                  Cannot have restricted characters: '@','?','#','*'
      * @param subscriptionName - Name of the subscription
+     *                         Max length is 50 chars. Cannot have restricted characters: '@','?','#','*','/'
      */
     public SubscriptionDescription(String topicPath, String subscriptionName)
     {
@@ -48,7 +51,7 @@ public class SubscriptionDescription {
      * Max length is 260 chars. Cannot start or end with a slash.
      * Cannot have restricted characters: '@','?','#','*'
      */
-    public void setTopicPath(String topicPath) {
+    private void setTopicPath(String topicPath) {
         EntityNameHelper.checkValidTopicName(topicPath);
         this.topicPath = topicPath;
     }
@@ -64,7 +67,7 @@ public class SubscriptionDescription {
      * Sets the name of the subscription.
      * Max length is 50 chars. Cannot have restricted characters: '@','?','#','*','/'
      */
-    public void setSubscriptionName(String subscriptionName) {
+    private void setSubscriptionName(String subscriptionName) {
         EntityNameHelper.checkValidSubscriptionName(subscriptionName);
         this.subscriptionName = subscriptionName;
     }
@@ -318,7 +321,7 @@ public class SubscriptionDescription {
     }
 
     /**
-     * Custom metdata that user can associate with the description.
+     * @return Custom metdata that user can associate with the description.
      */
     public String getUserMetadata() {
         return userMetadata;
@@ -369,5 +372,10 @@ public class SubscriptionDescription {
         }
 
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return this.getPath().hashCode();
     }
 }
