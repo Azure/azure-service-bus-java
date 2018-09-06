@@ -48,7 +48,7 @@ public class ConnectionStringBuilder
 	private final static String SHARED_ACCESS_KEY_CONFIG_NAME = "SharedAccessKey";
 	private final static String ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME = "SharedAccessSignature";
 	private final static String SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME = "SharedAccessSignatureToken";
-	private final static String TRANSPORT_TYPE_CONFIG = "TransportType";
+	private final static String TRANSPORT_TYPE_CONFIG_NAME = "TransportType";
 	private final static String ENTITY_PATH_CONFIG_NAME = "EntityPath";
 	private final static String OPERATION_TIMEOUT_CONFIG_NAME = "OperationTimeout";
 	private final static String RETRY_POLICY_CONFIG_NAME = "RetryPolicy";
@@ -57,7 +57,7 @@ public class ConnectionStringBuilder
 
 	private static final String ALL_KEY_ENUMERATE_REGEX = "(" + HOSTNAME_CONFIG_NAME + "|" +  ENDPOINT_CONFIG_NAME + "|" + SHARED_ACCESS_KEY_NAME_CONFIG_NAME
 			+ "|" + SHARED_ACCESS_KEY_CONFIG_NAME + "|"  + SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + "|" + ENTITY_PATH_CONFIG_NAME + "|" + OPERATION_TIMEOUT_CONFIG_NAME
-			+ "|" + RETRY_POLICY_CONFIG_NAME + "|" + ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + "|" + TRANSPORT_TYPE_CONFIG + "|" +")";
+			+ "|" + RETRY_POLICY_CONFIG_NAME + "|" + ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + "|" + TRANSPORT_TYPE_CONFIG_NAME + "|" +")";
 
 	private static final String KEYS_WITH_DELIMITERS_REGEX = KEY_VALUE_PAIR_DELIMITER + ALL_KEY_ENUMERATE_REGEX	+ KEY_VALUE_SEPARATOR;
 
@@ -384,7 +384,7 @@ public class ConnectionStringBuilder
 
 			if (this.transportType != null)
 			{
-				connectionStringBuilder.append(String.format(Locale.US, "%s%s%s%s", KEY_VALUE_PAIR_DELIMITER, TRANSPORT_TYPE_CONFIG,
+				connectionStringBuilder.append(String.format(Locale.US, "%s%s%s%s", KEY_VALUE_PAIR_DELIMITER, TRANSPORT_TYPE_CONFIG_NAME,
 						KEY_VALUE_SEPARATOR, this.transportType.toString()));
 			}
 
@@ -517,7 +517,7 @@ public class ConnectionStringBuilder
 									String.format(Locale.US, "Connection string parameter '%s'='%s' is not recognized",
 											RETRY_POLICY_CONFIG_NAME, values[valueIndex]));
 			}
-			else if (key.equalsIgnoreCase(TRANSPORT_TYPE_CONFIG))
+			else if (key.equalsIgnoreCase(TRANSPORT_TYPE_CONFIG_NAME))
 			{
 				try
 				{
@@ -525,7 +525,7 @@ public class ConnectionStringBuilder
 				} catch (IllegalArgumentException exception)
 				{
 					throw new IllegalConnectionStringFormatException(
-							String.format("Invalid value specified for property '%s' in the ConnectionString.", TRANSPORT_TYPE_CONFIG),
+							String.format("Invalid value specified for property '%s' in the ConnectionString.", TRANSPORT_TYPE_CONFIG_NAME),
 							exception);
 				}
 			}
