@@ -676,7 +676,7 @@ class RequestResponseLink extends ClientEntity{
 			
 		    // Return response in a separate thread so reactor thread is free to handle reactor events
 		    final Message finalResponseMessage = responseMessage;
-		    AsyncUtil.executorService.submit(() -> {
+		    MessagingFactory.INTERNAL_THREAD_POOL.submit(() -> {
 		        String requestMessageId = (String)finalResponseMessage.getCorrelationId();
 		        if(requestMessageId != null)
 	            {

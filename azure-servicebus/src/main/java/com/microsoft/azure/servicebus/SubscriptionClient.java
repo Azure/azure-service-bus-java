@@ -48,7 +48,7 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	{
 		this(receiveMode, amqpConnectionStringBuilder.getEntityPath());
 		CompletableFuture<MessagingFactory> factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder);
-		Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f)));
+		Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f), MessagingFactory.INTERNAL_THREAD_POOL));
 		if(TRACE_LOGGER.isInfoEnabled())
         {
             TRACE_LOGGER.info("Created subscription client to connection string '{}'", amqpConnectionStringBuilder.toLoggableString());
@@ -64,7 +64,7 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
     {
         this(receiveMode, subscriptionPath);
         CompletableFuture<MessagingFactory> factoryFuture = MessagingFactory.createFromNamespaceEndpointURIAsyc(namespaceEndpointURI, clientSettings);
-        Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f)));
+        Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f), MessagingFactory.INTERNAL_THREAD_POOL));
         if (TRACE_LOGGER.isInfoEnabled()) {
             TRACE_LOGGER.info("Created subscription client to subscription '{}/{}'", namespaceEndpointURI.toString(), subscriptionPath);
         }
@@ -83,7 +83,7 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 		CompletableFuture<Void> postSessionBrowserFuture = MiscRequestResponseOperationHandler.create(factory, this.subscriptionPath, MessagingEntityType.SUBSCRIPTION).thenAcceptAsync((msoh) -> {
 			this.miscRequestResponseHandler = msoh;
 			this.sessionBrowser = new SessionBrowser(factory, this.subscriptionPath, MessagingEntityType.SUBSCRIPTION, msoh);
-		});		
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 		
 		this.messageAndSessionPump = new MessageAndSessionPump(factory, this.subscriptionPath, MessagingEntityType.SUBSCRIPTION, receiveMode);
 		CompletableFuture<Void> messagePumpInitFuture = this.messageAndSessionPump.initializeAsync();

@@ -14,6 +14,8 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
@@ -48,6 +50,7 @@ import com.microsoft.azure.servicebus.security.SecurityToken;
 public class MessagingFactory extends ClientEntity implements IAmqpConnection
 {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessagingFactory.class);
+    public static final ExecutorService INTERNAL_THREAD_POOL = Executors.newCachedThreadPool();
 	
     private static final String REACTOR_THREAD_NAME_PREFIX = "ReactorThread";
 	private static final int MAX_CBS_LINK_CREATION_ATTEMPTS = 3;
