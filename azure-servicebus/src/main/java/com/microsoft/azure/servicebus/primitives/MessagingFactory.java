@@ -304,7 +304,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		if (this.getIsClosingOrClosed() && !this.connetionCloseFuture.isDone())
 		{
 		    TRACE_LOGGER.info("Connection to host closed.");
-		    this.connetionCloseFuture.complete(null);
+		    AsyncUtil.completeFuture(this.connetionCloseFuture, null);
 			Timer.unregister(this.getClientId());
 		} 
 	}
@@ -423,7 +423,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	                        }
 	                    });
 	                } catch (IOException e) {
-	                    AsyncUtil.completeFutureExceptionally(this.connetionCloseFuture, e);
+	                    this.connetionCloseFuture.completeExceptionally(e);
 	                }
 	                
 	                Timer.schedule(new Runnable()
@@ -435,7 +435,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	                        {
 	                            String errorMessage = "Closing MessagingFactory timed out.";
 	                            TRACE_LOGGER.warn(errorMessage);
-	                            MessagingFactory.this.connetionCloseFuture.completeExceptionally(new TimeoutException(errorMessage));
+	                            AsyncUtil.completeFutureExceptionally(MessagingFactory.this.connetionCloseFuture, new TimeoutException(errorMessage));
 	                        }
 	                    }
 	                },
@@ -565,7 +565,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
     	        SecurityToken generatedSecurityToken = t;
     	        CompletableFuture<Void> sendTokenFuture = this.cbsLinkCreationFuture.thenComposeAsync((v) -> {
     	                return CommonRequestResponseOperations.sendCBSTokenAsync(this.cbsLink, Util.adjustServerTimeout(this.clientSettings.getOperationTimeout()), generatedSecurityToken);
-    	            });
+    	            }, MessagingFactory.INTERNAL_THREAD_POOL);
     	        
     	        if(retryOnFailure)
     	        {
@@ -581,7 +581,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
     	                    TRACE_LOGGER.info("Will retry sending CBS Token for {} after {} seconds.", sasTokenAudienceURI, ClientConstants.DEFAULT_SAS_TOKEN_SEND_RETRY_INTERVAL_IN_SECONDS);
     	                    return Timer.schedule(validityRenewer, Duration.ofSeconds(ClientConstants.DEFAULT_SAS_TOKEN_SEND_RETRY_INTERVAL_IN_SECONDS), TimerType.OneTimeRun);
     	                }
-    	            });
+    	            }, MessagingFactory.INTERNAL_THREAD_POOL);
     	        }
     	        else
     	        {
@@ -591,7 +591,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
     	                return MessagingFactory.scheduleRenewTimer(generatedSecurityToken.getValidUntil(), validityRenewer);
     	            });
     	        }
-    	    });
+    	    }, MessagingFactory.INTERNAL_THREAD_POOL);
     }
 	
 	private static ScheduledFuture<?> scheduleRenewTimer(Instant currentTokenValidUntil, Runnable validityRenewer)
@@ -643,7 +643,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	                                this.createCBSLinkAsync();
 	                            }
 	                            return null;
-	                        });       
+	                        }, MessagingFactory.INTERNAL_THREAD_POOL);       
 	        return crateAndAssignRequestResponseLink;
 	    }	    
     }

@@ -164,7 +164,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	                            exception = new TimeoutException("Request timed out.");
 	                        }
 	                        TRACE_LOGGER.error("UpdateState request timed out. Delivery:{}", entry.getKey(), exception);
-	                        entry.getValue().getWork().completeExceptionally(exception);
+	                        AsyncUtil.completeFutureExceptionally(entry.getValue().getWork(), exception);
 	                    }
 	                }
 			        TRACE_LOGGER.trace("'{}' core message receiver's internal loop to complete timed out update state requests stopped.", CoreMessageReceiver.this.receivePath);
@@ -295,7 +295,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             {
                 Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sasTokenEx);
                 TRACE_LOGGER.error("Sending SAS Token failed. ReceivePath:{}", this.receivePath, cause);
-                AsyncUtil.completeFutureExceptionally(this.linkOpen.getWork(), cause);
+                this.linkOpen.getWork().completeExceptionally(cause);
             }
             else
             {
@@ -313,12 +313,12 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                 catch (IOException ioException)
                 {
                     this.cancelSASTokenRenewTimer();
-                    AsyncUtil.completeFutureExceptionally(this.linkOpen.getWork(), new ServiceBusException(false, "Failed to create Receiver, see cause for more details.", ioException));
+                    this.linkOpen.getWork().completeExceptionally(new ServiceBusException(false, "Failed to create Receiver, see cause for more details.", ioException));
                 }
             }
             
             return null;
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
 		
 		return this.linkOpen.getWork();
 	}
@@ -347,7 +347,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                         }
                     }
                     return null;
-                });
+                }, MessagingFactory.INTERNAL_THREAD_POOL);
             }
             
             return this.requestResponseLinkCreationFuture;
@@ -569,14 +569,14 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                         {
                             CoreMessageReceiver.this.reduceCreditForCompletedReceiveRequest(receiveWorkItem.getMaxMessageCount());
                             TRACE_LOGGER.warn("No messages received from '{}'. Pending receive request timed out. Returning null to the client.", CoreMessageReceiver.this.receivePath);
-                            receiveWorkItem.getWork().complete(null);
+                            AsyncUtil.completeFuture(receiveWorkItem.getWork(), null);
                         }
                     }
                 },
                 timeout,
-                TimerType.OneTimeRun);
+                TimerType.OneTimeRun);        
         
-        this.ensureLinkIsOpen().thenRunAsync(() -> {this.addCredit(receiveWorkItem);});
+        this.ensureLinkIsOpen().thenRun(() -> {this.addCredit(receiveWorkItem);});
 		return onReceive;
 	}
 
@@ -896,8 +896,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	            catch (IOException ioException)
 	            {
 	                this.pendingReceives.remove(receiveWorkItem);
-	                this.reduceCreditForCompletedReceiveRequest(receiveWorkItem.getMaxMessageCount());
-	                AsyncUtil.completeFutureExceptionally(receiveWorkItem.getWork(), generateDispatacherSchedulingFailedException("completeMessage", ioException));
+	                this.reduceCreditForCompletedReceiveRequest(receiveWorkItem.getMaxMessageCount());	                
+	                receiveWorkItem.getWork().completeExceptionally(generateDispatacherSchedulingFailedException("completeMessage", ioException));
 	                receiveWorkItem.cancelTimeoutTask(false);
 	            }
 	        }
@@ -931,7 +931,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 									String.format(Locale.US, "%s operation on ReceiveLink(%s) to path(%s) timed out at %s.", "Open", CoreMessageReceiver.this.receiveLink.getName(), CoreMessageReceiver.this.receivePath, ZonedDateTime.now()),
 									CoreMessageReceiver.this.lastKnownLinkError);
 							TRACE_LOGGER.warn(operationTimedout.getMessage());
-							ExceptionUtil.completeExceptionally(linkOpen.getWork(), operationTimedout, CoreMessageReceiver.this, false);
+							ExceptionUtil.completeExceptionally(linkOpen.getWork(), operationTimedout, CoreMessageReceiver.this, true);
 						}
 					}
 				}
@@ -952,7 +952,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Receive Link(%s) timed out at %s", "Close", CoreMessageReceiver.this.receiveLink.getName(), ZonedDateTime.now()));
 							TRACE_LOGGER.warn(operationTimedout.getMessage());
 
-							ExceptionUtil.completeExceptionally(linkClose, operationTimedout, CoreMessageReceiver.this, false);
+							ExceptionUtil.completeExceptionally(linkClose, operationTimedout, CoreMessageReceiver.this, true);
 						}
 					}
 				}
@@ -1123,14 +1123,14 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         if(delivery == null)
         {
             TRACE_LOGGER.error("Delivery not found for delivery tag '{}'. Either receive link to '{}' closed with a transient error and reopened or the delivery was already settled by complete/abandon/defer/deadletter.", deliveryTagAsString, this.receivePath);
-            AsyncUtil.completeFutureExceptionally(completeMessageFuture, generateDeliveryNotFoundException());
+            completeMessageFuture.completeExceptionally(generateDeliveryNotFoundException());
         }
         else
         {
             final UpdateStateWorkItem workItem = new UpdateStateWorkItem(completeMessageFuture, outcome, CoreMessageReceiver.this.factoryRceiveTimeout);
             CoreMessageReceiver.this.pendingUpdateStateRequests.put(deliveryTagAsString, workItem);
             
-            CoreMessageReceiver.this.ensureLinkIsOpen().thenRunAsync(() -> {
+            CoreMessageReceiver.this.ensureLinkIsOpen().thenRun(() -> {
                 try
                 {
                     this.underlyingFactory.scheduleOnReactorThread(new DispatchHandler()
@@ -1173,7 +1173,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                                         String.format(Locale.US, "%s operation on ReceiveLink(%s) to path(%s) timed out at %s.", "Open", CoreMessageReceiver.this.receiveLink.getName(), CoreMessageReceiver.this.receivePath, ZonedDateTime.now()));                           
                                 
                                 TRACE_LOGGER.warn(operationTimedout.getMessage());
-                                linkReopenFutureThatCanBeCancelled.completeExceptionally(operationTimedout);
+                                AsyncUtil.completeFutureExceptionally(linkReopenFutureThatCanBeCancelled, operationTimedout);
                             }
 	                    }
 	                    , CoreMessageReceiver.LINK_REOPEN_TIMEOUT
@@ -1205,7 +1205,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	                    }
 	                }
 	                return null;
-	            });
+	            }, MessagingFactory.INTERNAL_THREAD_POOL);
 		    }
 		    
 		    return this.receiveLinkReopenFuture;
@@ -1312,8 +1312,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
-			});
-		});					
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);					
 	}
 	
 	public CompletableFuture<Collection<MessageWithLockToken>> receiveDeferredMessageBatchAsync(Long[] sequenceNumbers)
@@ -1378,8 +1378,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
-			});
-		});		
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 	}
 	
 	public CompletableFuture<Void> updateDispositionAsync(UUID[] lockTokens, String dispositionStatus, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify)
@@ -1435,8 +1435,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
-			});
-		});		
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 	}
 	
 	public CompletableFuture<Void> renewSessionLocksAsync()
@@ -1467,8 +1467,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
-			});
-		});		
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 	}
 	
 	public CompletableFuture<byte[]> getSessionStateAsync()
@@ -1508,8 +1508,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
-			});
-		});
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 	
 	// NULL session state is allowed
@@ -1540,8 +1540,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 					returningFuture.completeExceptionally(failureException);
 				}
 				return returningFuture;
-			});
-		});		
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 	}
 	
 	// A receiver can be used to peek messages from any session-id, useful for browsable sessions
@@ -1550,6 +1550,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	    this.throwIfInUnusableState();
 		return this.createRequestResponseLinkAsync().thenComposeAsync((v) -> {
 			return CommonRequestResponseOperations.peekMessagesAsync(this.requestResponseLink, this.operationTimeout, fromSequenceNumber, messageCount, sessionId, this.receiveLink.getName());
-		});
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}	
 }

@@ -78,7 +78,7 @@ class RequestResponseLink extends ClientEntity{
 							Exception operationTimedout = new TimeoutException(
 									String.format(Locale.US, "Open operation on RequestResponseLink(%s) on Entity(%s) timed out at %s.", requestReponseLink.getClientId(), requestReponseLink.linkPath, ZonedDateTime.now().toString()));
 							TRACE_LOGGER.error("RequestResponseLink open timed out.", operationTimedout);
-							requestReponseLink.createFuture.completeExceptionally(operationTimedout);
+							AsyncUtil.completeFutureExceptionally(requestReponseLink.createFuture, operationTimedout);
 						}
 					}
 				}
@@ -113,7 +113,7 @@ class RequestResponseLink extends ClientEntity{
             }
             
             return null;
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
 		
 		CompletableFuture.allOf(requestReponseLink.amqpSender.openFuture, requestReponseLink.amqpReceiver.openFuture).handleAsync((v, ex) -> 
         {
@@ -129,7 +129,7 @@ class RequestResponseLink extends ClientEntity{
             }
             
             return null;
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
 		
 		return requestReponseLink.createFuture;
 	}
@@ -296,7 +296,7 @@ class RequestResponseLink extends ClientEntity{
             }
             
             return null;
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
         
         CompletableFuture.allOf(this.amqpSender.openFuture, this.amqpReceiver.openFuture).handleAsync((v, ex) -> 
         {
@@ -312,7 +312,7 @@ class RequestResponseLink extends ClientEntity{
             }
             
             return null;
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
 		
 		Timer.schedule(
             new Runnable()
@@ -325,7 +325,7 @@ class RequestResponseLink extends ClientEntity{
                                 String.format(Locale.US, "Recreating internal links of requestresponselink to %s timed out.", RequestResponseLink.this.linkPath));
                         TRACE_LOGGER.warn("Recreating internal links of requestresponselink timed out.", operationTimedout);
                         RequestResponseLink.this.cancelSASTokenRenewTimer();
-                        recreateInternalLinksFuture.completeExceptionally(operationTimedout);
+                        AsyncUtil.completeFutureExceptionally(recreateInternalLinksFuture, operationTimedout);
                     }
                 }
             }
@@ -339,8 +339,8 @@ class RequestResponseLink extends ClientEntity{
 	{
 	    TRACE_LOGGER.warn("Completing all pending requests with exception in request response link to {}", this.linkPath);
 		for(RequestResponseWorkItem workItem : this.pendingRequests.values())
-		{			
-			workItem.getWork().completeExceptionally(exception);
+		{
+			AsyncUtil.completeFutureExceptionally(workItem.getWork(), exception);
 			workItem.cancelTimeoutTask(true);
 		}
 		
@@ -371,7 +371,7 @@ class RequestResponseLink extends ClientEntity{
                         }
                         
                         return null;
-                    });
+                    }, MessagingFactory.INTERNAL_THREAD_POOL);
                 }
             }
         }
@@ -414,6 +414,7 @@ class RequestResponseLink extends ClientEntity{
 			}
 			
 			workItem.getWork().completeExceptionally(exceptionToReport);
+			AsyncUtil.completeFutureExceptionally(workItem.getWork(), exceptionToReport);
 			workItem.cancelTimeoutTask(true);
 		}
 		
@@ -482,7 +483,7 @@ class RequestResponseLink extends ClientEntity{
 	protected CompletableFuture<Void> onClose() {
 	    TRACE_LOGGER.info("Closing requestresponselink to {} by closing both internal sender and receiver links.", this.linkPath);
 	    this.cancelSASTokenRenewTimer();
-		return this.amqpSender.closeAsync().thenComposeAsync((v) -> this.amqpReceiver.closeAsync());
+		return this.amqpSender.closeAsync().thenComposeAsync((v) -> this.amqpReceiver.closeAsync(), MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 	
 	private static void scheduleLinkCloseTimeout(CompletableFuture<Void> closeFuture, Duration timeout, String linkName)
@@ -497,7 +498,7 @@ class RequestResponseLink extends ClientEntity{
 							Exception operationTimedout = new TimeoutException(String.format(Locale.US, "%s operation on Link(%s) timed out at %s", "Close", linkName, ZonedDateTime.now()));
 							TRACE_LOGGER.warn("Closing link timed out", operationTimedout);
 							
-							closeFuture.completeExceptionally(operationTimedout);
+							AsyncUtil.completeFutureExceptionally(closeFuture, operationTimedout);
 						}
 					}
 				}
@@ -547,18 +548,18 @@ class RequestResponseLink extends ClientEntity{
                                     }
                                     else
                                     {
-                                        InternalReceiver.this.closeFuture.complete(null);
+                                        AsyncUtil.completeFuture(InternalReceiver.this.closeFuture, null);
                                     }
                                 }
                             }
                         });
                     } catch (IOException e) {
-                        this.closeFuture.completeExceptionally(e);
+                        AsyncUtil.completeFutureExceptionally(this.closeFuture, e);
                     }
                 }
                 else
                 {
-                    this.closeFuture.complete(null);
+                    AsyncUtil.completeFuture(this.closeFuture, null);
                 }
             }
 		}
@@ -569,7 +570,7 @@ class RequestResponseLink extends ClientEntity{
 			{
 			    TRACE_LOGGER.debug("Opened internal receive link of requestresponselink to {}", parent.linkPath);
 			    this.parent.underlyingFactory.registerForConnectionError(this.receiveLink);
-				this.openFuture.complete(null);
+				AsyncUtil.completeFuture(this.openFuture, null);
 				
 				// Send unlimited credit
 				this.receiveLink.flow(Integer.MAX_VALUE);
@@ -578,8 +579,8 @@ class RequestResponseLink extends ClientEntity{
 			{
 			    TRACE_LOGGER.error("Opening internal receive link '{}' of requestresponselink to {} failed.", this.receiveLink.getName(), this.parent.linkPath, completionException);
 			    this.setClosed();
-			    this.closeFuture.complete(null);
-				this.openFuture.completeExceptionally(completionException);
+			    AsyncUtil.completeFuture(this.closeFuture, null);
+				AsyncUtil.completeFutureExceptionally(this.openFuture, completionException);
 			}
 		}
 
@@ -595,7 +596,7 @@ class RequestResponseLink extends ClientEntity{
 				if(!this.closeFuture.isDone())
 				{
 				    TRACE_LOGGER.error("Closing internal receive link '{}' of requestresponselink to {} failed.", this.receiveLink.getName(), this.parent.linkPath, exception);
-					this.closeFuture.completeExceptionally(exception);
+					AsyncUtil.completeFutureExceptionally(this.closeFuture, exception);
 				}
 			}
 			
@@ -619,13 +620,13 @@ class RequestResponseLink extends ClientEntity{
 					if(condition == null || condition.getCondition() == null)
 					{
 					    TRACE_LOGGER.info("Closed internal receive link of requestresponselink to {}", parent.linkPath);
-						this.closeFuture.complete(null);
+						AsyncUtil.completeFuture(this.closeFuture, null);
 					}
 					else
 					{
 						Exception exception = ExceptionUtil.toException(condition);
 						TRACE_LOGGER.error("Closing internal receive link '{}' of requestresponselink to {} failed.", this.receiveLink.getName(), this.parent.linkPath, exception);
-						this.closeFuture.completeExceptionally(exception);
+						AsyncUtil.completeFutureExceptionally(this.closeFuture, exception);
 					}
 				}
 			}
@@ -757,18 +758,18 @@ class RequestResponseLink extends ClientEntity{
                                     }
                                     else
                                     {
-                                        InternalSender.this.closeFuture.complete(null);
+                                        AsyncUtil.completeFuture(InternalSender.this.closeFuture, null);
                                     }
                                 }
                             }
                         });
                     } catch (IOException e) {
-                        this.closeFuture.completeExceptionally(e);
+                        AsyncUtil.completeFutureExceptionally(this.closeFuture, e);
                     }
                 }
                 else
                 {
-                    this.closeFuture.complete(null);
+                    AsyncUtil.completeFuture(this.closeFuture, null);
                 }
             }
 		}
@@ -780,15 +781,15 @@ class RequestResponseLink extends ClientEntity{
 			    TRACE_LOGGER.debug("Opened internal send link of requestresponselink to {}", parent.linkPath);
 			    this.parent.underlyingFactory.registerForConnectionError(this.sendLink);
 			    this.maxMessageSize = Util.getMaxMessageSizeFromLink(this.sendLink);
-				this.openFuture.complete(null);
+				AsyncUtil.completeFuture(this.openFuture, null);
 				this.runSendLoop();
 			}
 			else
 			{
 			    TRACE_LOGGER.error("Opening internal send link '{}' of requestresponselink to {} failed.", this.sendLink.getName(), this.parent.linkPath, completionException);
 			    this.setClosed();
-			    this.closeFuture.complete(null);
-				this.openFuture.completeExceptionally(completionException);
+				AsyncUtil.completeFuture(this.closeFuture, null);
+				AsyncUtil.completeFutureExceptionally(this.openFuture, completionException);
 			}
 		}
 
@@ -804,7 +805,7 @@ class RequestResponseLink extends ClientEntity{
 				if(!this.closeFuture.isDone())
 				{
 				    TRACE_LOGGER.error("Closing internal send link '{}' of requestresponselink to {} failed.", this.sendLink.getName(), this.parent.linkPath, exception);
-					this.closeFuture.completeExceptionally(exception);
+					AsyncUtil.completeFutureExceptionally(this.closeFuture, exception);
 				}
 			}
 			
@@ -828,13 +829,13 @@ class RequestResponseLink extends ClientEntity{
 					if(condition == null || condition.getCondition() == null)
 					{
 					    TRACE_LOGGER.info("Closed internal send link of requestresponselink to {}", this.parent.linkPath);
-						this.closeFuture.complete(null);
+						AsyncUtil.completeFuture(this.closeFuture, null);
 					}
 					else
 					{
 						Exception exception = ExceptionUtil.toException(condition);
 						TRACE_LOGGER.error("Closing internal send link '{}' of requestresponselink to {} failed.", this.sendLink.getName(), this.parent.linkPath, exception);
-						this.closeFuture.completeExceptionally(exception);
+						AsyncUtil.completeFutureExceptionally(this.closeFuture, exception);
 					}
 				}
 			}

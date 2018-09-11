@@ -78,7 +78,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
                         }
                     }
                     return null;
-                });
+                }, MessagingFactory.INTERNAL_THREAD_POOL);
             }
             
             return this.requestResponseLinkCreationFuture;
@@ -139,8 +139,8 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
 				}
 				return returningFuture;
-			});
-		});
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 	
 	public CompletableFuture<Void> removeRuleAsync(String ruleName)
@@ -167,8 +167,8 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
 				}
 				return returningFuture;
-			});
-		});
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 	
 	public CompletableFuture<Void> addRuleAsync(RuleDescription ruleDescription)
@@ -196,8 +196,8 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 					returningFuture.completeExceptionally(RequestResponseUtils.genereateExceptionFromResponse(responseMessage));
 				}
 				return returningFuture;
-			});
-		});		
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 	}
 
 	public CompletableFuture<Collection<RuleDescription>> getRulesAsync(int skip, int top)
@@ -243,7 +243,7 @@ public final class MiscRequestResponseOperationHandler extends ClientEntity
 				}
 
 				return returningFuture;
-			});
-		});
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 }
