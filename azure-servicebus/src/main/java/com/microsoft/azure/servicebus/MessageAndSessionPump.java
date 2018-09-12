@@ -59,20 +59,33 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         this.receiveMode = receiveMode;
         this.openSessions = new ConcurrentHashMap<>();
         this.prefetchCount = UNSET_PREFETCH_COUNT;
-        this.customCodeExecutor = ForkJoinPool.commonPool(); // Until we accept a threadpool from the customer
     }
 
+    @Deprecated
     @Override
     public void registerMessageHandler(IMessageHandler handler) throws InterruptedException, ServiceBusException {
         this.registerMessageHandler(handler, new MessageHandlerOptions());
+    }    
+    
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.registerMessageHandler(handler, new MessageHandlerOptions(), executorService);
     }
 
+    @Deprecated
     @Override
     public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
-        TRACE_LOGGER.info("Registering message handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
+    	this.registerMessageHandler(handler, handlerOptions, ForkJoinPool.commonPool());
+    }
+    
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+    	assertNonNulls(handler, handlerOptions, executorService);
+    	TRACE_LOGGER.info("Registering message handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
         this.setHandlerRegistered();
         this.messageHandler = handler;
         this.messageHandlerOptions = handlerOptions;
+        this.customCodeExecutor = executorService;
 
         this.innerReceiver = ClientFactory.createMessageReceiverFromEntityPath(this.factory, this.entityPath, this.entityType, this.receiveMode);
         TRACE_LOGGER.info("Created MessageReceiver to entity '{}'", this.entityPath);
@@ -85,21 +98,43 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         }
     }
 
+    @Deprecated
     @Override
     public void registerSessionHandler(ISessionHandler handler) throws InterruptedException, ServiceBusException {
         this.registerSessionHandler(handler, new SessionHandlerOptions());
+    }    
+    
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.registerSessionHandler(handler, new SessionHandlerOptions(), executorService);
     }
 
+    @Deprecated
     @Override
     public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
-        TRACE_LOGGER.info("Registering session handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
+    	this.registerSessionHandler(handler, handlerOptions, ForkJoinPool.commonPool());
+    }
+    
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+    	assertNonNulls(handler, handlerOptions, executorService);
+    	TRACE_LOGGER.info("Registering session handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
         this.setHandlerRegistered();
         this.sessionHandler = handler;
         this.sessionHandlerOptions = handlerOptions;
+        this.customCodeExecutor = executorService;
 
         for (int i = 0; i < handlerOptions.getMaxConcurrentSessions(); i++) {
             this.acceptSessionAndPumpMessages();
         }
+    }
+    
+    private static void assertNonNulls(Object handler, Object options, ExecutorService executorService)
+    {
+    	if(handler == null || options == null || executorService == null)
+    	{
+    		throw new IllegalArgumentException("None of the arguments can be null.");
+    	}
     }
 
     private synchronized void setHandlerRegistered() {

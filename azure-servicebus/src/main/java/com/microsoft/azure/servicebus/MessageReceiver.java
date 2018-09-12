@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
-import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.CoreMessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessageWithDeliveryTag;
 import com.microsoft.azure.servicebus.primitives.MessageWithLockToken;

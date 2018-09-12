@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,24 +202,48 @@ public final class QueueClient extends InitializableEntity implements IQueueClie
         return this.queuePath;
     }
 
+    @Deprecated
     @Override
     public void registerMessageHandler(IMessageHandler handler) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.registerMessageHandler(handler);
     }
 
+    @Deprecated
     @Override
     public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.registerMessageHandler(handler, handlerOptions);
     }
 
+    @Deprecated
     @Override
     public void registerSessionHandler(ISessionHandler handler) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.registerSessionHandler(handler);
     }
 
+    @Deprecated
     @Override
     public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
         this.messageAndSessionPump.registerSessionHandler(handler, handlerOptions);
+    }
+    
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerMessageHandler(handler, executorService);
+    }
+
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerMessageHandler(handler, handlerOptions, executorService);
+    }
+
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerSessionHandler(handler, executorService);
+    }
+
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerSessionHandler(handler, handlerOptions, executorService);
     }
 
     // No op now
