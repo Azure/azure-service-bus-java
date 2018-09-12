@@ -688,11 +688,11 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         int renewInterval = Util.getTokenRenewIntervalInSeconds((int)Duration.between(Instant.now(), currentTokenValidUntil).getSeconds());
         return Timer.schedule(validityRenewer, Duration.ofSeconds(renewInterval), TimerType.OneTimeRun);
 	}
-	
+
 	CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath, MessagingEntityType entityType)
 	{
-	    this.throwIfClosed(null);
-	    return this.managementLinksCache.obtainRequestResponseLinkAsync(entityPath, null, entityType);
+		this.throwIfClosed(null);
+		return this.managementLinksCache.obtainRequestResponseLinkAsync(entityPath, null, entityType);
 	}
 
     CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath, String transferDestinationPath, MessagingEntityType entityType)
@@ -716,40 +716,40 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
             this.managementLinksCache.releaseRequestResponseLink(entityPath, transferDestinationPath);
         }
     }
-	
+
 	private CompletableFuture<Void> createCBSLinkAsync()
-    {
-	    if(++this.cbsLinkCreationAttempts > MAX_CBS_LINK_CREATION_ATTEMPTS )
-	    {
-	        Throwable completionEx = this.lastCBSLinkCreationException == null ? new Exception("CBS link creation failed multiple times.") : this.lastCBSLinkCreationException;
-	        this.cbsLinkCreationFuture.completeExceptionally(completionEx);
-	        return CompletableFuture.completedFuture(null);     
-	    }
-	    else
-	    {	        
-	        String requestResponseLinkPath = RequestResponseLink.getCBSNodeLinkPath();
-	        TRACE_LOGGER.info("Creating CBS link to {}", requestResponseLinkPath);
-	        CompletableFuture<Void> crateAndAssignRequestResponseLink =
-	                        RequestResponseLink.createAsync(this, this.getClientId() + "-cbs", requestResponseLinkPath, null, null, null, null)
-                                    .handleAsync((cbsLink, ex) ->
-	                        {
-	                            if(ex == null)
-	                            {
-	                                TRACE_LOGGER.info("Created CBS link to {}", requestResponseLinkPath);
-	                                this.cbsLink = cbsLink;	
-	                                this.cbsLinkCreationFuture.complete(null);
-	                            }
-	                            else
-	                            {
-	                                this.lastCBSLinkCreationException = ExceptionUtil.extractAsyncCompletionCause(ex);
-	                                TRACE_LOGGER.warn("Creating CBS link to {} failed. Attempts '{}'", requestResponseLinkPath, this.cbsLinkCreationAttempts);
-	                                this.createCBSLinkAsync();
-	                            }
-	                            return null;
-	                        });       
-	        return crateAndAssignRequestResponseLink;
-	    }	    
-    }
+	{
+		if(++this.cbsLinkCreationAttempts > MAX_CBS_LINK_CREATION_ATTEMPTS )
+		{
+			Throwable completionEx = this.lastCBSLinkCreationException == null ? new Exception("CBS link creation failed multiple times.") : this.lastCBSLinkCreationException;
+			this.cbsLinkCreationFuture.completeExceptionally(completionEx);
+			return CompletableFuture.completedFuture(null);
+		}
+		else
+		{
+			String requestResponseLinkPath = RequestResponseLink.getCBSNodeLinkPath();
+			TRACE_LOGGER.info("Creating CBS link to {}", requestResponseLinkPath);
+			CompletableFuture<Void> crateAndAssignRequestResponseLink =
+					RequestResponseLink.createAsync(this, this.getClientId() + "-cbs", requestResponseLinkPath, null, null, null, null)
+							.handleAsync((cbsLink, ex) ->
+							{
+								if(ex == null)
+								{
+									TRACE_LOGGER.info("Created CBS link to {}", requestResponseLinkPath);
+									this.cbsLink = cbsLink;
+									this.cbsLinkCreationFuture.complete(null);
+								}
+								else
+								{
+									this.lastCBSLinkCreationException = ExceptionUtil.extractAsyncCompletionCause(ex);
+									TRACE_LOGGER.warn("Creating CBS link to {} failed. Attempts '{}'", requestResponseLinkPath, this.cbsLinkCreationAttempts);
+									this.createCBSLinkAsync();
+								}
+								return null;
+							});
+			return crateAndAssignRequestResponseLink;
+		}
+	}
 	
 	private static <T> T completeFuture(CompletableFuture<T> future) throws InterruptedException, ServiceBusException {
         try {
