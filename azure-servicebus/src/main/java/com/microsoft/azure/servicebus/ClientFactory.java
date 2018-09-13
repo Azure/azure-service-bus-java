@@ -40,7 +40,7 @@ public final class ClientFactory {
      *     IMessageSender messageSender = ClientFactory.createMessageSenderFromConnectionStringBuilder(new ConnectionStringBuilder(connectionString, queueName));
      * </pre>
      *
-     * @param amqpConnectionStringBuilder the connection string builder
+     * @param amqpConnectionString Builder the connection string builder
      * @return {@link IMessageSender} instance
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if the sender cannot be created

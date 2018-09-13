@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 
 public class WebSocketConnectionHandler extends ConnectionHandler {
 
-    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ConnectionHandler.class);
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(WebSocketConnectionHandler.class);
 
     public WebSocketConnectionHandler(IAmqpConnection messagingFactory)
     {
@@ -19,9 +19,11 @@ public class WebSocketConnectionHandler extends ConnectionHandler {
     @Override
     public void addTransportLayers(final Event event, final TransportInternal transport)
     {
+        final String hostName = event.getConnection().getHostname();
+
         final WebSocketImpl webSocket = new WebSocketImpl();
         webSocket.configure(
-                event.getConnection().getHostname(),
+                hostName,
                 "/$servicebus/websocket",
                 null,
                 0,
@@ -31,14 +33,15 @@ public class WebSocketConnectionHandler extends ConnectionHandler {
 
         transport.addTransportLayer(webSocket);
 
-        if (TRACE_LOGGER.isInfoEnabled())
-        {
-            TRACE_LOGGER.info("addWebsocketHandshake: hostname[" + event.getConnection().getHostname() +"]");
+        if (TRACE_LOGGER.isInfoEnabled()) {
+            TRACE_LOGGER.info("addWebsocketHandshake: hostname[" + hostName +"]");
         }
+
+        super.addTransportLayers(event, transport);
     }
 
     @Override
-    public int getPort()
+    protected int getProtocolPort()
     {
         return ClientConstants.HTTPS_PORT;
     }

@@ -45,6 +45,13 @@
 		</plugins>
 	</build>
 
+	<repositories>
+		<repository>
+			<id>azure eventhubs</id>
+			<url>https://oss.sonatype.org/content/repositories/commicrosoftazure-2584</url>
+		</repository>
+	</repositories>
+
 	 <dependencies>
 	 	<dependency>
 	 	    <groupId>org.apache.qpid</groupId>
@@ -54,7 +61,7 @@
 		 <dependency>
 			 <groupId>com.microsoft.azure</groupId>
 			 <artifactId>qpid-proton-j-extensions</artifactId>
-			 <version>${qpid-proton-j-extensions-version}</version>
+			 <version>1.1.0-PREVIEW</version>
 		 </dependency>
 	 	<dependency>
 	 	    <groupId>org.bouncycastle</groupId> 

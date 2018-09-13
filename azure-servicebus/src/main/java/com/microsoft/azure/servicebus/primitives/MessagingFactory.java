@@ -81,9 +81,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	    this.registeredLinks = new LinkedList<Link>();
         this.connetionCloseFuture = new CompletableFuture<Void>();
         this.reactorLock = new Object();
-        this.connectionHandler =   clientSettings.getTransportType() == TransportType.AMQP
-				? new ConnectionHandler(this)
-				: new WebSocketConnectionHandler(this);
+        this.connectionHandler =   ConnectionHandler.create(clientSettings.getTransportType(), this);
         this.factoryOpenFuture = new CompletableFuture<MessagingFactory>();
         this.cbsLinkCreationFuture = new CompletableFuture<Void>();
         this.managementLinksCache = new RequestResponseLinkCache(this);
@@ -95,8 +93,11 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
                 super.onReactorInit(e);
 
                 final Reactor r = e.getReactor();
-                TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, connectionHandler.getPort());
-                connection = r.connectionToHost(hostName, connectionHandler.getPort(), connectionHandler);
+                TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, connectionHandler.getProtocolPort());
+                connection = r.connectionToHost(
+                        connectionHandler.getOutboundSocketHostName(),
+                        connectionHandler.getOutboundSocketPort(),
+                        connectionHandler);
             }
         };
         Timer.register(this.getClientId());
@@ -175,7 +176,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         });
     }
 
-	String getHostName()
+    @Override
+	public String getHostname()
 	{
 		return this.hostName;
 	}
@@ -217,7 +219,10 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
 		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
-			this.connection = this.getReactor().connectionToHost(this.hostName, connectionHandler.getPort(), this.connectionHandler);
+            this.connection = this.getReactor().connectionToHost(
+                    this.connectionHandler.getOutboundSocketHostName(),
+                    this.connectionHandler.getOutboundSocketPort(),
+                    this.connectionHandler);
 		}
 
 		return this.connection;
