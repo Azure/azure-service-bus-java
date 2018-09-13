@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.ClientConstants;
-import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
 import com.microsoft.azure.servicebus.primitives.CoreMessageReceiver;
 import com.microsoft.azure.servicebus.primitives.MessageWithDeliveryTag;
 import com.microsoft.azure.servicebus.primitives.MessageWithLockToken;
@@ -141,7 +140,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                                 this.messagingFactory.closeAsync();
                             }
                         }
-                    });
+                    }, MessagingFactory.INTERNAL_THREAD_POOL);
                 } else {
                     acceptReceiverFuture = CompletableFuture.completedFuture(null);
                 }
@@ -156,8 +155,8 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                     } else {
                         TRACE_LOGGER.info("Created MessageBrowser to entity '{}'", this.entityPath);
                     }
-                });
-            });
+                }, MessagingFactory.INTERNAL_THREAD_POOL);
+            }, MessagingFactory.INTERNAL_THREAD_POOL);
         }
     }
 
@@ -368,7 +367,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                 return null;
             else
                 return MessageConverter.convertAmqpMessageToBrokeredMessage(c.toArray(new MessageWithDeliveryTag[0])[0]);
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
     }
 
     @Override
@@ -386,7 +385,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                 return null;
             else
                 return convertAmqpMessagesWithDeliveryTagsToBrokeredMessages(c);
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
     }
 
     @Override
@@ -401,7 +400,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                 return null;
             else
                 return c.toArray(new Message[0])[0];
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
     }
 
     @Override
@@ -415,7 +414,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                 return null;
             else
                 return convertAmqpMessagesWithLockTokensToBrokeredMessages(c);
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
     }
 
     @Override
@@ -443,7 +442,7 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                 } else {
                     return CompletableFuture.completedFuture(null);
                 }
-            });
+            }, MessagingFactory.INTERNAL_THREAD_POOL);
         } else {
             return CompletableFuture.completedFuture(null);
         }
@@ -563,7 +562,8 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
                         }
                     }
                     return newLockedUntilTimes;
-                }
+                },
+                MessagingFactory.INTERNAL_THREAD_POOL
         );
     }
 
