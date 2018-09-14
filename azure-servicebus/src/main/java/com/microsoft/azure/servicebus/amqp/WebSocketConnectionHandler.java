@@ -41,7 +41,7 @@ public class WebSocketConnectionHandler extends ConnectionHandler {
     }
 
     @Override
-    protected int getProtocolPort()
+    public int getProtocolPort()
     {
         return ClientConstants.HTTPS_PORT;
     }

@@ -31,7 +31,7 @@ import com.microsoft.azure.servicebus.primitives.StringUtil;
 public class ConnectionHandler extends BaseHandler
 {
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ConnectionHandler.class);
-	private final IAmqpConnection messagingFactory;
+	protected final IAmqpConnection messagingFactory;
 
 	protected ConnectionHandler(final IAmqpConnection messagingFactory)
 	{
@@ -43,7 +43,7 @@ public class ConnectionHandler extends BaseHandler
 	{
 		switch(transportType) {
 			case AMQP_WEB_SOCKETS:
-				if (ProxyConnectionHandler.shouldUseProxy()) {
+				if (ProxyConnectionHandler.shouldUseProxy(messagingFactory)) {
 					return new ProxyConnectionHandler(messagingFactory);
 				} else {
 					return new WebSocketConnectionHandler(messagingFactory);
@@ -58,7 +58,7 @@ public class ConnectionHandler extends BaseHandler
 	public void onConnectionInit(Event event)
 	{
 		final Connection connection = event.getConnection();
-		final String hostName = new StringBuilder(this.messagingFactory.getHostname())
+		final String hostName = new StringBuilder(this.messagingFactory.getHostName())
 									.append(":")
 									.append(String.valueOf(this.getProtocolPort()))
 									.toString();
@@ -81,17 +81,11 @@ public class ConnectionHandler extends BaseHandler
 		transport.ssl(domain);
 	}
 
-	public String getOutboundSocketHostName()
-	{
-		return messagingFactory.getHostname();
-	}
+	public String getOutboundSocketHostName() { return messagingFactory.getHostName(); }
 
-	public int getOutboundSocketPort()
-	{
-		return this.getProtocolPort();
-	}
+	public int getOutboundSocketPort() { return this.getProtocolPort(); }
 
-	protected int getProtocolPort()
+	public int getProtocolPort()
 	{
 		return ClientConstants.AMQPS_PORT;
 	}

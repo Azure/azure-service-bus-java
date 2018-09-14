@@ -4,7 +4,9 @@ import com.microsoft.azure.proton.transport.proxy.ProxyHandler;
 import com.microsoft.azure.proton.transport.proxy.impl.ProxyHandlerImpl;
 import com.microsoft.azure.proton.transport.proxy.impl.ProxyImpl;
 
+import com.microsoft.azure.servicebus.ClientSettings;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
+import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.impl.TransportInternal;
 import org.slf4j.Logger;
@@ -16,17 +18,21 @@ import java.util.Map;
 
 public class ProxyConnectionHandler extends WebSocketConnectionHandler {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ProxyConnectionHandler.class);
+    /* Making a (temporary) executive decision to add this as a member variable in *Proxy*ConnectionHandler only */
+    private ClientSettings clientSettings;
 
-    public static boolean shouldUseProxy() {
-        /* Implement */
+    public static boolean shouldUseProxy(IAmqpConnection messagingFactory) {
+        return !StringUtil.isNullOrEmpty((
+                (MessagingFactory)messagingFactory).getClientSettings().getProxyUserName());
     }
 
     public ProxyConnectionHandler(IAmqpConnection messagingFactory) {
         super(messagingFactory);
+        this.clientSettings = ((MessagingFactory)messagingFactory).getClientSettings();
     }
 
     @Override
-    protected void addTransportLayers(final Event event, final TransportInternal transport) {
+    public void addTransportLayers(final Event event, final TransportInternal transport) {
         super.addTransportLayers(event, transport);
 
         final ProxyImpl proxy = new ProxyImpl();
@@ -43,23 +49,9 @@ public class ProxyConnectionHandler extends WebSocketConnectionHandler {
         }
     }
 
-    @Override
-    public String getOutboundSocketHostName() {
-        /* TODO
-        return EventHubClientImpl.proxyHostName;
-        */
-    }
-
-    @Override
-    public int getOutboundSocketPort() {
-        /* TODO
-        return EventHubClientImpl.proxyHostPort;
-        */
-    }
-
     private Map<String, String> getAuthorizationHeader() {
-        final String proxyUserName = EventHubClientImpl.proxyUserName;
-        final String proxyPassword = EventHubClientImpl.proxyPassword;
+        final String proxyUserName = clientSettings.getProxyUserName();
+        final String proxyPassword = clientSettings.getProxyPassword();
         if (StringUtil.isNullOrEmpty(proxyUserName) ||
             StringUtil.isNullOrEmpty(proxyPassword)) {
             return null;
@@ -73,4 +65,13 @@ public class ProxyConnectionHandler extends WebSocketConnectionHandler {
         return proxyAuthorizationHeader;
     }
 
+    @Override
+    public String getOutboundSocketHostName() {
+        return clientSettings.getProxyHostName();
+    }
+
+    @Override
+    public int getOutboundSocketPort() {
+        return clientSettings.getProxyHostPort();
+    }
 }

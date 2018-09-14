@@ -93,11 +93,13 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
                 super.onReactorInit(e);
 
                 final Reactor r = e.getReactor();
-                TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, connectionHandler.getProtocolPort());
+                TRACE_LOGGER.info("Creating connection to host '{}:{}'",
+						connectionHandler.getOutboundSocketHostName(),
+						connectionHandler.getOutboundSocketPort());
                 connection = r.connectionToHost(
-                        connectionHandler.getOutboundSocketHostName(),
-                        connectionHandler.getOutboundSocketPort(),
-                        connectionHandler);
+                		connectionHandler.getOutboundSocketHostName(),
+						connectionHandler.getOutboundSocketPort(),
+						connectionHandler);
             }
         };
         Timer.register(this.getClientId());
@@ -177,11 +179,11 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
     }
 
     @Override
-	public String getHostname()
+	public String getHostName()
 	{
 		return this.hostName;
 	}
-	
+
 	private Reactor getReactor()
 	{
 		synchronized (this.reactorLock)
@@ -246,7 +248,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		return this.clientSettings.getRetryPolicy();
 	}
 	
-	public ClientSettings getClientSetttings()
+	public ClientSettings getClientSettings()
 	{
 	    return this.clientSettings;
 	}

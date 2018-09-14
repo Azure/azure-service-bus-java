@@ -18,7 +18,12 @@ public class ClientSettings {
     private RetryPolicy retryPolicy;
     private Duration operationTimeout;
     private TransportType transportType;
-    
+
+    private String proxyHostName = null;
+    private int proxyHostPort = 0;
+    private String proxyUserName = null;
+    private String proxyPassword = null;
+
     /**
      * Creates a new instance with the given token provider, default retry policy and default operation timeout.
      * @param tokenProvider {@link TokenProvider} instance
@@ -72,4 +77,52 @@ public class ClientSettings {
     }
 
     public TransportType getTransportType() { return transportType; }
+
+    /**
+     * Sets the proxy hostname. Required for proxy connection
+     * @param proxyHostName
+     */
+    public void setProxyHostName(String proxyHostName) { this.proxyHostName = proxyHostName; }
+
+    /**
+     * Sets the proxy host port. Required for proxy connection
+     * @param proxyHostPort
+     */
+    public void setProxyHostPort(int proxyHostPort) { this.proxyHostPort = proxyHostPort; }
+
+    /**
+     * Sets the proxy username
+     * @param proxyUserName
+     */
+    public void setProxyUserName(String proxyUserName) { this.proxyUserName = proxyUserName; }
+
+    /**
+     * Sets the proxy password
+     * @param proxyPassword
+     */
+    public void setProxyPassword(String proxyPassword) { this.proxyPassword = proxyPassword; }
+
+    /**
+     * Gets the proxy host name
+     * @return proxy host name
+     */
+    public String getProxyHostName() { return proxyHostName; }
+
+    /**
+     * Gets the proxy port
+     * @return proxy port
+     */
+    public int getProxyHostPort() { return proxyHostPort; }
+
+    /**
+     * Gets the proxy username
+     * @return proxy username
+     */
+    public String getProxyUserName() { return proxyUserName; }
+
+    /**
+     * Gets the proxy password
+     * @return proxy password
+     */
+    public String getProxyPassword() { return proxyPassword; }
 }

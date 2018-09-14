@@ -9,10 +9,7 @@ import org.apache.qpid.proton.engine.Link;
 
 public interface IAmqpConnection
 {
-	/**
-	 * TODO note here
-	 */
-	String getHostname();
+	String getHostName();
 
 	void onConnectionOpen();
 
