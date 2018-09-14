@@ -18,7 +18,7 @@ public class ProxyConnectionHandler extends WebSocketConnectionHandler {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ProxyConnectionHandler.class);
 
     public static boolean shouldUseProxy(IAmqpConnection messagingFactory) {
-        return !StringUtil.isNullOrEmpty(messagingFactory.getClientSettings().getProxyUserName());
+        return !StringUtil.isNullOrEmpty(messagingFactory.getClientSettings().getProxyHostName());
     }
 
     public ProxyConnectionHandler(IAmqpConnection messagingFactory) { super(messagingFactory); }

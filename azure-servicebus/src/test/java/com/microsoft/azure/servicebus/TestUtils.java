@@ -10,6 +10,7 @@ public class TestUtils {
 	
 	private static final String NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME = "AZURE_SERVICEBUS_JAVA_CLIENT_TEST_CONNECTION_STRING";
     public static final String FIRST_SUBSCRIPTION_NAME = "subscription1";
+    private static final Boolean RUN_WITH_PROXY = false;
 	private static String namespaceConnectionString;
 	private static ConnectionStringBuilder namespaceConnectionStringBuilder;
 	
@@ -17,8 +18,6 @@ public class TestUtils {
 	{
 		// Read connection string
         namespaceConnectionString = System.getenv(NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME);
-        //namespaceConnectionString = "Endpoint=sb://nemakamtest1.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=K9dVT66fAbuBf9XqpgmSXZxs08hvOokUJWiBZC3MY5o=";
-        //namespaceConnectionString = "Endpoint=sb://contoso.servicebus.onebox.windows-int.net/;SharedAccessKeyName=DefaultNamespaceSasAllKeyName;SharedAccessKey=8864/auVd3qDC75iTjBL1GJ4D2oXC6bIttRd0jzDZ+g=";
 		if(namespaceConnectionString == null || namespaceConnectionString.isEmpty())
 		{			
 			System.err.println(NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME + " environment variable not set. Tests will not be able to connect to to any service bus entity.");
@@ -33,13 +32,27 @@ public class TestUtils {
     
     public static ClientSettings getClientSettings()
     {
-        return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+        if (RUN_WITH_PROXY) {
+            return TestUtils.getProxyClientSettings();
+        } else {
+            return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+        }
     }
     
     // AADTokens cannot yet be used for management operations, sent directly to gateway
     public static ClientSettings getManagementClientSettings()
     {
         return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+    }
+
+    public static ClientSettings getProxyClientSettings()
+    {
+        ClientSettings clientSettings =
+                Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+        clientSettings.setProxyHostName("13.66.173.239");
+        clientSettings.setProxyHostPort(3128);
+
+        return clientSettings;
     }
 
 	public static String randomizeEntityName(String entityName)

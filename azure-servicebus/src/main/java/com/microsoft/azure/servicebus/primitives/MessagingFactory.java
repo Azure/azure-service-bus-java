@@ -550,8 +550,8 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 			{
 				this.rctr.setTimeout(3141);
 				this.rctr.start();
-				boolean continuteProcessing = true;
-                while(!Thread.interrupted() && continuteProcessing)
+				boolean continueProcessing = true;
+                while(!Thread.interrupted() && continueProcessing)
                 {
                     // If factory is closed, stop reactor too
                     if(MessagingFactory.this.getIsClosed())
@@ -559,7 +559,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
                         TRACE_LOGGER.info("Gracefully releasing reactor thread as messaging factory is closed");
                         break;
                     }
-                    continuteProcessing = this.rctr.process();
+                    continueProcessing = this.rctr.process();
                 }				
 				TRACE_LOGGER.info("Stopping reactor");
 				this.rctr.stop();

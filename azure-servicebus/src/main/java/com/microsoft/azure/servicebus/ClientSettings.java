@@ -80,24 +80,28 @@ public class ClientSettings {
 
     /**
      * Sets the proxy hostname. Required for proxy connection
+     * Proxy settings are only valid with transport type AMQP_WEB_SOCKETS
      * @param proxyHostName
      */
     public void setProxyHostName(String proxyHostName) { this.proxyHostName = proxyHostName; }
 
     /**
      * Sets the proxy host port. Required for proxy connection
+     * Proxy settings are only valid with transport type AMQP_WEB_SOCKETS
      * @param proxyHostPort
      */
     public void setProxyHostPort(int proxyHostPort) { this.proxyHostPort = proxyHostPort; }
 
     /**
      * Sets the proxy username
+     * Proxy settings are only valid with transport type AMQP_WEB_SOCKETS
      * @param proxyUserName
      */
     public void setProxyUserName(String proxyUserName) { this.proxyUserName = proxyUserName; }
 
     /**
      * Sets the proxy password
+     * Proxy settings are only valid with transport type AMQP_WEB_SOCKETS
      * @param proxyPassword
      */
     public void setProxyPassword(String proxyPassword) { this.proxyPassword = proxyPassword; }
