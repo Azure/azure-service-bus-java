@@ -25,7 +25,7 @@ public class WebSocketConnectionHandler extends ConnectionHandler {
         webSocket.configure(
                 hostName,
                 "/$servicebus/websocket",
-                null,
+                "",
                 0,
                 "AMQPWSB10",
                 null,
