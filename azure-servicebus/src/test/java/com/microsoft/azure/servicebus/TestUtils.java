@@ -49,7 +49,7 @@ public class TestUtils {
         return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
     }
 
-    public static ClientSettings getProxyClientSettings()
+    private static ClientSettings getProxyClientSettings()
     {
         ClientSettings clientSettings =
                 Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
