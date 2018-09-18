@@ -34,12 +34,24 @@ public class ClientSettings {
     {
         this(tokenProvider, RetryPolicy.getDefault(), Duration.ofSeconds(ClientConstants.DEFAULT_OPERATION_TIMEOUT_IN_SECONDS), TransportType.AMQP);
     }
-    
+
     /**
      * Creates a new instance with the given token provider, retry policy and operation timeout.
      * @param tokenProvider {@link TokenProvider} instance
      * @param retryPolicy {@link RetryPolicy} instance
      * @param operationTimeout default operation timeout to be used for all client operations. Client can override this value by explicitly specifying a timeout in the operation.
+     */
+    public ClientSettings(TokenProvider tokenProvider, RetryPolicy retryPolicy, Duration operationTimeout)
+    {
+        this(tokenProvider, retryPolicy, operationTimeout, TransportType.AMQP);
+    }
+
+    /**
+     * Creates a new instance with the given token provider, retry policy and operation timeout.
+     * @param tokenProvider {@link TokenProvider} instance
+     * @param retryPolicy {@link RetryPolicy} instance
+     * @param operationTimeout default operation timeout to be used for all client operations. Client can override this value by explicitly specifying a timeout in the operation.
+     * @param transportType {@link TransportType} instance
      */
     public ClientSettings(TokenProvider tokenProvider, RetryPolicy retryPolicy, Duration operationTimeout, TransportType transportType)
     {
@@ -76,6 +88,10 @@ public class ClientSettings {
         return operationTimeout;
     }
 
+    /**
+     * Gets the transport type for this instance
+     * @return transport type for the instance
+     */
     public TransportType getTransportType() { return transportType; }
 
     /**
