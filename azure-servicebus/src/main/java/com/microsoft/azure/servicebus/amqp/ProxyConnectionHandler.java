@@ -5,6 +5,7 @@ import com.microsoft.azure.proton.transport.proxy.impl.ProxyHandlerImpl;
 import com.microsoft.azure.proton.transport.proxy.impl.ProxyImpl;
 
 import com.microsoft.azure.servicebus.primitives.StringUtil;
+import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.impl.TransportInternal;
 import org.slf4j.Logger;
@@ -18,7 +19,7 @@ public class ProxyConnectionHandler extends WebSocketConnectionHandler {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ProxyConnectionHandler.class);
 
     public static boolean shouldUseProxy(IAmqpConnection messagingFactory) {
-        return !StringUtil.isNullOrEmpty(messagingFactory.getClientSettings().getProxyHostName());
+        return !StringUtil.isNullOrEmpty(((MessagingFactory)messagingFactory).getClientSettings().getProxyHostName());
     }
 
     public ProxyConnectionHandler(IAmqpConnection messagingFactory) { super(messagingFactory); }
@@ -42,8 +43,8 @@ public class ProxyConnectionHandler extends WebSocketConnectionHandler {
     }
 
     private Map<String, String> getAuthorizationHeader() {
-        final String proxyUserName = messagingFactory.getClientSettings().getProxyUserName();
-        final String proxyPassword = messagingFactory.getClientSettings().getProxyPassword();
+        final String proxyUserName = ((MessagingFactory)messagingFactory).getClientSettings().getProxyUserName();
+        final String proxyPassword = ((MessagingFactory)messagingFactory).getClientSettings().getProxyPassword();
         if (StringUtil.isNullOrEmpty(proxyUserName) ||
             StringUtil.isNullOrEmpty(proxyPassword)) {
             return null;
@@ -59,11 +60,11 @@ public class ProxyConnectionHandler extends WebSocketConnectionHandler {
 
     @Override
     public String getOutboundSocketHostName() {
-        return messagingFactory.getClientSettings().getProxyHostName();
+        return ((MessagingFactory)messagingFactory).getClientSettings().getProxyHostName();
     }
 
     @Override
     public int getOutboundSocketPort() {
-        return messagingFactory.getClientSettings().getProxyHostPort();
+        return ((MessagingFactory)messagingFactory).getClientSettings().getProxyHostPort();
     }
 }

@@ -10,10 +10,6 @@ import org.apache.qpid.proton.engine.Link;
 
 public interface IAmqpConnection
 {
-	String getHostName();
-
-	ClientSettings getClientSettings();
-
 	void onConnectionOpen();
 
 	void onConnectionError(ErrorCondition error);
