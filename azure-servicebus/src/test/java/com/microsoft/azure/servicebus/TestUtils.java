@@ -11,7 +11,7 @@ public class TestUtils {
 	private static final String NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME = "AZURE_SERVICEBUS_JAVA_CLIENT_TEST_CONNECTION_STRING";
     public static final String FIRST_SUBSCRIPTION_NAME = "subscription1";
 
-    private static final Boolean RUN_WITH_PROXY = false;
+    private static final String RUN_WITH_PROXY_ENV_VAR = "RUN_WITH_PROXY";
     private static final String PROXY_HOSTNAME_ENV_VAR = "PROXY_HOSTNAME";
     private static final String PROXY_PORT_ENV_VAR = "PROXY_PORT";
 
@@ -36,7 +36,7 @@ public class TestUtils {
     
     public static ClientSettings getClientSettings()
     {
-        if (RUN_WITH_PROXY) {
+        if (Boolean.valueOf(System.getenv(RUN_WITH_PROXY_ENV_VAR))) {
             return TestUtils.getProxyClientSettings();
         } else {
             return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
