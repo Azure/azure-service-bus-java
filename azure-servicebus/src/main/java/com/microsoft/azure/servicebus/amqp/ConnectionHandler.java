@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.microsoft.azure.servicebus.primitives.TransportType;
+import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
@@ -58,7 +59,7 @@ public class ConnectionHandler extends BaseHandler
 	public void onConnectionInit(Event event)
 	{
 		final Connection connection = event.getConnection();
-		final String hostName = new StringBuilder(this.messagingFactory.getHostName())
+		final String hostName = new StringBuilder(((MessagingFactory)messagingFactory).getHostName())
 									.append(":")
 									.append(String.valueOf(this.getProtocolPort()))
 									.toString();
@@ -81,7 +82,7 @@ public class ConnectionHandler extends BaseHandler
 		transport.ssl(domain);
 	}
 
-	public String getOutboundSocketHostName() { return messagingFactory.getHostName(); }
+	public String getOutboundSocketHostName() { return ((MessagingFactory)messagingFactory).getHostName(); }
 
 	public int getOutboundSocketPort() { return this.getProtocolPort(); }
 

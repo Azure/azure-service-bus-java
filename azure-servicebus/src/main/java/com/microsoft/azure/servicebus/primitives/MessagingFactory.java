@@ -178,7 +178,6 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         });
     }
 
-    @Override
 	public String getHostName()
 	{
 		return this.hostName;
