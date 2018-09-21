@@ -7,8 +7,8 @@ package com.microsoft.azure.servicebus.amqp;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.microsoft.azure.servicebus.primitives.TransportType;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
+import com.microsoft.azure.servicebus.primitives.TransportType;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
