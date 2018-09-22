@@ -832,7 +832,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 						}
 					}
 					return null;
-				});
+				}, MessagingFactory.INTERNAL_THREAD_POOL);
 			}
 
 			return this.sendLinkReopenFuture;

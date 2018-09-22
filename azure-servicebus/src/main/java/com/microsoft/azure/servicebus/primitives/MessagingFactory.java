@@ -639,12 +639,12 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 			SecurityToken generatedSecurityToken = t;
 			CompletableFuture<Void> sendTokenFuture = this.cbsLinkCreationFuture.thenComposeAsync((v) -> {
 				return CommonRequestResponseOperations.sendCBSTokenAsync(this.cbsLink, Util.adjustServerTimeout(this.clientSettings.getOperationTimeout()), generatedSecurityToken);
-			});
+			}, MessagingFactory.INTERNAL_THREAD_POOL);
 
 			return sendTokenFuture.thenAccept((v) -> {
 				TRACE_LOGGER.debug("Sent token for {}", sasTokenAudienceUri);});
 
-		});
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 
 	CompletableFuture<ScheduledFuture<?>> sendSecurityTokenAndSetRenewTimer(String sasTokenAudienceURI, boolean retryOnFailure, Runnable validityRenewer)
