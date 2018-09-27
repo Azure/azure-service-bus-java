@@ -1,6 +1,9 @@
 package com.microsoft.azure.servicebus;
 
-import java.net.URI;
+import java.io.IOException;
+import java.net.*;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
@@ -54,8 +57,21 @@ public class TestUtils {
         ClientSettings clientSettings =
                 Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
 
-        clientSettings.setProxyHostName(System.getenv(PROXY_HOSTNAME_ENV_VAR));
-        clientSettings.setProxyHostPort(Integer.valueOf(System.getenv(PROXY_PORT_ENV_VAR)));
+        ProxySelector.setDefault(new ProxySelector() {
+            @Override
+            public List<Proxy> select(URI uri) {
+                List<Proxy> proxies = new LinkedList<>();
+                proxies.add(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(
+                                System.getenv(PROXY_HOSTNAME_ENV_VAR),
+                                Integer.valueOf(System.getenv(PROXY_PORT_ENV_VAR)))));
+                return proxies;
+            }
+
+            @Override
+            public void connectFailed(URI uri, SocketAddress sa, IOException ioe) {
+                // no-op
+            }
+        });
 
         return clientSettings;
     }
