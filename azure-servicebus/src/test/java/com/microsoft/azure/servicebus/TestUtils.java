@@ -20,6 +20,10 @@ public class TestUtils {
 
 	private static String namespaceConnectionString;
 	private static ConnectionStringBuilder namespaceConnectionStringBuilder;
+
+	private static Boolean runWithProxy;
+	private static String proxyHostName;
+	private static int proxyPort;
 	
 	static
 	{
@@ -30,16 +34,26 @@ public class TestUtils {
 			System.err.println(NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME + " environment variable not set. Tests will not be able to connect to to any service bus entity.");
 		}
 		namespaceConnectionStringBuilder = new ConnectionStringBuilder(namespaceConnectionString);
+
+		// Read proxy settings
+        runWithProxy = Boolean.valueOf(System.getenv(RUN_WITH_PROXY_ENV_VAR));
+        if (runWithProxy)
+        {
+            proxyHostName = System.getenv(PROXY_HOSTNAME_ENV_VAR);
+            proxyPort = Integer.valueOf(System.getenv(PROXY_PORT_ENV_VAR));
+        }
 	}
 	
 	public static URI getNamespaceEndpointURI()
     {
         return namespaceConnectionStringBuilder.getEndpoint();
     }
-    
+
+    public static String getNamespaceConnectionString() { return namespaceConnectionString; }
+
     public static ClientSettings getClientSettings()
     {
-        if (Boolean.valueOf(System.getenv(RUN_WITH_PROXY_ENV_VAR))) {
+        if (runWithProxy) {
             return TestUtils.getProxyClientSettings();
         } else {
             return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
@@ -61,9 +75,7 @@ public class TestUtils {
             @Override
             public List<Proxy> select(URI uri) {
                 List<Proxy> proxies = new LinkedList<>();
-                proxies.add(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(
-                                System.getenv(PROXY_HOSTNAME_ENV_VAR),
-                                Integer.valueOf(System.getenv(PROXY_PORT_ENV_VAR)))));
+                proxies.add(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHostName, proxyPort)));
                 return proxies;
             }
 
