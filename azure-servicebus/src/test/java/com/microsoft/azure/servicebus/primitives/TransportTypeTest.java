@@ -48,6 +48,7 @@ public class TransportTypeTest {
     public void transportTypeAmqpWebSocketsCreatesConnectionWithPort443() throws Exception
     {
         namespaceConnectionStringBuilder = getWebSocketConnection();
+        namespaceConnectionStringBuilder.setTransportType(TransportType.AMQP_WEB_SOCKETS);
         this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceConnectionStringBuilder.getEndpoint(), Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder));
 
         try {
@@ -72,6 +73,7 @@ public class TransportTypeTest {
     public void transportTypeAmqpWebSocketsWithProxyCreatesConnectionWithCorrectPorts() throws Exception
     {
         namespaceConnectionStringBuilder = getWebSocketConnection();
+        namespaceConnectionStringBuilder.setTransportType(TransportType.AMQP_WEB_SOCKETS);
         this.factory = MessagingFactory.createFromNamespaceEndpointURI(namespaceConnectionStringBuilder.getEndpoint(), getProxyClientSettings());
         int proxyPort = 3128;
         try {
@@ -92,11 +94,9 @@ public class TransportTypeTest {
         }
     }
 
-    //setTransportType method is not allowed from ConnectionStringBuilder hence the hack
     private ConnectionStringBuilder getWebSocketConnection()
     {
         String namespaceConnectionString = System.getenv(NAMESPACE_CONNECTION_STRING_ENVIRONMENT_VARIABLE_NAME);
-        namespaceConnectionString = namespaceConnectionString + ";" + "TransportType=" + "AmqpWebSockets";
         return new ConnectionStringBuilder(namespaceConnectionString);
     }
 
