@@ -70,7 +70,13 @@ public class TestUtils {
     {
         ClientSettings clientSettings =
                 Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+        setDefaultProxySelector();
 
+        return clientSettings;
+    }
+
+    public static void setDefaultProxySelector() {
+	    // TODO: this needs a less confusing name (not "set") as it doesn't allow the caller to set the default
         ProxySelector.setDefault(new ProxySelector() {
             @Override
             public List<Proxy> select(URI uri) {
@@ -84,8 +90,6 @@ public class TestUtils {
                 // no-op
             }
         });
-
-        return clientSettings;
     }
 
 	public static String randomizeEntityName(String entityName)
