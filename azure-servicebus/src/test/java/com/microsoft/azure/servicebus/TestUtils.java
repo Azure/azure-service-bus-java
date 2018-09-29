@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
+import com.microsoft.azure.servicebus.primitives.StringUtil;
 import com.microsoft.azure.servicebus.primitives.Util;
 
 public class TestUtils {
@@ -35,13 +36,11 @@ public class TestUtils {
 		}
 		namespaceConnectionStringBuilder = new ConnectionStringBuilder(namespaceConnectionString);
 
-		// Read proxy settings
+		// Read proxy settings - proxy settings can still be set even if tests are not set to run with a proxy
         runWithProxy = Boolean.valueOf(System.getenv(RUN_WITH_PROXY_ENV_VAR));
-        if (runWithProxy)
-        {
-            proxyHostName = System.getenv(PROXY_HOSTNAME_ENV_VAR);
-            proxyPort = Integer.valueOf(System.getenv(PROXY_PORT_ENV_VAR));
-        }
+        proxyHostName = System.getenv(PROXY_HOSTNAME_ENV_VAR);
+        proxyPort = System.getenv(PROXY_PORT_ENV_VAR) == null ?
+                        0 : Integer.valueOf(System.getenv(PROXY_PORT_ENV_VAR));
 	}
 	
 	public static URI getNamespaceEndpointURI()
@@ -51,13 +50,15 @@ public class TestUtils {
 
     public static String getNamespaceConnectionString() { return namespaceConnectionString; }
 
-    public static ClientSettings getClientSettings()
-    {
+    public static int getProxyPort() { return proxyPort; }
+
+    public static Boolean isProxyEnabled() { return !StringUtil.isNullOrEmpty(proxyHostName) && proxyPort != 0; }
+
+    public static ClientSettings getClientSettings() {
         if (runWithProxy) {
-            return TestUtils.getProxyClientSettings();
-        } else {
-            return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
+            setDefaultProxySelector();
         }
+        return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
     }
     
     // AADTokens cannot yet be used for management operations, sent directly to gateway
@@ -66,11 +67,8 @@ public class TestUtils {
         return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
     }
 
-    private static ClientSettings getProxyClientSettings()
-    {
-        ClientSettings clientSettings =
-                Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
-
+    public static void setDefaultProxySelector() {
+	    // TODO: this needs a less confusing name (not "set") as it doesn't allow the caller to set the default
         ProxySelector.setDefault(new ProxySelector() {
             @Override
             public List<Proxy> select(URI uri) {
@@ -84,8 +82,6 @@ public class TestUtils {
                 // no-op
             }
         });
-
-        return clientSettings;
     }
 
 	public static String randomizeEntityName(String entityName)
