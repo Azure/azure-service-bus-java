@@ -36,7 +36,7 @@ public class TestUtils {
 		}
 		namespaceConnectionStringBuilder = new ConnectionStringBuilder(namespaceConnectionString);
 
-		// Read proxy settings - proxy settings can still be set even if tests are not set to run with a proxy
+		// Read proxy settings only if transport type is WebSockets
         runWithProxy = Boolean.valueOf(System.getenv(RUN_WITH_PROXY_ENV_VAR));
         proxyHostName = System.getenv(PROXY_HOSTNAME_ENV_VAR);
         proxyPort = System.getenv(PROXY_PORT_ENV_VAR) == null ?
@@ -67,7 +67,7 @@ public class TestUtils {
         return Util.getClientSettingsFromConnectionStringBuilder(namespaceConnectionStringBuilder);
     }
 
-    public static void setDefaultProxySelector() {
+    private static void setDefaultProxySelector() {
 	    // TODO: this needs a less confusing name (not "set") as it doesn't allow the caller to set the default
         ProxySelector.setDefault(new ProxySelector() {
             @Override
