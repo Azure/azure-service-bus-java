@@ -79,6 +79,7 @@ class RequestResponseLinkcache
         private RequestResponseLink requestResponseLink;
         private int referenceCount;
         private ArrayList<CompletableFuture<RequestResponseLink>> waiters;
+        private boolean isClosed;
         
         public RequestResponseLinkWrapper(MessagingFactory underlyingFactory, String entityPath, MessagingEntityType entityType)
         {
@@ -88,6 +89,7 @@ class RequestResponseLinkcache
             this.requestResponseLink = null;
             this.referenceCount = 0;
             this.waiters = new ArrayList<>();
+            this.isClosed = false;
             this.createRequestResponseLinkAsync();
         }
         
@@ -103,11 +105,15 @@ class RequestResponseLinkcache
                     if(ex == null)
                     {
                         TRACE_LOGGER.info("Created requestresponselink to '{}'", requestResponseLinkPath);
-                        this.requestResponseLink = rrlink;
-                        for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
+                        if(this.isClosed)
                         {
-                            this.referenceCount++;
-                            waiter.complete(this.requestResponseLink);
+                        	// Factory is likely closed. Close the link too
+                        	rrlink.closeAsync();
+                        }
+                        else
+                        {
+                        	this.requestResponseLink = rrlink;
+                            this.completeWaiters(null);
                         }
                     }
                     else
@@ -115,15 +121,31 @@ class RequestResponseLinkcache
                         Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);
                         TRACE_LOGGER.error("Creating requestresponselink to '{}' failed.", requestResponseLinkPath, cause);
                         RequestResponseLinkcache.this.removeWrapperFromCache(this.entityPath);
-                        for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
-                        {
-                            waiter.completeExceptionally(cause);
-                        }
+                        this.completeWaiters(cause);
                     }
                 }
                 
                 return null;
             }, MessagingFactory.INTERNAL_THREAD_POOL);
+        }
+        
+        // Caller must acquire lock
+        private void completeWaiters(Throwable exception)
+        {
+        	for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
+            {
+        		if(exception == null)
+        		{
+        			this.referenceCount++;
+        			AsyncUtil.completeFuture(waiter, this.requestResponseLink);
+        		}
+        		else
+        		{
+        			AsyncUtil.completeFutureExceptionally(waiter, exception);
+        		}
+            }
+        	
+        	this.waiters.clear();
         }
         
         public CompletableFuture<RequestResponseLink> acquireReferenceAsync()
@@ -160,7 +182,20 @@ class RequestResponseLinkcache
         public CompletableFuture<Void> forceCloseAsync()
         {
             TRACE_LOGGER.info("Force closing requestresponselink to '{}'", this.requestResponseLink.getLinkPath());
-            return this.requestResponseLink.closeAsync();
+            this.isClosed = true;
+            if(this.waiters.size() > 0)
+            {
+            	this.completeWaiters(new ServiceBusException(false, "MessagingFactory closed."));
+            }
+            
+            if(this.requestResponseLink != null)
+            {
+            	return this.requestResponseLink.closeAsync();
+            }
+            else
+            {
+            	return CompletableFuture.completedFuture(null);
+            }
         }
     }
 }
