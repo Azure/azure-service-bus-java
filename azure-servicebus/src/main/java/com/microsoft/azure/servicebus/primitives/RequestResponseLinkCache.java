@@ -129,7 +129,6 @@ class RequestResponseLinkcache
             }, MessagingFactory.INTERNAL_THREAD_POOL);
         }
         
-        // Caller must acquire lock
         private void completeWaiters(Throwable exception)
         {
         	for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
