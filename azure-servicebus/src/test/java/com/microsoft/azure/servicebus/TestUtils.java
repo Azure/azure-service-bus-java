@@ -50,10 +50,6 @@ public class TestUtils {
 
     public static String getNamespaceConnectionString() { return namespaceConnectionString; }
 
-    public static int getProxyPort() { return proxyPort; }
-
-    public static Boolean isProxyEnabled() { return !StringUtil.isNullOrEmpty(proxyHostName) && proxyPort != 0; }
-
     public static ClientSettings getClientSettings() {
         if (runWithProxy) {
             setUpDefaultProxySelector();
