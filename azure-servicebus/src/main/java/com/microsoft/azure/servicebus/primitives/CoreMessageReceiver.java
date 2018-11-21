@@ -793,12 +793,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 	}
 
-	public void onError(ErrorCondition error)
-	{		
-		Exception completionException = ExceptionUtil.toException(error);
-		this.onError(completionException);
-	}
-
 	@Override
 	public void onError(Exception exception)
 	{
@@ -970,7 +964,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		else
 		{
-			this.onError(condition);
+			Exception completionException = ExceptionUtil.toException(condition);
+			this.onError(completionException);
 		}
 	}
 
