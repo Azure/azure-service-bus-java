@@ -89,6 +89,10 @@ public final class ExceptionUtil
 		{
 			return new ServiceBusException(true, new AmqpException(errorCondition));
 		}
+		else if (errorCondition.getCondition() == AmqpErrorCode.FramingError)
+		{
+			return new ServiceBusException(true, new AmqpException(errorCondition));
+		}
 		else if (errorCondition.getCondition() == AmqpErrorCode.ResourceLimitExceeded)
 		{
 			return new QuotaExceededException(errorCondition.getDescription());

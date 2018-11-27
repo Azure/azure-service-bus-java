@@ -409,13 +409,7 @@ class RequestResponseLink extends ClientEntity{
 	public CompletableFuture<Message> requestAysnc(Message requestMessage, Duration timeout)
 	{	    
 		this.throwIfClosed(null);
-		// Check and recreate links if necessary
-        if(!((this.amqpSender.sendLink.getLocalState() == EndpointState.ACTIVE && this.amqpSender.sendLink.getRemoteState() == EndpointState.ACTIVE)
-                && (this.amqpReceiver.receiveLink.getLocalState() == EndpointState.ACTIVE && this.amqpReceiver.receiveLink.getRemoteState() == EndpointState.ACTIVE)))
-        {
-            this.ensureUniqueLinkRecreation();
-        }
-        
+		
 		CompletableFuture<Message> responseFuture = new CompletableFuture<Message>();
 		RequestResponseWorkItem workItem = new RequestResponseWorkItem(requestMessage, responseFuture, timeout);
 		String requestId = "request:" +  this.requestCounter.incrementAndGet();
@@ -425,6 +419,14 @@ class RequestResponseLink extends ClientEntity{
 		workItem.setTimeoutTask(this.scheduleRequestTimeout(requestId, timeout));
 		TRACE_LOGGER.debug("Sending request with id:{}", requestId);
 		this.amqpSender.sendRequest(requestId, false);
+		
+		// Check and recreate links if necessary
+        if(!((this.amqpSender.sendLink.getLocalState() == EndpointState.ACTIVE && this.amqpSender.sendLink.getRemoteState() == EndpointState.ACTIVE)
+                && (this.amqpReceiver.receiveLink.getLocalState() == EndpointState.ACTIVE && this.amqpReceiver.receiveLink.getRemoteState() == EndpointState.ACTIVE)))
+        {
+            this.ensureUniqueLinkRecreation();
+        }
+        
 		return responseFuture;
 	}
 	
@@ -985,7 +987,7 @@ class RequestResponseLink extends ClientEntity{
                     else
                     {
                     	TRACE_LOGGER.warn("Request with id:{} not found in the requestresponse link.", requestIdToBeSent);
-                    }                    
+                    }
                 }
             }
             finally
