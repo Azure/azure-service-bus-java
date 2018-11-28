@@ -126,11 +126,19 @@ public abstract class SessionTests extends Tests {
 	}
 	
 	@Test
+	public void testBasicReceiveAndDeleteWithLargeMessage() throws InterruptedException, ServiceBusException, ExecutionException
+	{
+		String sessionId = TestUtils.getRandomString();
+		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
+		TestCommons.testBasicReceiveAndDeleteWithLargeMessage(this.sender, sessionId, this.session);
+	}
+	
+	@Test
 	public void testBasicReceiveBatchAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
 		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
-		TestCommons.testBasicReceiveBatchAndDelete(this.sender, sessionId, this.session);
+		TestCommons.testBasicReceiveBatchAndDelete(this.sender, sessionId, this.session, this.isEntityPartitioned());
 	}
 	
 	@Test
@@ -162,7 +170,7 @@ public abstract class SessionTests extends Tests {
 	{
 		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.PEEKLOCK);
-		TestCommons.testBasicReceiveBatchAndComplete(this.sender, sessionId, this.session);
+		TestCommons.testBasicReceiveBatchAndComplete(this.sender, sessionId, this.session, this.isEntityPartitioned());
 	}
 	
 	@Test
@@ -194,7 +202,7 @@ public abstract class SessionTests extends Tests {
 	{
 		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.PEEKLOCK);
-		TestCommons.testPeekMessageBatch(this.sender, sessionId, this.session);
+		TestCommons.testPeekMessageBatch(this.sender, sessionId, this.session, this.isEntityPartitioned());
 	}
 	
 	@Test

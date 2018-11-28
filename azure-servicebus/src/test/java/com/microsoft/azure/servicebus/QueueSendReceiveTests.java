@@ -21,4 +21,17 @@ public class QueueSendReceiveTests extends SendReceiveTests
     public boolean isEntityPartitioned() {
         return false;
     }
+        if(this.isEntityPartitioned())
+        {
+        	message.setPartitionKey(messageId);
+        }
+        if(this.isEntityPartitioned())
+        {
+        	message.setPartitionKey(messageId);
+        }
+        
+        if(this.isEntityPartitioned())
+        {
+        	message2.setPartitionKey(receivedMessage.getPartitionKey());
+        }
 }

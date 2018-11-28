@@ -185,8 +185,13 @@ public class ClientValidationTests
 						return CompletableFuture.completedFuture(null);
 					}
 				}, MessageAndSessionPumpTests.EXECUTOR_SERVICE);
+<<<<<<< Updated upstream
 				
+				Thread.sleep(1000); // Sleep for a second for the exception				
+=======
+
 				Thread.sleep(2000); // Sleep for two seconds for the exception
+>>>>>>> Stashed changes
 				Assert.assertTrue("QueueClient created to a subscription which shouldn't be allowed.", unsupportedExceptionOccured.get());
 			} finally {
 				qc.close();
@@ -223,8 +228,13 @@ public class ClientValidationTests
 						return CompletableFuture.completedFuture(null);
 					}
 				}, MessageAndSessionPumpTests.EXECUTOR_SERVICE);
+<<<<<<< Updated upstream
 				
+				Thread.sleep(1000); // Sleep for a second for the exception				
+=======
+
 				Thread.sleep(2000); // Sleep for two seconds for the exception
+>>>>>>> Stashed changes
 				Assert.assertTrue("SubscriptionClient created to a queue which shouldn't be allowed.", unsupportedExceptionOccured.get());
 			} finally {
 				sc.close();
