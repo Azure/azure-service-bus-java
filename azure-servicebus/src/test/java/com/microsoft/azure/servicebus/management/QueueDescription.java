@@ -37,7 +37,7 @@ public class QueueDescription extends ResourceDescripton{
         this.path = path;
         this.defaultMessageTimeToLive = Duration.ofDays(7);
         this.maxSizeInMegaBytes = 1024;
-        this.lockDuration = Duration.ofMinutes(1);
+        this.lockDuration = Duration.ofMinutes(5);
         this.maxDeliveryCount = 10;
     }
 
