@@ -234,13 +234,20 @@ public class TestCommons {
 				
 		ArrayList<IMessage> totalReceivedMessages = new ArrayList<>();		
 		
-		Collection<IMessage> receivedMessages = receiver.receiveBatch(numMessages);				
-		while(receivedMessages != null && receivedMessages.size() > 0 && totalReceivedMessages.size() < numMessages)
+		Collection<IMessage> receivedMessages = receiver.receiveBatch(numMessages);
+		if(isEntityPartitioned)
 		{
-		    totalReceivedMessages.addAll(receivedMessages);
-			receivedMessages = receiver.receiveBatch(numMessages);
+			Assert.assertTrue("Messages not received", receivedMessages != null && receivedMessages.size() > 0);
 		}
-		Assert.assertEquals("All messages not received", numMessages, totalReceivedMessages.size());
+		else
+		{
+			while(receivedMessages != null && receivedMessages.size() > 0 && totalReceivedMessages.size() < numMessages)
+			{
+			    totalReceivedMessages.addAll(receivedMessages);
+				receivedMessages = receiver.receiveBatch(numMessages);
+			}
+			Assert.assertEquals("All messages not received", numMessages, totalReceivedMessages.size());
+		}
 		
 		ArrayList<Instant> oldLockTimes = new ArrayList<Instant>();
 		for(IMessage message : totalReceivedMessages)
