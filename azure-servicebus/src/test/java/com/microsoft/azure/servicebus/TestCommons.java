@@ -329,7 +329,16 @@ public class TestCommons {
 		
 		sender.scheduleMessage(message1, Instant.now().plusSeconds(secondsToWaitBeforeScheduling));
 		sender.scheduleMessage(message2, Instant.now().plusSeconds(secondsToWaitBeforeScheduling));
-		Thread.sleep(secondsToWaitBeforeScheduling * 1000 * 2);
+		if(sessionId == null)
+		{
+			Thread.sleep(secondsToWaitBeforeScheduling * 1000 * 2);
+		}
+		else
+		{
+			Thread.sleep(secondsToWaitBeforeScheduling * 1000);
+			((IMessageSession)receiver).renewSessionLock();
+			Thread.sleep(secondsToWaitBeforeScheduling * 1000);
+		}
 		
 		Collection<IMessage> allReceivedMessages = new LinkedList<IMessage>();
 		Collection<IMessage> receivedMessages = receiver.receiveBatch(10);
@@ -371,7 +380,16 @@ public class TestCommons {
 		sender.scheduleMessage(message1, Instant.now().plusSeconds(secondsToWaitBeforeScheduling));
 		long sequnceNumberMsg2 = sender.scheduleMessage(message2, Instant.now().plusSeconds(secondsToWaitBeforeScheduling));
 		sender.cancelScheduledMessage(sequnceNumberMsg2);
-		Thread.sleep(secondsToWaitBeforeScheduling * 1000 * 2);
+		if(sessionId == null)
+		{
+			Thread.sleep(secondsToWaitBeforeScheduling * 1000 * 2);
+		}
+		else
+		{
+			Thread.sleep(secondsToWaitBeforeScheduling * 1000);
+			((IMessageSession)receiver).renewSessionLock();
+			Thread.sleep(secondsToWaitBeforeScheduling * 1000);
+		}
 		
 		Collection<IMessage> allReceivedMessages = new LinkedList<IMessage>();
 		Collection<IMessage> receivedMessages = receiver.receiveBatch(10);

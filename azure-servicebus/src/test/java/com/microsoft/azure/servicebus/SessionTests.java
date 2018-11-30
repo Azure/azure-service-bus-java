@@ -3,6 +3,7 @@ package com.microsoft.azure.servicebus;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -313,15 +314,19 @@ public abstract class SessionTests extends Tests {
 	}
 	
 	@Test
-    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException
+    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException, ExecutionException
     {	    
 	    int limitToTest = 5000;
 	    String sessionId = TestUtils.getRandomString();
 	    this.session = ClientFactory.acceptSessionFromEntityPath(TestUtils.getNamespaceEndpointURI(), this.receiveEntityPath, sessionId, TestUtils.getClientSettings(), ReceiveMode.PEEKLOCK);
+	    CompletableFuture[] futures = new CompletableFuture[limitToTest];
 	    for(int i=0; i<limitToTest; i++)
 	    {
-	        this.session.renewSessionLock();
+	        CompletableFuture<Void> future = this.session.renewSessionLockAsync();
+	        futures[i] = future;
 	    }
+	    
+	    CompletableFuture.allOf(futures).get();
 	    
 	    this.session.renewSessionLock();
     }
