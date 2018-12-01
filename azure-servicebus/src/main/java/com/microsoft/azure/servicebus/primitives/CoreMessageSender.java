@@ -377,7 +377,6 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	{
 		if (completionException == null)
 		{
-		    this.underlyingFactory.registerForConnectionError(this.sendLink);
 		    this.maxMessageSize = Util.getMaxMessageSizeFromLink(this.sendLink);
 			this.lastKnownLinkError = null;
 			this.retryPolicy.resetRetryCount(this.getClientId());
@@ -614,6 +613,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		BaseHandler.setHandler(sender, handler);
 		sender.open();
 		this.sendLink = sender;
+		this.underlyingFactory.registerForConnectionError(this.sendLink);
 	}
 	
 	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)

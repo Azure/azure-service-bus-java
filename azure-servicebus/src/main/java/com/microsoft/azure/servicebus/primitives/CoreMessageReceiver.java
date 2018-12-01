@@ -418,6 +418,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		BaseHandler.setHandler(receiver, handler);
 		receiver.open();
 		this.receiveLink = receiver;
+		this.underlyingFactory.registerForConnectionError(this.receiveLink);
 	}
 	
 	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)
@@ -615,8 +616,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		
 		if (exception == null)
 		{
-		    this.underlyingFactory.registerForConnectionError(this.receiveLink);
-		    
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
 			{
 				AsyncUtil.completeFuture(this.linkOpen.getWork(), this);
@@ -651,13 +650,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             {
 			    TRACE_LOGGER.warn("Opening receive link '{}' to '{}' failed.", this.receiveLink.getName(), this.receivePath, exception);
 			    AsyncUtil.completeFutureExceptionally(this.receiveLinkReopenFuture, exception);
-			    if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
-                {
-                    // No point in retrying to establish a link.. SessionLock is lost
-                    TRACE_LOGGER.warn("SessionId '{}' lock lost. Closing receiver.", this.sessionId);
-                    this.isSessionLockLost = true;
-                    this.closeAsync();
-                }
             }
 			
 			this.lastKnownLinkError = exception;
@@ -813,6 +805,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		else
 		{
+			this.underlyingFactory.deregisterForConnectionError(this.receiveLink);
 		    TRACE_LOGGER.warn("Receive link '{}' to '{}', sessionId '{}' closed with error.", this.receiveLink.getName(), this.receivePath, this.sessionId, exception);
 			this.lastKnownLinkError = exception;
 			if ((this.linkOpen != null && !this.linkOpen.getWork().isDone()) ||
@@ -820,39 +813,35 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			{
 			    this.onOpenComplete(exception);
 			}
-			else
-			{
-			    this.underlyingFactory.deregisterForConnectionError(this.receiveLink);
-			    
-			    if (exception != null &&
-	                    (!(exception instanceof ServiceBusException) || !((ServiceBusException) exception).getIsTransient()))
-	            {
-	                this.clearAllPendingWorkItems(exception);
-	                
-	                if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
-	                {
-	                    // No point in retrying to establish a link.. SessionLock is lost
-	                    TRACE_LOGGER.warn("SessionId '{}' lock lost. Closing receiver.", this.sessionId);
-	                    this.isSessionLockLost = true;
-	                    this.closeAsync();
-	                }
-	            }
-	            else
-	            {
-	                // TODO Why recreating link needs to wait for retry interval of pending receive?
-	                ReceiveWorkItem workItem = this.pendingReceives.peek();
-	                if (workItem != null && workItem.getTimeoutTracker() != null)
-	                {
-	                    Duration nextRetryInterval = this.underlyingFactory.getRetryPolicy()
-	                            .getNextRetryInterval(this.getClientId(), exception, workItem.getTimeoutTracker().remaining());
-	                    if (nextRetryInterval != null)
-	                    {
-	                        TRACE_LOGGER.info("Receive link '{}' to '{}', sessionId '{}' will be reopened after '{}'", this.receiveLink.getName(), this.receivePath, this.sessionId, nextRetryInterval);
-	                        Timer.schedule(() -> {CoreMessageReceiver.this.ensureLinkIsOpen();}, nextRetryInterval, TimerType.OneTimeRun);
-	                    }
-	                }
-	            }
-			}
+			
+			if (exception != null &&
+                    (!(exception instanceof ServiceBusException) || !((ServiceBusException) exception).getIsTransient()))
+            {
+                this.clearAllPendingWorkItems(exception);
+                
+                if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
+                {
+                    // No point in retrying to establish a link.. SessionLock is lost
+                    TRACE_LOGGER.warn("SessionId '{}' lock lost. Closing receiver.", this.sessionId);
+                    this.isSessionLockLost = true;
+                    this.closeAsync();
+                }
+            }
+            else
+            {
+                // TODO Why recreating link needs to wait for retry interval of pending receive?
+                ReceiveWorkItem workItem = this.pendingReceives.peek();
+                if (workItem != null && workItem.getTimeoutTracker() != null)
+                {
+                    Duration nextRetryInterval = this.underlyingFactory.getRetryPolicy()
+                            .getNextRetryInterval(this.getClientId(), exception, workItem.getTimeoutTracker().remaining());
+                    if (nextRetryInterval != null)
+                    {
+                        TRACE_LOGGER.info("Receive link '{}' to '{}', sessionId '{}' will be reopened after '{}'", this.receiveLink.getName(), this.receivePath, this.sessionId, nextRetryInterval);
+                        Timer.schedule(() -> {CoreMessageReceiver.this.ensureLinkIsOpen();}, nextRetryInterval, TimerType.OneTimeRun);
+                    }
+                }
+            }
 		}
 	}
 	

@@ -260,6 +260,7 @@ class RequestResponseLink extends ClientEntity{
 		this.amqpSender.setSendLink(sender);
 		TRACE_LOGGER.debug("RequestReponseLink - opening send link to {}", this.linkPath);
 		sender.open();
+		this.underlyingFactory.registerForConnectionError(sender);
 		
 		// Create receive link
 		session = connection.session();
@@ -289,6 +290,7 @@ class RequestResponseLink extends ClientEntity{
 		this.amqpReceiver.setReceiveLink(receiver);
 		TRACE_LOGGER.debug("RequestReponseLink - opening receive link to {}", this.linkPath);
 		receiver.open();
+		this.underlyingFactory.registerForConnectionError(receiver);
 	}
 	
 	private void ensureUniqueLinkRecreation()
@@ -611,7 +613,6 @@ class RequestResponseLink extends ClientEntity{
 			if(completionException == null)
 			{
 			    TRACE_LOGGER.debug("Opened internal receive link of requestresponselink to {}", parent.linkPath);
-			    this.parent.underlyingFactory.registerForConnectionError(this.receiveLink);
 				AsyncUtil.completeFuture(this.openFuture, null);
 				
 				// Send unlimited credit
@@ -641,15 +642,17 @@ class RequestResponseLink extends ClientEntity{
 					AsyncUtil.completeFutureExceptionally(this.closeFuture, exception);
 				}
 			}
-			
-			TRACE_LOGGER.warn("Internal receive link '{}' of requestresponselink to '{}' encountered error.", this.receiveLink.getName(), this.parent.linkPath, exception);
-			this.parent.underlyingFactory.deregisterForConnectionError(this.receiveLink);
-			if(this.parent.amqpSender.sendLink != null)
-            {
-                this.parent.amqpSender.sendLink.close();
-                this.parent.underlyingFactory.deregisterForConnectionError(this.parent.amqpSender.sendLink);
-            }
-			this.parent.onInnerLinksClosed(exception);
+			else
+			{
+				TRACE_LOGGER.warn("Internal receive link '{}' of requestresponselink to '{}' encountered error.", this.receiveLink.getName(), this.parent.linkPath, exception);
+				this.parent.underlyingFactory.deregisterForConnectionError(this.receiveLink);
+				if(this.parent.amqpSender.sendLink != null)
+	            {
+	                this.parent.amqpSender.sendLink.close();
+	                this.parent.underlyingFactory.deregisterForConnectionError(this.parent.amqpSender.sendLink);
+	            }
+				this.parent.onInnerLinksClosed(exception);
+			}
 		}
 
 		@Override
@@ -793,7 +796,6 @@ class RequestResponseLink extends ClientEntity{
 			if(completionException == null)
 			{
 			    TRACE_LOGGER.debug("Opened internal send link of requestresponselink to {}", parent.linkPath);
-			    this.parent.underlyingFactory.registerForConnectionError(this.sendLink);
 			    this.maxMessageSize = Util.getMaxMessageSizeFromLink(this.sendLink);
 				AsyncUtil.completeFuture(this.openFuture, null);
 				this.runSendLoop();
@@ -822,15 +824,17 @@ class RequestResponseLink extends ClientEntity{
 					AsyncUtil.completeFutureExceptionally(this.closeFuture, exception);
 				}
 			}
-			
-			TRACE_LOGGER.warn("Internal send link '{}' of requestresponselink to '{}' encountered error.", this.sendLink.getName(), this.parent.linkPath, exception);
-			this.parent.underlyingFactory.deregisterForConnectionError(this.sendLink);
-			if(this.parent.amqpReceiver.receiveLink != null)
-            {
-                this.parent.amqpReceiver.receiveLink.close();
-                this.parent.underlyingFactory.deregisterForConnectionError(this.parent.amqpReceiver.receiveLink);
-            }
-            this.parent.onInnerLinksClosed(exception);
+			else
+			{
+				TRACE_LOGGER.warn("Internal send link '{}' of requestresponselink to '{}' encountered error.", this.sendLink.getName(), this.parent.linkPath, exception);
+				this.parent.underlyingFactory.deregisterForConnectionError(this.sendLink);
+				if(this.parent.amqpReceiver.receiveLink != null)
+	            {
+	                this.parent.amqpReceiver.receiveLink.close();
+	                this.parent.underlyingFactory.deregisterForConnectionError(this.parent.amqpReceiver.receiveLink);
+	            }
+	            this.parent.onInnerLinksClosed(exception);
+			}
 		}
 
 		@Override
