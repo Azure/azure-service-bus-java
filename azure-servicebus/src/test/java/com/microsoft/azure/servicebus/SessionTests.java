@@ -3,6 +3,7 @@ package com.microsoft.azure.servicebus;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -126,11 +127,19 @@ public abstract class SessionTests extends Tests {
 	}
 	
 	@Test
+	public void testBasicReceiveAndDeleteWithLargeMessage() throws InterruptedException, ServiceBusException, ExecutionException
+	{
+		String sessionId = TestUtils.getRandomString();
+		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
+		TestCommons.testBasicReceiveAndDeleteWithLargeMessage(this.sender, sessionId, this.session);
+	}
+	
+	@Test
 	public void testBasicReceiveBatchAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
 	{
 		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
-		TestCommons.testBasicReceiveBatchAndDelete(this.sender, sessionId, this.session);
+		TestCommons.testBasicReceiveBatchAndDelete(this.sender, sessionId, this.session, this.isEntityPartitioned());
 	}
 	
 	@Test
@@ -162,7 +171,7 @@ public abstract class SessionTests extends Tests {
 	{
 		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.PEEKLOCK);
-		TestCommons.testBasicReceiveBatchAndComplete(this.sender, sessionId, this.session);
+		TestCommons.testBasicReceiveBatchAndComplete(this.sender, sessionId, this.session, this.isEntityPartitioned());
 	}
 	
 	@Test
@@ -194,7 +203,7 @@ public abstract class SessionTests extends Tests {
 	{
 		String sessionId = TestUtils.getRandomString();
 		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.PEEKLOCK);
-		TestCommons.testPeekMessageBatch(this.sender, sessionId, this.session);
+		TestCommons.testPeekMessageBatch(this.sender, sessionId, this.session, this.isEntityPartitioned());
 	}
 	
 	@Test
@@ -305,15 +314,19 @@ public abstract class SessionTests extends Tests {
 	}
 	
 	@Test
-    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException
+    public void testRequestResponseLinkRequestLimit() throws InterruptedException, ServiceBusException, ExecutionException
     {	    
 	    int limitToTest = 5000;
 	    String sessionId = TestUtils.getRandomString();
 	    this.session = ClientFactory.acceptSessionFromEntityPath(TestUtils.getNamespaceEndpointURI(), this.receiveEntityPath, sessionId, TestUtils.getClientSettings(), ReceiveMode.PEEKLOCK);
+	    CompletableFuture[] futures = new CompletableFuture[limitToTest];
 	    for(int i=0; i<limitToTest; i++)
 	    {
-	        this.session.renewSessionLock();
+	        CompletableFuture<Void> future = this.session.renewSessionLockAsync();
+	        futures[i] = future;
 	    }
+	    
+	    CompletableFuture.allOf(futures).get();
 	    
 	    this.session.renewSessionLock();
     }
