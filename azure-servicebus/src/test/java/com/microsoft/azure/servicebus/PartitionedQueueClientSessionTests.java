@@ -1,14 +1,9 @@
 package com.microsoft.azure.servicebus;
 
-public class SubscriptionClientSessionTests extends ClientSessionTests{
-    @Override
+public class PartitionedQueueClientSessionTests extends QueueClientSessionTests{
+	@Override
     public String getEntityNamePrefix() {
-       return "SubscriptionClientSessionTests";
-    }
-
-    @Override
-    public boolean isEntityQueue() {
-        return false;
+       return "PartitionedQueueClientSessionTests";
     }
 
     @Override
@@ -18,6 +13,6 @@ public class SubscriptionClientSessionTests extends ClientSessionTests{
 
     @Override
     public boolean isEntityPartitioned() {
-        return false;
+        return true;
     }
 }

@@ -377,7 +377,6 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	{
 		if (completionException == null)
 		{
-		    this.underlyingFactory.registerForConnectionError(this.sendLink);
 		    this.maxMessageSize = Util.getMaxMessageSizeFromLink(this.sendLink);
 			this.lastKnownLinkError = null;
 			this.retryPolicy.resetRetryCount(this.getClientId());
@@ -614,6 +613,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 		BaseHandler.setHandler(sender, handler);
 		sender.open();
 		this.sendLink = sender;
+		this.underlyingFactory.registerForConnectionError(this.sendLink);
 	}
 	
 	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)
@@ -623,16 +623,16 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             return CompletableFuture.completedFuture(null);
         }
         else
-        {            
+        {
             CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;});
         }
 	}
 	
 	private void cancelSASTokenRenewTimer()
     {
         if(this.sasTokenRenewTimerFuture != null && !this.sasTokenRenewTimerFuture.isDone())
-        {            
+        {
             this.sasTokenRenewTimerFuture.cancel(true);
             TRACE_LOGGER.debug("Cancelled SAS Token renew timer");
         }
