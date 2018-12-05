@@ -177,6 +177,7 @@ public final class ClientConstants
     
     static final int DEFAULT_SAS_TOKEN_SEND_RETRY_INTERVAL_IN_SECONDS = 5;
     static final String SAS_TOKEN_AUDIENCE_FORMAT = "amqp://%s/%s";
+    static final Duration SAS_TOKEN_SEND_TIMEOUT = Duration.ofSeconds(10);
 
     private static String getClientVersion() {
         String clientVersion;

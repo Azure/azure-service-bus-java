@@ -623,16 +623,16 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
             return CompletableFuture.completedFuture(null);
         }
         else
-        {            
+        {
             CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f; TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;});
         }
 	}
 	
 	private void cancelSASTokenRenewTimer()
     {
         if(this.sasTokenRenewTimerFuture != null && !this.sasTokenRenewTimerFuture.isDone())
-        {            
+        {
             this.sasTokenRenewTimerFuture.cancel(true);
             TRACE_LOGGER.debug("Cancelled SAS Token renew timer");
         }

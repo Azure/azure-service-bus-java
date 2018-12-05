@@ -430,7 +430,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         else
         {            
             CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;});
         }
     }
 	
@@ -575,7 +575,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                     }
                 },
                 timeout,
-                TimerType.OneTimeRun);        
+                TimerType.OneTimeRun);
         
         this.ensureLinkIsOpen().thenRun(() -> {this.addCredit(receiveWorkItem);});
 		return onReceive;
