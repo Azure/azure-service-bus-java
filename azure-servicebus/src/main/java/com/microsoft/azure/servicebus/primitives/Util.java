@@ -442,7 +442,7 @@ public class Util
             return tokenValidityInSeconds - 10;
         }
         else
-        {            
+        {
             return (tokenValidityInSeconds - 1) > 0 ? tokenValidityInSeconds - 1 : 0;
         }
     }

@@ -24,4 +24,5 @@ public final class AmqpErrorCode
 
 	// connection errors
 	public static final Symbol ConnectionForced = Symbol.getSymbol("amqp:connection:forced");
+	public static final Symbol FramingError = Symbol.getSymbol("amqp:connection:framing-error");
 }

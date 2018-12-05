@@ -93,7 +93,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private Receiver receiveLink;
 	private RequestResponseLink requestResponseLink;
 	private WorkItem<CoreMessageReceiver> linkOpen;
-	private Duration factoryRceiveTimeout;
 
 	private Exception lastKnownLinkError;
 	private Instant lastKnownErrorReportedAt;
@@ -132,7 +131,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		this.prefetchedMessages = new ConcurrentLinkedQueue<MessageWithDeliveryTag>();
 		this.linkClose = new CompletableFuture<Void>();
 		this.lastKnownLinkError = null;
-		this.factoryRceiveTimeout = factory.getOperationTimeout();
 		this.prefetchCountSync = new Object();
 		this.retryPolicy = factory.getRetryPolicy();
 		this.pendingReceives = new ConcurrentLinkedQueue<ReceiveWorkItem>();
@@ -418,6 +416,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		BaseHandler.setHandler(receiver, handler);
 		receiver.open();
 		this.receiveLink = receiver;
+		this.underlyingFactory.registerForConnectionError(this.receiveLink);
 	}
 	
 	CompletableFuture<Void> sendTokenAndSetRenewTimer(boolean retryOnFailure)
@@ -429,7 +428,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         else
         {            
             CompletableFuture<ScheduledFuture<?>> sendTokenFuture = this.underlyingFactory.sendSecurityTokenAndSetRenewTimer(this.sasTokenAudienceURI, retryOnFailure, () -> this.sendTokenAndSetRenewTimer(true));
-            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;TRACE_LOGGER.debug("Sent SAS Token and set renew timer");});
+            return sendTokenFuture.thenAccept((f) -> {this.sasTokenRenewTimerFuture = f;});
         }
     }
 	
@@ -574,7 +573,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                     }
                 },
                 timeout,
-                TimerType.OneTimeRun);        
+                TimerType.OneTimeRun);
         
         this.ensureLinkIsOpen().thenRun(() -> {this.addCredit(receiveWorkItem);});
 		return onReceive;
@@ -615,8 +614,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		
 		if (exception == null)
 		{
-		    this.underlyingFactory.registerForConnectionError(this.receiveLink);
-		    
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
 			{
 				AsyncUtil.completeFuture(this.linkOpen.getWork(), this);
@@ -651,13 +648,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             {
 			    TRACE_LOGGER.warn("Opening receive link '{}' to '{}' failed.", this.receiveLink.getName(), this.receivePath, exception);
 			    AsyncUtil.completeFutureExceptionally(this.receiveLinkReopenFuture, exception);
-			    if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
-                {
-                    // No point in retrying to establish a link.. SessionLock is lost
-                    TRACE_LOGGER.warn("SessionId '{}' lock lost. Closing receiver.", this.sessionId);
-                    this.isSessionLockLost = true;
-                    this.closeAsync();
-                }
             }
 			
 			this.lastKnownLinkError = exception;
@@ -793,12 +783,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 	}
 
-	public void onError(ErrorCondition error)
-	{		
-		Exception completionException = ExceptionUtil.toException(error);
-		this.onError(completionException);
-	}
-
 	@Override
 	public void onError(Exception exception)
 	{
@@ -819,6 +803,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		else
 		{
+			this.underlyingFactory.deregisterForConnectionError(this.receiveLink);
 		    TRACE_LOGGER.warn("Receive link '{}' to '{}', sessionId '{}' closed with error.", this.receiveLink.getName(), this.receivePath, this.sessionId, exception);
 			this.lastKnownLinkError = exception;
 			if ((this.linkOpen != null && !this.linkOpen.getWork().isDone()) ||
@@ -826,39 +811,35 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			{
 			    this.onOpenComplete(exception);
 			}
-			else
-			{
-			    this.underlyingFactory.deregisterForConnectionError(this.receiveLink);
-			    
-			    if (exception != null &&
-	                    (!(exception instanceof ServiceBusException) || !((ServiceBusException) exception).getIsTransient()))
-	            {
-	                this.clearAllPendingWorkItems(exception);
-	                
-	                if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
-	                {
-	                    // No point in retrying to establish a link.. SessionLock is lost
-	                    TRACE_LOGGER.warn("SessionId '{}' lock lost. Closing receiver.", this.sessionId);
-	                    this.isSessionLockLost = true;
-	                    this.closeAsync();
-	                }
-	            }
-	            else
-	            {
-	                // TODO Why recreating link needs to wait for retry interval of pending receive?
-	                ReceiveWorkItem workItem = this.pendingReceives.peek();
-	                if (workItem != null && workItem.getTimeoutTracker() != null)
-	                {
-	                    Duration nextRetryInterval = this.underlyingFactory.getRetryPolicy()
-	                            .getNextRetryInterval(this.getClientId(), exception, workItem.getTimeoutTracker().remaining());
-	                    if (nextRetryInterval != null)
-	                    {
-	                        TRACE_LOGGER.info("Receive link '{}' to '{}', sessionId '{}' will be reopened after '{}'", this.receiveLink.getName(), this.receivePath, this.sessionId, nextRetryInterval);
-	                        Timer.schedule(() -> {CoreMessageReceiver.this.ensureLinkIsOpen();}, nextRetryInterval, TimerType.OneTimeRun);
-	                    }
-	                }
-	            }
-			}
+			
+			if (exception != null &&
+                    (!(exception instanceof ServiceBusException) || !((ServiceBusException) exception).getIsTransient()))
+            {
+                this.clearAllPendingWorkItems(exception);
+                
+                if(this.isSessionReceiver && (exception instanceof SessionLockLostException || exception instanceof SessionCannotBeLockedException))
+                {
+                    // No point in retrying to establish a link.. SessionLock is lost
+                    TRACE_LOGGER.warn("SessionId '{}' lock lost. Closing receiver.", this.sessionId);
+                    this.isSessionLockLost = true;
+                    this.closeAsync();
+                }
+            }
+            else
+            {
+                // TODO Why recreating link needs to wait for retry interval of pending receive?
+                ReceiveWorkItem workItem = this.pendingReceives.peek();
+                if (workItem != null && workItem.getTimeoutTracker() != null)
+                {
+                    Duration nextRetryInterval = this.underlyingFactory.getRetryPolicy()
+                            .getNextRetryInterval(this.getClientId(), exception, workItem.getTimeoutTracker().remaining());
+                    if (nextRetryInterval != null)
+                    {
+                        TRACE_LOGGER.info("Receive link '{}' to '{}', sessionId '{}' will be reopened after '{}'", this.receiveLink.getName(), this.receivePath, this.sessionId, nextRetryInterval);
+                        Timer.schedule(() -> {CoreMessageReceiver.this.ensureLinkIsOpen();}, nextRetryInterval, TimerType.OneTimeRun);
+                    }
+                }
+            }
 		}
 	}
 	
@@ -970,7 +951,8 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		}
 		else
 		{
-			this.onError(condition);
+			Exception completionException = ExceptionUtil.toException(condition);
+			this.onError(completionException);
 		}
 	}
 
@@ -1127,7 +1109,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         }
         else
         {
-            final UpdateStateWorkItem workItem = new UpdateStateWorkItem(completeMessageFuture, outcome, CoreMessageReceiver.this.factoryRceiveTimeout);
+            final UpdateStateWorkItem workItem = new UpdateStateWorkItem(completeMessageFuture, outcome, CoreMessageReceiver.this.operationTimeout);
             CoreMessageReceiver.this.pendingUpdateStateRequests.put(deliveryTagAsString, workItem);
             
             CoreMessageReceiver.this.ensureLinkIsOpen().thenRun(() -> {
