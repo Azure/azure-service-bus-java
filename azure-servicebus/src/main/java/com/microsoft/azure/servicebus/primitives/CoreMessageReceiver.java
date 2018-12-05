@@ -93,7 +93,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private Receiver receiveLink;
 	private RequestResponseLink requestResponseLink;
 	private WorkItem<CoreMessageReceiver> linkOpen;
-	private Duration factoryRceiveTimeout;
 
 	private Exception lastKnownLinkError;
 	private Instant lastKnownErrorReportedAt;
@@ -132,7 +131,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		this.prefetchedMessages = new ConcurrentLinkedQueue<MessageWithDeliveryTag>();
 		this.linkClose = new CompletableFuture<Void>();
 		this.lastKnownLinkError = null;
-		this.factoryRceiveTimeout = factory.getOperationTimeout();
 		this.prefetchCountSync = new Object();
 		this.retryPolicy = factory.getRetryPolicy();
 		this.pendingReceives = new ConcurrentLinkedQueue<ReceiveWorkItem>();
@@ -1111,7 +1109,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
         }
         else
         {
-            final UpdateStateWorkItem workItem = new UpdateStateWorkItem(completeMessageFuture, outcome, CoreMessageReceiver.this.factoryRceiveTimeout);
+            final UpdateStateWorkItem workItem = new UpdateStateWorkItem(completeMessageFuture, outcome, CoreMessageReceiver.this.operationTimeout);
             CoreMessageReceiver.this.pendingUpdateStateRequests.put(deliveryTagAsString, workItem);
             
             CoreMessageReceiver.this.ensureLinkIsOpen().thenRun(() -> {

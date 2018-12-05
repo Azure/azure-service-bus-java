@@ -238,6 +238,7 @@ public class TestCommons {
 		if(isEntityPartitioned)
 		{
 			Assert.assertTrue("Messages not received", receivedMessages != null && receivedMessages.size() > 0);
+			totalReceivedMessages.addAll(receivedMessages);
 		}
 		else
 		{
