@@ -39,37 +39,6 @@ public class TestCommons {
 		sender.sendBatch(messages);
 	}
 	
-	public static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
-	{	
-		testBasicReceiveAndDelete(sender, sessionId, receiver, 64);
-	}
-	
-	public static void testBasicReceiveAndDeleteWithLargeMessage(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
-	{	
-		testBasicReceiveAndDelete(sender, sessionId, receiver, 64 * 1024);
-	}
-	
-	private static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver, int messageSize) throws InterruptedException, ServiceBusException, ExecutionException
-	{
-		String messageId = UUID.randomUUID().toString();
-		String messageBody = "AMQP message";
-		Message message = new Message(messageBody);
-		message.setMessageId(messageId);
-		if(sessionId != null)
-		{
-			message.setSessionId(sessionId);
-		}
-		sender.send(message);
- 				
-		IMessage receivedMessage = receiver.receive();
-		Assert.assertNotNull("Message not received", receivedMessage);
-		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
-		Assert.assertEquals("Message Body Type did not match", MessageBodyType.VALUE, receivedMessage.getMessageBody().getBodyType());
-		Assert.assertEquals("Message content did not match", messageBody, receivedMessage.getMessageBody().getValueData());
-		receivedMessage = receiver.receive(SHORT_WAIT_TIME);
-		Assert.assertNull("Message received again", receivedMessage);
-	}
-	
 	public static void testBasicReceiveAndDeleteWithValueData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
     {
 		String messageData = "testBasicReceiveAndDeleteWithValueData";
@@ -93,9 +62,19 @@ public class TestCommons {
     }
 	
 	public static void testBasicReceiveAndDeleteWithBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+	{
+		testBasicReceiveAndDeleteWithBinaryData(sender, sessionId, receiver, 64);
+	}
+	
+	public static void testBasicReceiveAndDeleteWithLargeBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+	{
+		testBasicReceiveAndDeleteWithBinaryData(sender, sessionId, receiver, 64 * 1024);
+	}
+	
+	private static void testBasicReceiveAndDeleteWithBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver, int messageSize) throws InterruptedException, ServiceBusException, ExecutionException
     {
         String messageId = UUID.randomUUID().toString();
-        byte[] binaryData = new byte[200];
+        byte[] binaryData = new byte[messageSize];
         for(int i=0; i< binaryData.length; i++)
         {
             binaryData[i] = (byte)i;

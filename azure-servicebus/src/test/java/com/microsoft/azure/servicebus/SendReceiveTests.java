@@ -109,20 +109,6 @@ public abstract class SendReceiveTests extends Tests {
 	        EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SendReceiveTests.entityNameCreatedForAllTests);
 	    }
 	}
-	
-	@Test
-	public void testBasicReceiveAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
-	{
-		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.RECEIVEANDDELETE);
-		TestCommons.testBasicReceiveAndDelete(this.sender, this.sessionId, this.receiver);
-	}
-	
-	@Test
-	public void testBasicReceiveAndDeleteWithLargeMessage() throws InterruptedException, ServiceBusException, ExecutionException
-	{
-		this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.RECEIVEANDDELETE);
-		TestCommons.testBasicReceiveAndDeleteWithLargeMessage(this.sender, this.sessionId, this.receiver);
-	}
 
 	@Test
     public void testBasicReceiveAndDeleteWithValueData() throws InterruptedException, ServiceBusException, ExecutionException
@@ -136,6 +122,13 @@ public abstract class SendReceiveTests extends Tests {
     {
         this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.RECEIVEANDDELETE);
         TestCommons.testBasicReceiveAndDeleteWithBinaryData(this.sender, this.sessionId, this.receiver);
+    }
+	
+	@Test
+    public void testBasicReceiveAndDeleteWithLargeBinaryData() throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.RECEIVEANDDELETE);
+        TestCommons.testBasicReceiveAndDeleteWithLargeBinaryData(this.sender, this.sessionId, this.receiver);
     }
 	
 	@Test
