@@ -65,7 +65,7 @@ public class TestCommons {
 		Assert.assertNotNull("Message not received", receivedMessage);
 		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
 		Assert.assertEquals("Message Body Type did not match", MessageBodyType.VALUE, receivedMessage.getMessageBody().getBodyType());
-		Assert.assertEquals("Message content did not match", messageBody, receivedMessage.getMessageBody().getValue());
+		Assert.assertEquals("Message content did not match", messageBody, receivedMessage.getMessageBody().getValueData());
 		receivedMessage = receiver.receive(SHORT_WAIT_TIME);
 		Assert.assertNull("Message received again", receivedMessage);
 	}
@@ -78,16 +78,12 @@ public class TestCommons {
         {
             binaryData[i] = (byte)i;
         }
-        Message message = new Message(new MessageBody(binaryData));
+        Message message = new Message(Utils.fromBinay(binaryData));
         message.setMessageId(messageId);
         if(sessionId != null)
         {
             message.setSessionId(sessionId);
         }
-		
-		byte[] body = new byte[messageSize];
-		Arrays.fill(body, (byte)127);
-		message.setBody(body);
 		
         sender.send(message);
                 
@@ -95,7 +91,7 @@ public class TestCommons {
         Assert.assertNotNull("Message not received", receivedMessage);
         Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
         Assert.assertEquals("Message Body Type did not match", MessageBodyType.BINARY, receivedMessage.getMessageBody().getBodyType());
-        Assert.assertArrayEquals("Message content did not match", binaryData, receivedMessage.getMessageBody().getBinaryData());
+        Assert.assertArrayEquals("Message content did not match", binaryData, Utils.getDataFromMessageBody(receivedMessage.getMessageBody()));
         receivedMessage = receiver.receive(SHORT_WAIT_TIME);
         Assert.assertNull("Message received again", receivedMessage);
     }
@@ -107,7 +103,7 @@ public class TestCommons {
         sequence.add("azure");
         sequence.add("servicebus");
         sequence.add("messaging");
-        Message message = new Message(new MessageBody(sequence));
+        Message message = new Message(Utils.fromSequence(sequence));
         message.setMessageId(messageId);
         if(sessionId != null)
         {
@@ -119,7 +115,7 @@ public class TestCommons {
         Assert.assertNotNull("Message not received", receivedMessage);
         Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
         Assert.assertEquals("Message Body Type did not match", MessageBodyType.SEQUENCE, receivedMessage.getMessageBody().getBodyType());
-        Assert.assertArrayEquals("Message content did not match", sequence.toArray(new String[] {}), receivedMessage.getMessageBody().getSequence().toArray(new String[] {}));
+        Assert.assertArrayEquals("Message content did not match", sequence.toArray(new String[] {}), Utils.getSequenceFromMessageBody(receivedMessage.getMessageBody()).toArray(new String[] {}));
         receivedMessage = receiver.receive(SHORT_WAIT_TIME);
         Assert.assertNull("Message received again", receivedMessage);
     }

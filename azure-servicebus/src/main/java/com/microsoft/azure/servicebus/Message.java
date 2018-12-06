@@ -15,7 +15,7 @@ final public class Message implements Serializable, IMessage {
 	
 	private static final String DEFAULT_CONTENT_TYPE = null;
 	
-	private static final MessageBody DEFAULT_CONTENT = new MessageBody(new byte[0]);
+	private static final MessageBody DEFAULT_CONTENT = Utils.fromBinay(new byte[0]);
 
 	private long deliveryCount;
 	
@@ -23,7 +23,7 @@ final public class Message implements Serializable, IMessage {
 	
 	private Duration timeToLive;
 	
-	private MessageBody messsageBody;
+	private MessageBody messageBody;
 	
 	private String contentType;
 	
@@ -64,12 +64,12 @@ final public class Message implements Serializable, IMessage {
 	
 	public Message(String content)
 	{
-		this(new MessageBody(content));
+		this(MessageBody.fromValueData(content));
 	}
 	
 	public Message(byte[] content)
 	{
-		this(new MessageBody(content));
+		this(Utils.fromBinay(content));
 	}
 	
 	public Message(MessageBody body)
@@ -79,12 +79,12 @@ final public class Message implements Serializable, IMessage {
 	
 	public Message(String content, String contentType)
 	{
-		this(new MessageBody(content), contentType);
+		this(MessageBody.fromValueData(content), contentType);
 	}
 	
 	public Message(byte[] content, String contentType)
 	{
-		this(new MessageBody(content), contentType);
+		this(Utils.fromBinay(content), contentType);
 	}
 	
 	public Message(MessageBody body, String contentType)
@@ -94,18 +94,18 @@ final public class Message implements Serializable, IMessage {
 	
 	public Message(String messageId, String content, String contentType)
 	{
-		this(messageId, new MessageBody(content), contentType);
+		this(messageId, MessageBody.fromValueData(content), contentType);
 	}
 	
 	public Message(String messageId, byte[] content, String contentType)
 	{
-		this(messageId, new MessageBody(content), contentType);
+		this(messageId, Utils.fromBinay(content), contentType);
 	}
 
 	public Message(String messageId, MessageBody body, String contentType)
 	{
 		this.messageId = messageId;
-		this.messsageBody = body;
+		this.messageBody = body;
 		this.contentType = contentType;
 		this.properties = new HashMap<>();
 	}
@@ -315,25 +315,25 @@ final public class Message implements Serializable, IMessage {
 	@Deprecated
 	public byte[] getBody()
 	{
-		return this.messsageBody.getBinaryData();
+		return Utils.getDataFromMessageBody(this.messageBody);
 	}
 
 	@Override
 	@Deprecated
 	public void setBody(byte[] body)
 	{
-		this.messsageBody = new MessageBody(body);
+		this.messageBody = Utils.fromBinay(body);
 	}
 
 	@Override
 	public MessageBody getMessageBody()
 	{
-		return this.messsageBody;
+		return this.messageBody;
 	}
 
 	@Override
 	public void setMessageBody(MessageBody body)
 	{
-		this.messsageBody = body;
+		this.messageBody = body;
 	}
 }

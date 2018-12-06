@@ -32,15 +32,15 @@ class MessageConverter
 		{
 		    if (body.getBodyType() == MessageBodyType.VALUE)
 		    {
-		        amqpMessage.setBody(new AmqpValue(body.getValue()));
+		        amqpMessage.setBody(new AmqpValue(body.getValueData()));
 		    }
 		    else if (body.getBodyType() == MessageBodyType.SEQUENCE)
 		    {
-		        amqpMessage.setBody(new AmqpSequence(body.getSequence()));
+		        amqpMessage.setBody(new AmqpSequence(Utils.getSequenceFromMessageBody(body)));
 		    }
 		    else
 		    {
-		        amqpMessage.setBody(new Data(new Binary(body.getBinaryData())));
+		        amqpMessage.setBody(new Data(new Binary(Utils.getDataFromMessageBody(body))));
 		    }
 		}
 		
@@ -107,17 +107,17 @@ class MessageConverter
 			if(body instanceof Data)
 			{
 				Binary messageData = ((Data)body).getValue();
-				brokeredMessage = new Message(new MessageBody(messageData.getArray()));
+				brokeredMessage = new Message(Utils.fromBinay(messageData.getArray()));
 			}
 			else if (body instanceof AmqpValue)
 			{
 			    Object messageData = ((AmqpValue)body).getValue();
-			    brokeredMessage = new Message(new MessageBody(messageData));
+			    brokeredMessage = new Message(MessageBody.fromValueData(messageData));
 			}
 			else if (body instanceof AmqpSequence)
 			{
 			    List<Object> messageData = ((AmqpSequence)body).getValue();
-			    brokeredMessage = new Message(new MessageBody(messageData));
+			    brokeredMessage = new Message(Utils.fromSequence(messageData));
 			}
 			else
 			{
