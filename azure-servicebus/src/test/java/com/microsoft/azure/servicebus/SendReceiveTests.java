@@ -124,7 +124,13 @@ public abstract class SendReceiveTests extends Tests {
 		TestCommons.testBasicReceiveAndDeleteWithLargeMessage(this.sender, this.sessionId, this.receiver);
 	}
 
-	
+	@Test
+    public void testBasicReceiveAndDeleteWithValueData() throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        this.receiver = ClientFactory.createMessageReceiverFromEntityPath(factory, this.receiveEntityPath, ReceiveMode.RECEIVEANDDELETE);
+        TestCommons.testBasicReceiveAndDeleteWithValueData(this.sender, this.sessionId, this.receiver);
+    }
+		
 	@Test
     public void testBasicReceiveAndDeleteWithBinaryData() throws InterruptedException, ServiceBusException, ExecutionException
     {

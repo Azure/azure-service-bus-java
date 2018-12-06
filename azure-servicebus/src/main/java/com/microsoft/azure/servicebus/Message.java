@@ -4,6 +4,7 @@
 package com.microsoft.azure.servicebus;
 
 import java.io.Serializable;
+import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -12,7 +13,7 @@ import java.util.UUID;
 
 final public class Message implements Serializable, IMessage {
 	private static final long serialVersionUID = 7849508139219590863L;
-	
+	private static final Charset DEFAULT_CHAR_SET = Charset.forName("UTF-8");
 	private static final String DEFAULT_CONTENT_TYPE = null;
 	
 	private static final MessageBody DEFAULT_CONTENT = Utils.fromBinay(new byte[0]);
@@ -57,51 +58,99 @@ final public class Message implements Serializable, IMessage {
 	
 	private byte[] deliveryTag;
 	
+	/**
+	 * Creates an empty message with an empty byte array as body.
+	 */
 	public Message()
 	{
 		this(DEFAULT_CONTENT);
 	}
 	
+	/**
+	 * Creates a message from a string. For backward compatibility reasons, the string is converted to a byte array and message body type is set to binary.
+	 * @param content content of the message.
+	 */
 	public Message(String content)
 	{
-		this(MessageBody.fromValueData(content));
+		this(content.getBytes(DEFAULT_CHAR_SET));
 	}
 	
+	/**
+	 * Creates a message from a byte array. Message body type is set to binary.
+	 * @param content content of the message
+	 */
 	public Message(byte[] content)
 	{
 		this(Utils.fromBinay(content));
 	}
 	
+	/**
+	 * Creates a message from message body.
+	 * @param body message body
+	 */
 	public Message(MessageBody body)
 	{
 		this(body, DEFAULT_CONTENT_TYPE);
 	}
 	
+	/**
+	 * Creates a message from a string. For backward compatibility reasons, the string is converted to a byte array and message body type is set to binary.
+	 * @param content content of the message
+	 * @param contentType content type of the message
+	 */
 	public Message(String content, String contentType)
 	{
-		this(MessageBody.fromValueData(content), contentType);
+		this(content.getBytes(DEFAULT_CHAR_SET), contentType);
 	}
 	
+	/**
+	 * Creates a message from a byte array. Message body type is set to binary.
+	 * @param content content of the message
+	 * @param contentType content type of the message
+	 */
 	public Message(byte[] content, String contentType)
 	{
 		this(Utils.fromBinay(content), contentType);
 	}
 	
+	/**
+	 * Creates a message from message body.
+	 * @param body message body
+	 * @param contentType content type of the message
+	 */
 	public Message(MessageBody body, String contentType)
 	{
 		this(UUID.randomUUID().toString(), body, contentType);
 	}
 	
+	/**
+	 * Creates a message from a string. For backward compatibility reasons, the string is converted to a byte array and message body type is set to binary.
+	 * @param messageId id of the message
+	 * @param content content of the message
+	 * @param contentType content type of the message
+	 */
 	public Message(String messageId, String content, String contentType)
 	{
-		this(messageId, MessageBody.fromValueData(content), contentType);
+		this(messageId, content.getBytes(DEFAULT_CHAR_SET), contentType);
 	}
 	
+	/**
+	 * Creates a message from a byte array. Message body type is set to binary.
+	 * @param messageId id of the message
+	 * @param content content of the message
+	 * @param contentType content type of the message
+	 */
 	public Message(String messageId, byte[] content, String contentType)
 	{
 		this(messageId, Utils.fromBinay(content), contentType);
 	}
 
+	/**
+	 * Creates a message from message body.
+	 * @param messageId id of the message
+	 * @param body message body
+	 * @param contentType content type of the message
+	 */
 	public Message(String messageId, MessageBody body, String contentType)
 	{
 		this.messageId = messageId;
