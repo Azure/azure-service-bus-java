@@ -23,6 +23,11 @@ public class MessageBody {
      */
     public static MessageBody fromValueData(Object value)
     {
+    	if(value == null)
+    	{
+    		throw new IllegalArgumentException("Value data is null.");
+    	}
+    	
     	MessageBody body = new MessageBody();
     	body.bodyType = MessageBodyType.VALUE;
     	body.valueData = value;
