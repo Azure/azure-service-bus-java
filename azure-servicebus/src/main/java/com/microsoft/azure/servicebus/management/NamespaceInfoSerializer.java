@@ -89,7 +89,9 @@ class NamespaceInfoSerializer {
                                     case "MessagingSKU":
                                         try {
                                             namespaceInfo.setNamespaceSku(NamespaceSku.valueOf(element.getFirstChild().getNodeValue()));
-                                        } catch (IllegalArgumentException ignored) {}
+                                        } catch (IllegalArgumentException ignored) {
+                                            namespaceInfo.setNamespaceSku(NamespaceSku.Unknown);
+                                        }
                                         break;
                                 }
                             }

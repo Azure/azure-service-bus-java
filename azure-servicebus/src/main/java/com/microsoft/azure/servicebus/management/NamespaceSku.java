@@ -20,7 +20,12 @@ public enum NamespaceSku {
     /**
      * Premium namespace. Dedicated Resource. Queues and topics.
      */
-    Premium(3);
+    Premium(3),
+
+    /**
+     * Unknown SKU.
+     */
+    Unknown(100);
 
     private int numVal;
 
