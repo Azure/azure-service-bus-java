@@ -5,9 +5,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -117,22 +114,38 @@ public abstract class SessionTests extends Tests {
             EntityManager.deleteEntity(TestUtils.getNamespaceEndpointURI(), TestUtils.getManagementClientSettings(), SessionTests.entityNameCreatedForAllTests);
         }
     }
-    
-	@Test
-	public void testBasicReceiveAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
-	{
-		String sessionId = TestUtils.getRandomString();
-		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
-		TestCommons.testBasicReceiveAndDelete(this.sender, sessionId, this.session);
-	}
 	
 	@Test
-	public void testBasicReceiveAndDeleteWithLargeMessage() throws InterruptedException, ServiceBusException, ExecutionException
-	{
+    public void testBasicReceiveAndDeleteWithValueData() throws InterruptedException, ServiceBusException, ExecutionException
+    {
 		String sessionId = TestUtils.getRandomString();
-		this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
-		TestCommons.testBasicReceiveAndDeleteWithLargeMessage(this.sender, sessionId, this.session);
-	}
+        this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
+        TestCommons.testBasicReceiveAndDeleteWithValueData(this.sender, sessionId, this.session);
+    }
+	
+	@Test
+    public void testBasicReceiveAndDeleteWithBinaryData() throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        String sessionId = TestUtils.getRandomString();
+        this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
+        TestCommons.testBasicReceiveAndDeleteWithBinaryData(this.sender, sessionId, this.session);
+    }
+	
+	@Test
+    public void testBasicReceiveAndDeleteWithLargeBinaryData() throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        String sessionId = TestUtils.getRandomString();
+        this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
+        TestCommons.testBasicReceiveAndDeleteWithLargeBinaryData(this.sender, sessionId, this.session);
+    }
+	
+	@Test
+    public void testBasicReceiveAndDeleteWithSequenceData() throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        String sessionId = TestUtils.getRandomString();
+        this.session = ClientFactory.acceptSessionFromEntityPath(this.factory, this.receiveEntityPath, sessionId, ReceiveMode.RECEIVEANDDELETE);
+        TestCommons.testBasicReceiveAndDeleteWithSequenceData(this.sender, sessionId, this.session);
+    }	
 	
 	@Test
 	public void testBasicReceiveBatchAndDelete() throws InterruptedException, ServiceBusException, ExecutionException
