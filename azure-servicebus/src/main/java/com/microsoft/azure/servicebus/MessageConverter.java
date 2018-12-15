@@ -46,7 +46,9 @@ class MessageConverter
 		
 		if(brokeredMessage.getProperties() != null)
 		{
-			amqpMessage.setApplicationProperties(new ApplicationProperties(brokeredMessage.getProperties()));
+			Map<String, Object> applicationProperties = new HashMap<>();
+			applicationProperties.putAll(brokeredMessage.getProperties());
+			amqpMessage.setApplicationProperties(new ApplicationProperties(applicationProperties));
 		}
 		
 		if(brokeredMessage.getTimeToLive() != null)
@@ -134,7 +136,20 @@ class MessageConverter
 		ApplicationProperties applicationProperties = amqpMessage.getApplicationProperties();
 		if(applicationProperties != null)
 		{
-			brokeredMessage.setProperties(applicationProperties.getValue());
+			Map<String, String> convertedProperties = new HashMap<>();
+			for(Map.Entry<String, Object> entry : applicationProperties.getValue().entrySet())
+			{
+				if(entry.getValue() instanceof String)
+				{
+					convertedProperties.put(entry.getKey(), (String)entry.getValue());
+				}
+				else
+				{
+					convertedProperties.put(entry.getKey(), entry.getValue().toString());
+				}
+			}
+			
+			brokeredMessage.setProperties(convertedProperties);
 		}		
 		
 		// Header

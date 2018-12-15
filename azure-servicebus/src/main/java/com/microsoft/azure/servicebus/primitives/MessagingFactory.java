@@ -104,9 +104,16 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         Timer.register(this.getClientId());
 	}
 
-	String getHostName()
+	@Override
+	public String getHostName()
 	{
 		return this.hostName;
+	}
+	
+	@Override
+	public int getPort()
+	{
+		return ClientConstants.AMQPS_PORT;
 	}
 	
 	private Reactor getReactor()
@@ -145,7 +152,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
-		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
+		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", this.hostName, ClientConstants.AMQPS_PORT);
 			this.connection = this.getReactor().connectionToHost(this.hostName, ClientConstants.AMQPS_PORT, this.connectionHandler);
 		}
 

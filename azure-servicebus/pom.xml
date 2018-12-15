@@ -55,11 +55,6 @@
 	 	    <artifactId>proton-j</artifactId>
 	 	    <version>${proton-j-version}</version>
 	 	</dependency>
-	 	<dependency>
-	 	    <groupId>org.bouncycastle</groupId> 
-	 	    <artifactId>bcpkix-jdk15on</artifactId> 
-	 	    <version>1.53</version> 
-	  	</dependency>
 	  	<dependency>
 			 <groupId>com.microsoft.azure</groupId>
 			 <artifactId>adal4j</artifactId>
