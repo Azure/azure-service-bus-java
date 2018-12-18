@@ -10,6 +10,5 @@ public class StrictTLSContext extends SSLContext{
 	
 	protected StrictTLSContext(SSLContextSpi contextSpi, Provider provider, String protocol) {
 		super(contextSpi, provider, protocol);
-		// TODO Auto-generated constructor stub
 	}
 }
