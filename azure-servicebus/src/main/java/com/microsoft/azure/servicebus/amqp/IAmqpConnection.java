@@ -11,8 +11,6 @@ public interface IAmqpConnection
 {
 	String getHostName();
 	
-	int getPort();
-	
 	void onConnectionOpen();
 
 	void onConnectionError(ErrorCondition error);

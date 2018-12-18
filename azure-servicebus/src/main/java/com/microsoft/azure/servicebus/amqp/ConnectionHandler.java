@@ -41,6 +41,11 @@ public final class ConnectionHandler extends BaseHandler
 		this.messagingFactory = messagingFactory;
 	}
 	
+	public int getPort()
+	{
+		return ClientConstants.AMQPS_PORT;
+	}
+	
 	@Override
 	public void onConnectionInit(Event event)
 	{
@@ -78,7 +83,7 @@ public final class ConnectionHandler extends BaseHandler
 			SSLContext strictTlsContext = new StrictTLSContext(strictTlsContextSpi, defaultContext.getProvider(), defaultContext.getProtocol());
 			domain.setSslContext(strictTlsContext);
 			domain.setPeerAuthentication(SslDomain.VerifyMode.VERIFY_PEER_NAME);
-			SslPeerDetails peerDetails = Proton.sslPeerDetails(this.messagingFactory.getHostName(), this.messagingFactory.getPort());
+			SslPeerDetails peerDetails = Proton.sslPeerDetails(this.messagingFactory.getHostName(), this.getPort());
 			transport.ssl(domain, peerDetails);
 		} catch (NoSuchAlgorithmException e) {
 			// Should never happen
