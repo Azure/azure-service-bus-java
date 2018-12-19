@@ -397,7 +397,7 @@ public class Util
 		}
 		catch(BufferOverflowException exception)
 		{
-			throw new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", length / 1024), exception);		
+			throw new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s KB", length / 1024), exception);		
 		}
 	}
 
