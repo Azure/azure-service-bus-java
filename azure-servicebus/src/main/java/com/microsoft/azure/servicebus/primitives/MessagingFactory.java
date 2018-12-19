@@ -73,12 +73,10 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	private Throwable lastCBSLinkCreationException = null;
 	
 	private final ClientSettings clientSettings;
-	private final URI namespaceEndpointUri;
 	
 	private MessagingFactory(URI namespaceEndpointUri, ClientSettings clientSettings)
 	{
 	    super("MessagingFactory".concat(StringUtil.getShortRandomString()));
-	    this.namespaceEndpointUri = namespaceEndpointUri;
 	    this.clientSettings = clientSettings;
 	    
 	    this.hostName = namespaceEndpointUri.getHost();
@@ -98,13 +96,14 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 
                 final Reactor r = e.getReactor();
                 TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
-                connection = r.connectionToHost(hostName, ClientConstants.AMQPS_PORT, connectionHandler);
+                connection = r.connectionToHost(hostName, MessagingFactory.this.connectionHandler.getPort(), connectionHandler);
             }
         };
         Timer.register(this.getClientId());
 	}
 
-	String getHostName()
+	@Override
+	public String getHostName()
 	{
 		return this.hostName;
 	}
@@ -145,7 +144,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
-		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
+		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", this.hostName, ClientConstants.AMQPS_PORT);
 			this.connection = this.getReactor().connectionToHost(this.hostName, ClientConstants.AMQPS_PORT, this.connectionHandler);
 		}
 

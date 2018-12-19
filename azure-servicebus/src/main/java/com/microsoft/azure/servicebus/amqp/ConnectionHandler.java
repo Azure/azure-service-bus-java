@@ -4,8 +4,11 @@
  */
 package com.microsoft.azure.servicebus.amqp;
 
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.net.ssl.SSLContext;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
@@ -16,6 +19,7 @@ import org.apache.qpid.proton.engine.EndpointState;
 import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.SslDomain;
+import org.apache.qpid.proton.engine.SslPeerDetails;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.reactor.Handshaker;
 import org.slf4j.Logger;
@@ -35,6 +39,11 @@ public final class ConnectionHandler extends BaseHandler
 	{
 		add(new Handshaker());
 		this.messagingFactory = messagingFactory;
+	}
+	
+	public int getPort()
+	{
+		return ClientConstants.AMQPS_PORT;
 	}
 	
 	@Override
@@ -58,14 +67,29 @@ public final class ConnectionHandler extends BaseHandler
 	@Override
 	public void onConnectionBound(Event event)
 	{
-	    TRACE_LOGGER.debug("onConnectionBound: hostname:{}", event.getConnection().getHostname());
+		TRACE_LOGGER.debug("onConnectionBound: hostname:{}", event.getConnection().getHostname());
 		Transport transport = event.getTransport();
-
-		SslDomain domain = makeDomain(SslDomain.Mode.CLIENT);
-		transport.ssl(domain);
-
+		
 		Sasl sasl = transport.sasl();
 		sasl.setMechanisms("ANONYMOUS");
+		
+		SslDomain domain = Proton.sslDomain();
+		domain.init(SslDomain.Mode.CLIENT);
+		
+		try {
+			// Default SSL context will have the root certificate from azure in truststore anyway
+			SSLContext defaultContext = SSLContext.getDefault();
+			StrictTLSContextSpi strictTlsContextSpi = new StrictTLSContextSpi(defaultContext);
+			SSLContext strictTlsContext = new StrictTLSContext(strictTlsContextSpi, defaultContext.getProvider(), defaultContext.getProtocol());
+			domain.setSslContext(strictTlsContext);
+			domain.setPeerAuthentication(SslDomain.VerifyMode.VERIFY_PEER_NAME);
+			SslPeerDetails peerDetails = Proton.sslPeerDetails(this.messagingFactory.getHostName(), this.getPort());
+			transport.ssl(domain, peerDetails);
+		} catch (NoSuchAlgorithmException e) {
+			// Should never happen
+			TRACE_LOGGER.error("Default SSL algorithm not found in JRE. Please check your JRE setup.", e);
+//			this.messagingFactory.onConnectionError(new ErrorCondition(AmqpErrorCode.InternalError, e.getMessage()));
+		}
 	}
 
 	@Override
@@ -131,14 +155,4 @@ public final class ConnectionHandler extends BaseHandler
 	        connection.free();
 	    }
     }
-
-	private static SslDomain makeDomain(SslDomain.Mode mode)
-	{
-		SslDomain domain = Proton.sslDomain();
-		domain.init(mode);
-
-		// TODO: VERIFY_PEER_NAME support
-		domain.setPeerAuthentication(SslDomain.VerifyMode.ANONYMOUS_PEER);
-		return domain;
-	}
 }
