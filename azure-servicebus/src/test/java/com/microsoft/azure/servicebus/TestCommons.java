@@ -40,38 +40,87 @@ public class TestCommons {
 		sender.sendBatch(messages);
 	}
 	
-	public static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
-	{	
-		testBasicReceiveAndDelete(sender, sessionId, receiver, 64);
-	}
+	public static void testBasicReceiveAndDeleteWithValueData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+    {
+		String messageData = "testBasicReceiveAndDeleteWithValueData";
+        String messageId = UUID.randomUUID().toString();
+        Message message = new Message(MessageBody.fromValueData(messageData));
+        message.setMessageId(messageId);
+        if(sessionId != null)
+        {
+            message.setSessionId(sessionId);
+        }
+		
+        sender.send(message);
+        
+        IMessage receivedMessage = receiver.receive();
+        Assert.assertNotNull("Message not received", receivedMessage);
+        Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+        Assert.assertEquals("Message Body Type did not match", MessageBodyType.VALUE, receivedMessage.getMessageBody().getBodyType());
+        Assert.assertEquals("Message content did not match", messageData, receivedMessage.getMessageBody().getValueData());
+        receivedMessage = receiver.receive(SHORT_WAIT_TIME);
+        Assert.assertNull("Message received again", receivedMessage);
+    }
 	
-	public static void testBasicReceiveAndDeleteWithLargeMessage(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
-	{	
-		testBasicReceiveAndDelete(sender, sessionId, receiver, 64 * 1024);
-	}
-	
-	private static void testBasicReceiveAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver, int messageSize) throws InterruptedException, ServiceBusException, ExecutionException
+	public static void testBasicReceiveAndDeleteWithBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
 	{
-		String messageId = UUID.randomUUID().toString();
-		Message message = new Message();
-		message.setMessageId(messageId);
-		if(sessionId != null)
-		{
-			message.setSessionId(sessionId);
-		}
-		
-		byte[] body = new byte[messageSize];
-		Arrays.fill(body, (byte)127);
-		message.setBody(body);
-		
-		sender.send(message);
- 				
-		IMessage receivedMessage = receiver.receive();
-		Assert.assertNotNull("Message not received", receivedMessage);
-		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
-		receivedMessage = receiver.receive(SHORT_WAIT_TIME);
-		Assert.assertNull("Message received again", receivedMessage);
+		testBasicReceiveAndDeleteWithBinaryData(sender, sessionId, receiver, 64);
 	}
+	
+	public static void testBasicReceiveAndDeleteWithLargeBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+	{
+		testBasicReceiveAndDeleteWithBinaryData(sender, sessionId, receiver, 64 * 1024);
+	}
+	
+	private static void testBasicReceiveAndDeleteWithBinaryData(IMessageSender sender, String sessionId, IMessageReceiver receiver, int messageSize) throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        String messageId = UUID.randomUUID().toString();
+        byte[] binaryData = new byte[messageSize];
+        for(int i=0; i< binaryData.length; i++)
+        {
+            binaryData[i] = (byte)i;
+        }
+        Message message = new Message(Utils.fromBinay(binaryData));
+        message.setMessageId(messageId);
+        if(sessionId != null)
+        {
+            message.setSessionId(sessionId);
+        }
+		
+        sender.send(message);
+        
+        IMessage receivedMessage = receiver.receive();
+        Assert.assertNotNull("Message not received", receivedMessage);
+        Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+        Assert.assertEquals("Message Body Type did not match", MessageBodyType.BINARY, receivedMessage.getMessageBody().getBodyType());
+        Assert.assertArrayEquals("Message content did not match", binaryData, Utils.getDataFromMessageBody(receivedMessage.getMessageBody()));
+        receivedMessage = receiver.receive(SHORT_WAIT_TIME);
+        Assert.assertNull("Message received again", receivedMessage);
+    }
+	
+	public static void testBasicReceiveAndDeleteWithSequenceData(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+    {
+        String messageId = UUID.randomUUID().toString();
+        List<Object> sequence = new ArrayList<Object>();
+        sequence.add("azure");
+        sequence.add("servicebus");
+        sequence.add("messaging");
+        Message message = new Message(Utils.fromSequence(sequence));
+        message.setMessageId(messageId);
+        if(sessionId != null)
+        {
+            message.setSessionId(sessionId);
+        }
+        sender.send(message);
+                
+        IMessage receivedMessage = receiver.receive();
+        Assert.assertNotNull("Message not received", receivedMessage);
+        Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+        Assert.assertEquals("Message Body Type did not match", MessageBodyType.SEQUENCE, receivedMessage.getMessageBody().getBodyType());
+        Assert.assertArrayEquals("Message content did not match", sequence.toArray(new String[] {}), Utils.getSequenceFromMessageBody(receivedMessage.getMessageBody()).toArray(new String[] {}));
+        receivedMessage = receiver.receive(SHORT_WAIT_TIME);
+        Assert.assertNull("Message received again", receivedMessage);
+    }
 	
 	public static void testBasicReceiveBatchAndDelete(IMessageSender sender, String sessionId, IMessageReceiver receiver, boolean isEntityPartitioned) throws InterruptedException, ServiceBusException, ExecutionException
 	{
