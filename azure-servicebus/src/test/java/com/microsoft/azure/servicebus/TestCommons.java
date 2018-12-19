@@ -204,7 +204,7 @@ public class TestCommons {
 		
 	public static void testBasicReceiveAndRenewLockBatch(IMessageSender sender, String sessionId, IMessageReceiver receiver, boolean isEntityPartitioned) throws InterruptedException, ServiceBusException, ExecutionException
 	{		
-		int numMessages = 10;
+		int numMessages = 2;
 		if(isEntityPartitioned)
 		{
 			for(int i=0; i<numMessages; i++)
@@ -233,15 +233,17 @@ public class TestCommons {
 			sender.sendBatch(messages);
 		}
 				
-		ArrayList<IMessage> totalReceivedMessages = new ArrayList<>();		
+		ArrayList<IMessage> totalReceivedMessages = new ArrayList<>();
 		
-		Collection<IMessage> receivedMessages = receiver.receiveBatch(numMessages);
-		if(isEntityPartitioned)
+		if(isEntityPartitioned && sessionId == null)
 		{
+			Collection<IMessage> receivedMessages = receiver.receiveBatch(1);
 			Assert.assertTrue("Messages not received", receivedMessages != null && receivedMessages.size() > 0);
+			totalReceivedMessages.addAll(receivedMessages);
 		}
 		else
 		{
+			Collection<IMessage> receivedMessages = receiver.receiveBatch(numMessages);
 			while(receivedMessages != null && receivedMessages.size() > 0 && totalReceivedMessages.size() < numMessages)
 			{
 			    totalReceivedMessages.addAll(receivedMessages);
