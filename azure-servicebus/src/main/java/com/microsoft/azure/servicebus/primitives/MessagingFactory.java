@@ -70,16 +70,15 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	private RequestResponseLink cbsLink;
 	private int cbsLinkCreationAttempts = 0;
 	private Throwable lastCBSLinkCreationException = null;
+	private URI namespaceEndpointUri;
 	
 	private final ClientSettings clientSettings;
-	private final URI namespaceEndpointUri;
 
 	private MessagingFactory(URI namespaceEndpointUri, ClientSettings clientSettings)
 	{
 	    super("MessagingFactory".concat(StringUtil.getShortRandomString()));
-	    this.namespaceEndpointUri = namespaceEndpointUri;
 	    this.clientSettings = clientSettings;
-	    
+	    this.namespaceEndpointUri = namespaceEndpointUri;
 	    this.hostName = namespaceEndpointUri.getHost();
 	    this.registeredLinks = new LinkedList<Link>();
         this.connetionCloseFuture = new CompletableFuture<Void>();
@@ -181,6 +180,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
         });
     }
 
+	@Override
 	public String getHostName()
 	{
 		return this.hostName;
@@ -222,7 +222,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
-		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", hostName, ClientConstants.AMQPS_PORT);
+		    TRACE_LOGGER.info("Creating connection to host '{}:{}'", this.connectionHandler.getOutboundSocketHostName(), this.connectionHandler.getOutboundSocketPort());
             this.connection = this.getReactor().connectionToHost(
                     this.connectionHandler.getOutboundSocketHostName(),
                     this.connectionHandler.getOutboundSocketPort(),
