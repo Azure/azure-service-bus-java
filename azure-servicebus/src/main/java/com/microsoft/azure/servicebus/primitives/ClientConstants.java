@@ -175,6 +175,11 @@ public final class ClientConstants
     public static final UnsignedLong FALSE_FILTER_DESCRIPTOR = new UnsignedLong(0x000001370000008L);
     public static final UnsignedLong CORRELATION_FILTER_DESCRIPTOR = new UnsignedLong(0x000001370000009L);
     
+    public static final String SSL_VERIFY_MODE_PROPERTY_NAME = "com.microsoft.azure.servicebus.ssl.verifymode";
+    public static final String SSL_VERIFY_MODE_ANONYMOUS = "anonymous";
+    public static final String SSL_VERIFY_MODE_CERTONLY = "verifyCertificateOnly";
+    public static final String SSL_VERIFY_MODE_CERT_AND_HOSTNAME = "verifyCertificateAndHostName";
+    
     static final int DEFAULT_SAS_TOKEN_SEND_RETRY_INTERVAL_IN_SECONDS = 5;
     static final String SAS_TOKEN_AUDIENCE_FORMAT = "amqp://%s/%s";
     static final Duration SAS_TOKEN_SEND_TIMEOUT = Duration.ofSeconds(10);
