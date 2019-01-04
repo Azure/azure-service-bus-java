@@ -111,9 +111,24 @@ public final class ConnectionHandler extends BaseHandler
 //				this.messagingFactory.onConnectionError(new ErrorCondition(AmqpErrorCode.InternalError, e.getMessage()));
 			}
 		}
+		else if (VERIFY_MODE == SslDomain.VerifyMode.VERIFY_PEER)
+		{
+			// Default SSL context will have the root certificate from azure in truststore anyway
+			try {
+				SSLContext defaultContext = SSLContext.getDefault();
+				domain.setSslContext(defaultContext);
+				domain.setPeerAuthentication(SslDomain.VerifyMode.VERIFY_PEER);
+				transport.ssl(domain);
+			} catch (NoSuchAlgorithmException e) {
+				// Should never happen
+				TRACE_LOGGER.error("Default SSL algorithm not found in JRE. Please check your JRE setup.", e);
+//				this.messagingFactory.onConnectionError(new ErrorCondition(AmqpErrorCode.InternalError, e.getMessage()));
+			}
+			
+		}
 		else
 		{
-			domain.setPeerAuthentication(VERIFY_MODE);
+			domain.setPeerAuthentication(SslDomain.VerifyMode.ANONYMOUS_PEER);
 			transport.ssl(domain);
 		}
 	}
