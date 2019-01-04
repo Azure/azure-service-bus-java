@@ -32,9 +32,27 @@ import com.microsoft.azure.servicebus.primitives.StringUtil;
 // amqp_connection/transport related events from reactor
 public final class ConnectionHandler extends BaseHandler
 {
+	private static final SslDomain.VerifyMode VERIFY_MODE;
 	private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(ConnectionHandler.class);
 	private final IAmqpConnection messagingFactory;
 
+	static
+	{
+		String verifyModePropValue = System.getProperty(ClientConstants.SSL_VERIFY_MODE_PROPERTY_NAME);
+		if(ClientConstants.SSL_VERIFY_MODE_ANONYMOUS.equalsIgnoreCase(verifyModePropValue))
+		{
+			VERIFY_MODE = SslDomain.VerifyMode.ANONYMOUS_PEER;
+		}
+		else if(ClientConstants.SSL_VERIFY_MODE_CERTONLY.equalsIgnoreCase(verifyModePropValue))
+		{
+			VERIFY_MODE = SslDomain.VerifyMode.VERIFY_PEER;
+		}
+		else
+		{
+			VERIFY_MODE = SslDomain.VerifyMode.VERIFY_PEER_NAME;
+		}
+	}
+	
 	public ConnectionHandler(final IAmqpConnection messagingFactory)
 	{
 		add(new Handshaker());
@@ -76,19 +94,27 @@ public final class ConnectionHandler extends BaseHandler
 		SslDomain domain = Proton.sslDomain();
 		domain.init(SslDomain.Mode.CLIENT);
 		
-		try {
-			// Default SSL context will have the root certificate from azure in truststore anyway
-			SSLContext defaultContext = SSLContext.getDefault();
-			StrictTLSContextSpi strictTlsContextSpi = new StrictTLSContextSpi(defaultContext);
-			SSLContext strictTlsContext = new StrictTLSContext(strictTlsContextSpi, defaultContext.getProvider(), defaultContext.getProtocol());
-			domain.setSslContext(strictTlsContext);
-			domain.setPeerAuthentication(SslDomain.VerifyMode.VERIFY_PEER_NAME);
-			SslPeerDetails peerDetails = Proton.sslPeerDetails(this.messagingFactory.getHostName(), this.getPort());
-			transport.ssl(domain, peerDetails);
-		} catch (NoSuchAlgorithmException e) {
-			// Should never happen
-			TRACE_LOGGER.error("Default SSL algorithm not found in JRE. Please check your JRE setup.", e);
-//			this.messagingFactory.onConnectionError(new ErrorCondition(AmqpErrorCode.InternalError, e.getMessage()));
+		if(VERIFY_MODE == SslDomain.VerifyMode.VERIFY_PEER_NAME)
+		{
+			try {
+				// Default SSL context will have the root certificate from azure in truststore anyway
+				SSLContext defaultContext = SSLContext.getDefault();
+				StrictTLSContextSpi strictTlsContextSpi = new StrictTLSContextSpi(defaultContext);
+				SSLContext strictTlsContext = new StrictTLSContext(strictTlsContextSpi, defaultContext.getProvider(), defaultContext.getProtocol());
+				domain.setSslContext(strictTlsContext);
+				domain.setPeerAuthentication(SslDomain.VerifyMode.VERIFY_PEER_NAME);
+				SslPeerDetails peerDetails = Proton.sslPeerDetails(this.messagingFactory.getHostName(), this.getPort());
+				transport.ssl(domain, peerDetails);
+			} catch (NoSuchAlgorithmException e) {
+				// Should never happen
+				TRACE_LOGGER.error("Default SSL algorithm not found in JRE. Please check your JRE setup.", e);
+//				this.messagingFactory.onConnectionError(new ErrorCondition(AmqpErrorCode.InternalError, e.getMessage()));
+			}
+		}
+		else
+		{
+			domain.setPeerAuthentication(VERIFY_MODE);
+			transport.ssl(domain);
 		}
 	}
 
