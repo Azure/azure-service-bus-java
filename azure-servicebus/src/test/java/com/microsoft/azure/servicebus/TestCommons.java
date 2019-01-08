@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -181,6 +182,32 @@ public class TestCommons {
 		IMessage receivedMessage = receiver.receive();
 		Assert.assertNotNull("Message not received", receivedMessage);
 		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+		receiver.complete(receivedMessage.getLockToken());
+		receivedMessage = receiver.receive(SHORT_WAIT_TIME);
+		Assert.assertNull("Message was not properly completed", receivedMessage);
+	}
+	
+	public static void testBasicReceiveAndCompleteMessageWithProperties(IMessageSender sender, String sessionId, IMessageReceiver receiver) throws InterruptedException, ServiceBusException, ExecutionException
+	{		
+		String messageId = UUID.randomUUID().toString();
+		Message message = new Message("AMQP message");
+		message.setMessageId(messageId);
+		if(sessionId != null)
+		{
+			message.setSessionId(sessionId);
+		}
+		HashMap<String, String> messageProps = new HashMap<>();
+		messageProps.put("key1", "value1");
+		messageProps.put("key2", null); // Some customers are using it this way
+		message.setProperties(messageProps);
+		sender.send(message);
+				
+		IMessage receivedMessage = receiver.receive();
+		Assert.assertNotNull("Message not received", receivedMessage);
+		Assert.assertEquals("Message Id did not match", messageId, receivedMessage.getMessageId());
+		Map<String, String> receivedProps = receivedMessage.getProperties();
+		Assert.assertEquals("All sent properties not recieved", "value1", receivedProps.get("key1"));
+		Assert.assertNull("Property with null value not received",  receivedProps.get("key2"));
 		receiver.complete(receivedMessage.getLockToken());
 		receivedMessage = receiver.receive(SHORT_WAIT_TIME);
 		Assert.assertNull("Message was not properly completed", receivedMessage);

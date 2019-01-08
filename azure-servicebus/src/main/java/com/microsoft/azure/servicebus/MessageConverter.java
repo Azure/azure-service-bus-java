@@ -145,7 +145,14 @@ class MessageConverter
 				}
 				else
 				{
-					convertedProperties.put(entry.getKey(), entry.getValue().toString());
+					if(entry.getValue() == null)
+					{
+						convertedProperties.put(entry.getKey(), null);
+					}
+					else
+					{
+						convertedProperties.put(entry.getKey(), entry.getValue().toString());
+					}
 				}
 			}
 			
