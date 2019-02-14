@@ -1,5 +1,4 @@
 package com.microsoft.azure.servicebus;
-
 public class SubscriptionClientSessionTests extends ClientSessionTests{
     @Override
     public String getEntityNamePrefix() {
@@ -8,7 +7,7 @@ public class SubscriptionClientSessionTests extends ClientSessionTests{
 
     @Override
     public boolean isEntityQueue() {
-        return true;
+        return false;
     }
 
     @Override

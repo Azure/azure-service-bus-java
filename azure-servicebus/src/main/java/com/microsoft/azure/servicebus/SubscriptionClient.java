@@ -2,22 +2,26 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 package com.microsoft.azure.servicebus;
 
+import java.net.URI;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder;
+import com.microsoft.azure.servicebus.primitives.MessagingEntityType;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.MiscRequestResponseOperationHandler;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 import com.microsoft.azure.servicebus.primitives.StringUtil;
+import com.microsoft.azure.servicebus.primitives.Util;
 import com.microsoft.azure.servicebus.rules.Filter;
 import com.microsoft.azure.servicebus.rules.RuleDescription;
 
@@ -36,7 +40,7 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 
 	private SubscriptionClient(ReceiveMode receiveMode, String subscriptionPath)
 	{
-		super(StringUtil.getShortRandomString(), null);		
+		super(StringUtil.getShortRandomString());		
 		this.receiveMode = receiveMode;
 		this.subscriptionPath = subscriptionPath;
 	}
@@ -45,12 +49,27 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	{
 		this(receiveMode, amqpConnectionStringBuilder.getEntityPath());
 		CompletableFuture<MessagingFactory> factoryFuture = MessagingFactory.createFromConnectionStringBuilderAsync(amqpConnectionStringBuilder);
-		Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f)));
+		Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f), MessagingFactory.INTERNAL_THREAD_POOL));
 		if(TRACE_LOGGER.isInfoEnabled())
         {
             TRACE_LOGGER.info("Created subscription client to connection string '{}'", amqpConnectionStringBuilder.toLoggableString());
         }
 	}
+	
+	public SubscriptionClient(String namespace, String subscriptionPath, ClientSettings clientSettings, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+    {
+        this(Util.convertNamespaceToEndPointURI(namespace), subscriptionPath, clientSettings, receiveMode);
+    }
+    
+    public SubscriptionClient(URI namespaceEndpointURI, String subscriptionPath, ClientSettings clientSettings, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
+    {
+        this(receiveMode, subscriptionPath);
+        CompletableFuture<MessagingFactory> factoryFuture = MessagingFactory.createFromNamespaceEndpointURIAsyc(namespaceEndpointURI, clientSettings);
+        Utils.completeFuture(factoryFuture.thenComposeAsync((f) -> this.createPumpAndBrowserAsync(f), MessagingFactory.INTERNAL_THREAD_POOL));
+        if (TRACE_LOGGER.isInfoEnabled()) {
+            TRACE_LOGGER.info("Created subscription client to subscription '{}/{}'", namespaceEndpointURI.toString(), subscriptionPath);
+        }
+    }
 	
 	SubscriptionClient(MessagingFactory factory, String subscriptionPath, ReceiveMode receiveMode) throws InterruptedException, ServiceBusException
 	{
@@ -62,12 +81,12 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	private CompletableFuture<Void> createPumpAndBrowserAsync(MessagingFactory factory)
 	{
 	    this.factory = factory;
-		CompletableFuture<Void> postSessionBrowserFuture = MiscRequestResponseOperationHandler.create(factory, this.subscriptionPath).thenAcceptAsync((msoh) -> {
+		CompletableFuture<Void> postSessionBrowserFuture = MiscRequestResponseOperationHandler.create(factory, this.subscriptionPath, MessagingEntityType.SUBSCRIPTION).thenAcceptAsync((msoh) -> {
 			this.miscRequestResponseHandler = msoh;
-			this.sessionBrowser = new SessionBrowser(factory, this.subscriptionPath, msoh);
-		});		
+			this.sessionBrowser = new SessionBrowser(factory, this.subscriptionPath, MessagingEntityType.SUBSCRIPTION, msoh);
+		}, MessagingFactory.INTERNAL_THREAD_POOL);		
 		
-		this.messageAndSessionPump = new MessageAndSessionPump(factory, this.subscriptionPath, receiveMode);
+		this.messageAndSessionPump = new MessageAndSessionPump(factory, this.subscriptionPath, MessagingEntityType.SUBSCRIPTION, receiveMode);
 		CompletableFuture<Void> messagePumpInitFuture = this.messageAndSessionPump.initializeAsync();
 		
 		return CompletableFuture.allOf(postSessionBrowserFuture, messagePumpInitFuture);
@@ -127,25 +146,49 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 		return this.miscRequestResponseHandler.getRulesAsync(skip, top);
 	}
 
+	@Deprecated
 	@Override
 	public void registerMessageHandler(IMessageHandler handler) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.registerMessageHandler(handler);		
 	}
 
+	@Deprecated
 	@Override
 	public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.registerMessageHandler(handler, handlerOptions);		
 	}
 
+	@Deprecated
 	@Override
 	public void registerSessionHandler(ISessionHandler handler) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.registerSessionHandler(handler);		
 	}
 
+	@Deprecated
 	@Override
 	public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.registerSessionHandler(handler, handlerOptions);		
 	}
+	
+	@Override
+    public void registerMessageHandler(IMessageHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerMessageHandler(handler, executorService);
+    }
+
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerMessageHandler(handler, handlerOptions, executorService);
+    }
+
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerSessionHandler(handler, executorService);
+    }
+
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.messageAndSessionPump.registerSessionHandler(handler, handlerOptions, executorService);
+    }
 
 	// No op now
 	@Override
@@ -184,8 +227,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public void abandon(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.abandon(lockToken, transaction);
+	}
+
+	@Override
 	public void abandon(UUID lockToken, Map<String, Object> propertiesToModify)	throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.abandon(lockToken, propertiesToModify);		
+	}
+
+	@Override
+	public void abandon(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction)	throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.abandon(lockToken, propertiesToModify, transaction);
 	}
 
 	@Override
@@ -194,8 +247,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public CompletableFuture<Void> abandonAsync(UUID lockToken, TransactionContext transaction) {
+		return this.messageAndSessionPump.abandonAsync(lockToken, transaction);
+	}
+
+	@Override
 	public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
 		return this.messageAndSessionPump.abandonAsync(lockToken, propertiesToModify);
+	}
+
+	@Override
+	public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
+		return this.messageAndSessionPump.abandonAsync(lockToken, propertiesToModify, transaction);
 	}
 
 	@Override
@@ -204,8 +267,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public void complete(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.complete(lockToken, transaction);
+	}
+
+	@Override
 	public CompletableFuture<Void> completeAsync(UUID lockToken) {
 		return this.messageAndSessionPump.completeAsync(lockToken);
+	}
+
+	@Override
+	public CompletableFuture<Void> completeAsync(UUID lockToken, TransactionContext transaction) {
+		return this.messageAndSessionPump.completeAsync(lockToken, transaction);
 	}
 
 //	@Override
@@ -234,8 +307,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public void deadLetter(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.deadLetter(lockToken, transaction);
+	}
+
+	@Override
 	public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.deadLetter(lockToken, propertiesToModify);		
+	}
+
+	@Override
+	public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.deadLetter(lockToken, propertiesToModify, transaction);
 	}
 
 	@Override
@@ -244,8 +327,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
+	}
+
+	@Override
 	public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
 		this.messageAndSessionPump.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);		
+	}
+
+	@Override
+	public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+		this.messageAndSessionPump.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
 	}
 
 	@Override
@@ -254,8 +347,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, TransactionContext transaction) {
+		return this.messageAndSessionPump.deadLetterAsync(lockToken, transaction);
+	}
+
+	@Override
 	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
 		return this.messageAndSessionPump.deadLetterAsync(lockToken, propertiesToModify);
+	}
+
+	@Override
+	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
+		return this.messageAndSessionPump.deadLetterAsync(lockToken, propertiesToModify, transaction);
 	}
 
 	@Override
@@ -264,8 +367,18 @@ public final class SubscriptionClient extends InitializableEntity implements ISu
 	}
 
 	@Override
+	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) {
+		return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
+	}
+
+	@Override
 	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason,	String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
 		return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+	}
+
+	@Override
+	public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason,	String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) {
+		return this.messageAndSessionPump.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
 	}
 	
 	@Override

@@ -6,6 +6,9 @@ package com.microsoft.azure.servicebus;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.jar.JarException;
 
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
 
@@ -16,41 +19,96 @@ interface IMessageAndSessionPump {
 
     /**
      * Receive messages continuously from the entity. Registers a message handler and begins a new thread to receive messages.
+     * IMessageHandler methods are executed on java.util.concurrent.commonPool()
      *
      * @param handler The {@link IMessageHandler} instance
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if register failed
+     * @deprecated Use {@link #registerMessageHandler(IMessageHandler, ExecutorService)}
      */
+	@Deprecated
     public void registerMessageHandler(IMessageHandler handler) throws InterruptedException, ServiceBusException;
+    
+    /**
+     * Receive messages continuously from the entity. Registers a message handler and begins a new thread to receive messages.
+     * IMessageHandler methods are executed on the passed executor service.
+     *
+     * @param handler The {@link IMessageHandler} instance
+     * @param executorService ExecutorService which is used to execute {@link IMessageHandler} methods.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if register failed
+     */
+    public void registerMessageHandler(IMessageHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException;
 
     /**
      * Receive messages continuously from the entity. Registers a message handler and begins a new thread to receive messages.
+     * IMessageHandler methods are executed on java.util.concurrent.commonPool()
      *
      * @param handler        The {@link IMessageHandler} instance
      * @param handlerOptions {@link MessageHandlerOptions}
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if register failed
      */
+    @Deprecated
     public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException;
+    
+    /**
+     * Receive messages continuously from the entity. Registers a message handler and begins a new thread to receive messages.
+     * IMessageHandler methods are executed on the passed executor service.
+     *
+     * @param handler        The {@link IMessageHandler} instance
+     * @param handlerOptions {@link MessageHandlerOptions}
+     * @param executorService ExecutorService which is used to execute {@link IMessageHandler} methods
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if register failed
+     */
+    public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException;
 
     /**
-     * Receive session messages continously from the queue. Registers a message handler and begins a new thread to receive session-messages.
-     *
+     * Receive session messages continuously from the queue. Registers a message handler and begins a new thread to receive session-messages.
+     * ISessionHandler methods are executed on java.util.concurrent.commonPool()
+     * 
      * @param handler The {@link ISessionHandler} instance
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if register failed
      */
+    @Deprecated
     public void registerSessionHandler(ISessionHandler handler) throws InterruptedException, ServiceBusException;
+    
+    /**
+     * Receive session messages continuously from the queue. Registers a message handler and begins a new thread to receive session-messages.
+     * ISessionHandler methods are executed on the passed executor service.
+     *
+     * @param handler The {@link ISessionHandler} instance
+     * @param executorService ExecutorService which is used to execute {@link ISessionHandler} methods
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if register failed
+     */
+    public void registerSessionHandler(ISessionHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException;
 
     /**
-     * Receive session messages continously from the queue. Registers a message handler and begins a new thread to receive session-messages.
+     * Receive session messages continuously from the queue. Registers a message handler and begins a new thread to receive session-messages.
+     * ISessionHandler methods are executed on java.util.concurrent.commonPool()
      *
      * @param handler        The {@link ISessionHandler} instance
      * @param handlerOptions {@link SessionHandlerOptions}
      * @throws InterruptedException if the current thread was interrupted while waiting
      * @throws ServiceBusException  if register failed
      */
+    @Deprecated
     public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException;
+    
+    /**
+     * Receive session messages continuously from the queue. Registers a message handler and begins a new thread to receive session-messages.
+     * ISessionHandler methods are executed on the passed executor service.
+     *
+     * @param handler        The {@link ISessionHandler} instance
+     * @param handlerOptions {@link SessionHandlerOptions}
+     * @param executorService ExecutorService which is used to execute {@link ISessionHandler} methods
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if register failed
+     */
+    public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException;
 
     /**
      * Abandon {@link Message} with lock token. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message
@@ -60,6 +118,16 @@ interface IMessageAndSessionPump {
      * @throws ServiceBusException  if abandon failed
      */
     void abandon(UUID lockToken) throws InterruptedException, ServiceBusException;
+
+    /**
+     * Abandon {@link Message} with lock token. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if abandon failed
+     */
+    void abandon(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     /**
      * Abandon {@link Message} with lock token and updated message property. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message
@@ -72,12 +140,32 @@ interface IMessageAndSessionPump {
     void abandon(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
     /**
+     * Abandon {@link Message} with lock token and updated message property. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message
+     *
+     * @param lockToken          Message lock token {@link Message#getLockToken()}
+     * @param propertiesToModify Message properties to modify.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if abandon failed
+     */
+    void abandon(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
+    /**
      * Asynchronously abandon {@link Message} with lock token. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message.
      *
      * @param lockToken Message lock token {@link Message#getLockToken()}
      * @return a CompletableFuture representing the pending abandon.
      */
     CompletableFuture<Void> abandonAsync(UUID lockToken);
+
+    /**
+     * Asynchronously abandon {@link Message} with lock token. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending abandon.
+     */
+    CompletableFuture<Void> abandonAsync(UUID lockToken, TransactionContext transaction);
 
     /**
      * Asynchronously abandon {@link Message} with lock token and updated message property. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message.
@@ -89,6 +177,16 @@ interface IMessageAndSessionPump {
     CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify);
 
     /**
+     * Asynchronously abandon {@link Message} with lock token and updated message property. This will make the message available again for processing. Abandoning a message will increase the delivery count on the message.
+     *
+     * @param lockToken          Message lock token {@link Message#getLockToken()}
+     * @param propertiesToModify Message properties to modify.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending abandon.
+     */
+    CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction);
+
+    /**
      * Completes a {@link Message} using its lock token. This will delete the message from the service.
      *
      * @param lockToken Message lock token {@link Message#getLockToken()}
@@ -98,12 +196,31 @@ interface IMessageAndSessionPump {
     void complete(UUID lockToken) throws InterruptedException, ServiceBusException;
 
     /**
+     * Completes a {@link Message} using its lock token. This will delete the message from the service.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if abandon failed
+     */
+    void complete(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
+    /**
      * Asynchronously completes a {@link Message} using its lock token. This will delete the message from the service.
      *
      * @param lockToken Message lock token {@link Message#getLockToken()}
      * @return a CompletableFuture representing the pending complete.
      */
     CompletableFuture<Void> completeAsync(UUID lockToken);
+
+    /**
+     * Asynchronously completes a {@link Message} using its lock token. This will delete the message from the service.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending complete.
+     */
+    CompletableFuture<Void> completeAsync(UUID lockToken, TransactionContext transaction);
 
 //    void defer(UUID lockToken) throws InterruptedException, ServiceBusException;
 //
@@ -136,6 +253,16 @@ interface IMessageAndSessionPump {
     void deadLetter(UUID lockToken) throws InterruptedException, ServiceBusException;
 
     /**
+     * Moves a {@link Message} to the deadletter sub-queue.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if deadletter failed
+     */
+    void deadLetter(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
+    /**
      * Moves a {@link Message} to the deadletter sub-queue with modified message properties.
      *
      * @param lockToken          Message lock token {@link Message#getLockToken()}
@@ -144,6 +271,17 @@ interface IMessageAndSessionPump {
      * @throws ServiceBusException  if deadletter failed
      */
     void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
+
+    /**
+     * Moves a {@link Message} to the deadletter sub-queue with modified message properties.
+     *
+     * @param lockToken          Message lock token {@link Message#getLockToken()}
+     * @param propertiesToModify Message properties to modify.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if deadletter failed
+     */
+    void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     /**
      * Moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description.
@@ -155,6 +293,18 @@ interface IMessageAndSessionPump {
      * @throws ServiceBusException  if deadletter failed
      */
     void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription) throws InterruptedException, ServiceBusException;
+
+    /**
+     * Moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description.
+     *
+     * @param lockToken                  Message lock token {@link Message#getLockToken()}
+     * @param deadLetterReason           The deadletter reason.
+     * @param deadLetterErrorDescription The deadletter error description.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if deadletter failed
+     */
+    void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) throws InterruptedException, ServiceBusException;
 
     /**
      * Moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description and modified properties.
@@ -169,12 +319,34 @@ interface IMessageAndSessionPump {
     void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException;
 
     /**
+     * Moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description and modified properties.
+     *
+     * @param lockToken                  Message lock token {@link Message#getLockToken()}
+     * @param deadLetterReason           The deadletter reason.
+     * @param deadLetterErrorDescription The deadletter error description.
+     * @param propertiesToModify         Message properties to modify.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @throws InterruptedException if the current thread was interrupted while waiting
+     * @throws ServiceBusException  if deadletter failed
+     */
+    void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException;
+
+    /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter.
      *
      * @param lockToken Message lock token {@link Message#getLockToken()}
      * @return a CompletableFuture representing the pending deadletter.
      */
     CompletableFuture<Void> deadLetterAsync(UUID lockToken);
+
+    /**
+     * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter.
+     *
+     * @param lockToken Message lock token {@link Message#getLockToken()}
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending deadletter.
+     */
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, TransactionContext transaction);
 
     /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with modified properties.
@@ -184,6 +356,16 @@ interface IMessageAndSessionPump {
      * @return a CompletableFuture representing the pending deadletter.
      */
     CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify);
+
+    /**
+     * Asynchronously moves a {@link Message} to the deadletter sub-queue with modified properties.
+     *
+     * @param lockToken          Message lock token {@link Message#getLockToken()}
+     * @param propertiesToModify Message properties to modify.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending deadletter.
+     */
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction);
 
     /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description.
@@ -196,6 +378,17 @@ interface IMessageAndSessionPump {
     CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription);
 
     /**
+     * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description.
+     *
+     * @param lockToken                  Message lock token {@link Message#getLockToken()}
+     * @param deadLetterReason           The deadletter reason.
+     * @param deadLetterErrorDescription The deadletter error description.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending deadletter.
+     */
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction);
+
+    /**
      * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description and modified properties.
      *
      * @param lockToken                  Message lock token {@link Message#getLockToken()}
@@ -205,6 +398,18 @@ interface IMessageAndSessionPump {
      * @return a CompletableFuture representing the pending deadletter.
      */
     CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify);
+
+    /**
+     * Asynchronously moves a {@link Message} to the deadletter sub-queue with deadletter reason and error description and modified properties.
+     *
+     * @param lockToken                  Message lock token {@link Message#getLockToken()}
+     * @param deadLetterReason           The deadletter reason.
+     * @param deadLetterErrorDescription The deadletter error description.
+     * @param propertiesToModify         Message properties to modify.
+     * @param transaction {@link TransactionContext} which this operation should enlist to.
+     * @return a CompletableFuture representing the pending deadletter.
+     */
+    CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction);
 
     /**
      * Get the prefetch value set.

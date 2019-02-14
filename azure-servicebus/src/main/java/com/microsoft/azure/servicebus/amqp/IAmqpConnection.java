@@ -4,11 +4,14 @@
  */
 package com.microsoft.azure.servicebus.amqp;
 
+import com.microsoft.azure.servicebus.ClientSettings;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.Link;
 
 public interface IAmqpConnection
 {
+	String getHostName();
+	
 	void onConnectionOpen();
 
 	void onConnectionError(ErrorCondition error);

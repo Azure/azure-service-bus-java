@@ -18,16 +18,13 @@ public abstract class ClientEntity
 {
 	private final String clientId;
 	private final Object syncClose;
-	private final ClientEntity parent;
 
 	private boolean isClosing;
 	private boolean isClosed;
 
-	protected ClientEntity(final String clientId, final ClientEntity parent)
+	protected ClientEntity(final String clientId)
 	{
 		this.clientId = clientId;
-		this.parent = parent;
-
 		this.syncClose = new Object();
 	}
 
@@ -39,21 +36,19 @@ public abstract class ClientEntity
 	}
 
 	protected boolean getIsClosed()
-	{
-		final boolean isParentClosed = this.parent != null && this.parent.getIsClosed();
+	{		
 		synchronized (this.syncClose)
 		{
-			return isParentClosed || this.isClosed;
+			return this.isClosed;
 		}
 	}
-
-	// returns true even if the Parent is (being) Closed
+	
 	protected boolean getIsClosingOrClosed()
 	{
-		final boolean isParentClosingOrClosed = this.parent != null && this.parent.getIsClosingOrClosed();
+		
 		synchronized (this.syncClose)
 		{
-			return isParentClosingOrClosed || this.isClosing || this.isClosed;
+			return this.isClosing || this.isClosed;
 		}
 	}
 
@@ -88,7 +83,7 @@ public abstract class ClientEntity
 					ClientEntity.this.isClosing = false;
 					ClientEntity.this.isClosed = true;
 				}
-			}});
+			}}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 
 	public final void close() throws ServiceBusException
@@ -127,7 +122,7 @@ public abstract class ClientEntity
 	{
 		if (this.getIsClosingOrClosed())
 		{
-			throw new IllegalStateException(String.format(Locale.US, "Operation not allowed after the %s instance is Closed.", this.getClass().getName()), cause);
+			throw new IllegalStateException(String.format(Locale.US, "Operation not allowed after the %s instance is closed.", this.getClass().getName()), cause);
 		}
 	}
 	

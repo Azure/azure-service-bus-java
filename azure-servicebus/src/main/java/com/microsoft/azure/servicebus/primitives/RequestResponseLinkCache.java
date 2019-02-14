@@ -2,53 +2,75 @@ package com.microsoft.azure.servicebus.primitives;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.qpid.proton.amqp.Symbol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class RequestResponseLinkcache 
+class RequestResponseLinkCache
 {
-    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(RequestResponseLinkcache.class);
-    
+    private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(RequestResponseLinkCache.class);
+
     private Object lock = new Object();
-    private final MessagingFactory underlyingFactory;    
+    private final MessagingFactory underlyingFactory;
     private HashMap<String, RequestResponseLinkWrapper> pathToRRLinkMap;
-    
-    public RequestResponseLinkcache(MessagingFactory underlyingFactory)
+
+    public RequestResponseLinkCache(MessagingFactory underlyingFactory)
     {
         this.underlyingFactory = underlyingFactory;
         this.pathToRRLinkMap = new HashMap<>();
     }
-    
-    public CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath)
+
+    public CompletableFuture<RequestResponseLink> obtainRequestResponseLinkAsync(String entityPath, String transferEntityPath, MessagingEntityType entityType)
     {
         RequestResponseLinkWrapper wrapper;
+        String mapKey;
+        if (transferEntityPath != null)
+        {
+            mapKey = entityPath + ":" + transferEntityPath;
+        }
+        else
+        {
+            mapKey = entityPath;
+        }
+
         synchronized (lock)
         {
-            wrapper = this.pathToRRLinkMap.get(entityPath);
+            wrapper = this.pathToRRLinkMap.get(mapKey);
             if(wrapper == null)
             {
-                wrapper = new RequestResponseLinkWrapper(this.underlyingFactory, entityPath);
-                this.pathToRRLinkMap.put(entityPath, wrapper);            
+                wrapper = new RequestResponseLinkWrapper(this.underlyingFactory, entityPath, transferEntityPath, entityType);
+                this.pathToRRLinkMap.put(mapKey, wrapper);
             }
         }
         return wrapper.acquireReferenceAsync();
     }
-    
-    public void releaseRequestResponseLink(String entityPath)
+
+    public void releaseRequestResponseLink(String entityPath, String transferEntityPath)
     {
+        String mapKey;
+        if (transferEntityPath != null)
+        {
+            mapKey = entityPath + ":" + transferEntityPath;
+        }
+        else
+        {
+            mapKey = entityPath;
+        }
+
         RequestResponseLinkWrapper wrapper;
         synchronized (lock)
         {
-            wrapper = this.pathToRRLinkMap.get(entityPath);
+            wrapper = this.pathToRRLinkMap.get(mapKey);
         }
         if(wrapper != null)
         {
             wrapper.releaseReference();
         }
     }
-    
+
     public CompletableFuture<Void> freeAsync()
     {
         TRACE_LOGGER.info("Closing all cached request-response links");
@@ -57,11 +79,11 @@ class RequestResponseLinkcache
         {
             closeFutures.add(wrapper.forceCloseAsync());
         }
-        
+
         this.pathToRRLinkMap.clear();
         return CompletableFuture.allOf(closeFutures.toArray(new CompletableFuture[0]));
     }
-    
+
     private void removeWrapperFromCache(String entityPath)
     {
         synchronized (lock)
@@ -69,60 +91,102 @@ class RequestResponseLinkcache
             this.pathToRRLinkMap.remove(entityPath);
         }
     }
-    
+
     private class RequestResponseLinkWrapper
     {
         private Object lock = new Object();
         private final MessagingFactory underlyingFactory;
         private final String entityPath;
+        private final String transferEntityPath;
+        private final MessagingEntityType entityType;
         private RequestResponseLink requestResponseLink;
         private int referenceCount;
         private ArrayList<CompletableFuture<RequestResponseLink>> waiters;
-        
-        public RequestResponseLinkWrapper(MessagingFactory underlyingFactory, String entityPath)
+        private boolean isClosed;
+
+        public RequestResponseLinkWrapper(MessagingFactory underlyingFactory, String entityPath, String transferEntityPath, MessagingEntityType entityType)
         {
             this.underlyingFactory = underlyingFactory;
             this.entityPath = entityPath;
+            this.transferEntityPath = transferEntityPath;
+            this.entityType = entityType;
             this.requestResponseLink = null;
             this.referenceCount = 0;
             this.waiters = new ArrayList<>();
+            this.isClosed = false;
             this.createRequestResponseLinkAsync();
         }
-        
+
         private void createRequestResponseLinkAsync()
         {
             String requestResponseLinkPath = RequestResponseLink.getManagementNodeLinkPath(this.entityPath);
+            String sasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, this.underlyingFactory.getHostName(), this.entityPath);
+
+            String transferDestinationSasTokenAudienceURI = null;
+            Map<Symbol, Object> additionalProperties = null;
+            if (this.transferEntityPath != null) {
+                transferDestinationSasTokenAudienceURI = String.format(ClientConstants.SAS_TOKEN_AUDIENCE_FORMAT, this.underlyingFactory.getHostName(), this.transferEntityPath);
+                additionalProperties = new HashMap<>();
+                additionalProperties.put(ClientConstants.LINK_TRANSFER_DESTINATION_PROPERTY, this.transferEntityPath);
+            }
+
             TRACE_LOGGER.debug("Creating requestresponselink to '{}'", requestResponseLinkPath);
-            RequestResponseLink.createAsync(this.underlyingFactory, StringUtil.getShortRandomString() + "-RequestResponse", requestResponseLinkPath).handleAsync((rrlink, ex) ->
+            RequestResponseLink.createAsync(
+                    this.underlyingFactory,
+                    StringUtil.getShortRandomString() + "-RequestResponse",
+                    requestResponseLinkPath,
+                    sasTokenAudienceURI,
+                    transferDestinationSasTokenAudienceURI,
+                    additionalProperties,
+                    this.entityType).handleAsync((rrlink, ex) ->
             {
                 synchronized (this.lock)
                 {
                     if(ex == null)
                     {
                         TRACE_LOGGER.info("Created requestresponselink to '{}'", requestResponseLinkPath);
-                        this.requestResponseLink = rrlink;
-                        for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
+                        if(this.isClosed)
                         {
-                            this.referenceCount++;
-                            waiter.complete(this.requestResponseLink);
+                        	// Factory is likely closed. Close the link too
+                        	rrlink.closeAsync();
+                        }
+                        else
+                        {
+                        	this.requestResponseLink = rrlink;
+                            this.completeWaiters(null);
                         }
                     }
                     else
                     {
                         Throwable cause = ExceptionUtil.extractAsyncCompletionCause(ex);
                         TRACE_LOGGER.error("Creating requestresponselink to '{}' failed.", requestResponseLinkPath, cause);
-                        RequestResponseLinkcache.this.removeWrapperFromCache(this.entityPath);
-                        for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
-                        {
-                            waiter.completeExceptionally(cause);
-                        }
+                        RequestResponseLinkCache.this.removeWrapperFromCache(this.entityPath);
+                        this.completeWaiters(cause);
                     }
                 }
                 
                 return null;
-            });
+            }, MessagingFactory.INTERNAL_THREAD_POOL);
         }
         
+        private void completeWaiters(Throwable exception)
+        {
+        	for(CompletableFuture<RequestResponseLink> waiter : this.waiters)
+            {
+        		if(exception == null)
+        		{
+        			this.referenceCount++;
+        			AsyncUtil.completeFuture(waiter, this.requestResponseLink);
+        		}
+        		else
+        		{
+        			AsyncUtil.completeFutureExceptionally(waiter, exception);
+        		}
+            }
+        	
+        	this.waiters.clear();
+        }
+
         public CompletableFuture<RequestResponseLink> acquireReferenceAsync()
         {
             synchronized (this.lock)
@@ -140,24 +204,37 @@ class RequestResponseLinkcache
                 }
             }
         }
-        
+
         public void releaseReference()
-        {            
+        {
             synchronized (this.lock)
             {
                 if(--this.referenceCount == 0)
                 {
-                    RequestResponseLinkcache.this.removeWrapperFromCache(this.entityPath);
+                    RequestResponseLinkCache.this.removeWrapperFromCache(this.entityPath);
                     TRACE_LOGGER.info("Closing requestresponselink to '{}'", this.requestResponseLink.getLinkPath());
                     this.requestResponseLink.closeAsync();
                 }
             }
         }
-        
+
         public CompletableFuture<Void> forceCloseAsync()
         {
             TRACE_LOGGER.info("Force closing requestresponselink to '{}'", this.requestResponseLink.getLinkPath());
-            return this.requestResponseLink.closeAsync();
+            this.isClosed = true;
+            if(this.waiters.size() > 0)
+            {
+            	this.completeWaiters(new ServiceBusException(false, "MessagingFactory closed."));
+            }
+            
+            if(this.requestResponseLink != null)
+            {
+            	return this.requestResponseLink.closeAsync();
+            }
+            else
+            {
+            	return CompletableFuture.completedFuture(null);
+            }
         }
     }
 }

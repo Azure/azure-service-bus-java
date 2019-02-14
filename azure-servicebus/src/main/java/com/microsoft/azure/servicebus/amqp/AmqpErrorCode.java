@@ -16,6 +16,7 @@ public final class AmqpErrorCode
 	public static final Symbol InternalError = Symbol.getSymbol("amqp:internal-error");
 	public static final Symbol IllegalState = Symbol.getSymbol("amqp:illegal-state");
 	public static final Symbol NotImplemented = Symbol.getSymbol("amqp:not-implemented");
+	public static final Symbol DecodeError = Symbol.getSymbol("amqp:decode-error");
 
 	// link errors
 	public static final Symbol Stolen = Symbol.getSymbol("amqp:link:stolen");
@@ -24,4 +25,7 @@ public final class AmqpErrorCode
 
 	// connection errors
 	public static final Symbol ConnectionForced = Symbol.getSymbol("amqp:connection:forced");
+	public static final Symbol FramingError = Symbol.getSymbol("amqp:connection:framing-error");
+	// proton library IOExceptions while performing operations on SocketChannel (in IOHandler.java)
+	public static final Symbol ProtonIOError = Symbol.getSymbol("proton:io");
 }

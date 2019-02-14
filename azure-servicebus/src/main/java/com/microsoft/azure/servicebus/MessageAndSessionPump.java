@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledFuture;
 
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.ExceptionUtil;
 import com.microsoft.azure.servicebus.primitives.MessageLockLostException;
+import com.microsoft.azure.servicebus.primitives.MessagingEntityType;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.OperationCancelledException;
 import com.microsoft.azure.servicebus.primitives.ServiceBusException;
@@ -27,17 +30,17 @@ import com.microsoft.azure.servicebus.primitives.TimerType;
 
 class MessageAndSessionPump extends InitializableEntity implements IMessageAndSessionPump {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(MessageAndSessionPump.class);
-    // Larger value means few receive calls to the internal receiver and better.
-    private static final Duration MESSAGE_RECEIVE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration MINIMUM_MESSAGE_LOCK_VALIDITY = Duration.ofSeconds(4);
     private static final Duration MAXIMUM_RENEW_LOCK_BUFFER = Duration.ofSeconds(10);
     private static final Duration SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION = Duration.ofMinutes(1);
     private static final int UNSET_PREFETCH_COUNT = -1; // Means prefetch count not set
+    private static final CompletableFuture<Void> COMPLETED_FUTURE = CompletableFuture.completedFuture(null);
 
     private final ConcurrentHashMap<String, IMessageSession> openSessions;
     private final MessagingFactory factory;
     private final String entityPath;
     private final ReceiveMode receiveMode;
+    private final MessagingEntityType entityType;
     private IMessageReceiver innerReceiver;
 
     private boolean handlerRegistered = false;
@@ -46,29 +49,45 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
     private MessageHandlerOptions messageHandlerOptions;
     private SessionHandlerOptions sessionHandlerOptions;
     private int prefetchCount;
+    private ExecutorService customCodeExecutor;
 
-    public MessageAndSessionPump(MessagingFactory factory, String entityPath, ReceiveMode receiveMode) {
-        super(StringUtil.getShortRandomString(), null);
+    public MessageAndSessionPump(MessagingFactory factory, String entityPath, MessagingEntityType entityType, ReceiveMode receiveMode) {
+        super(StringUtil.getShortRandomString());
         this.factory = factory;
         this.entityPath = entityPath;
+        this.entityType = entityType;
         this.receiveMode = receiveMode;
         this.openSessions = new ConcurrentHashMap<>();
         this.prefetchCount = UNSET_PREFETCH_COUNT;
     }
 
+    @Deprecated
     @Override
     public void registerMessageHandler(IMessageHandler handler) throws InterruptedException, ServiceBusException {
         this.registerMessageHandler(handler, new MessageHandlerOptions());
+    }    
+    
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.registerMessageHandler(handler, new MessageHandlerOptions(), executorService);
     }
 
+    @Deprecated
     @Override
     public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
-        TRACE_LOGGER.info("Registering message handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
+    	this.registerMessageHandler(handler, handlerOptions, ForkJoinPool.commonPool());
+    }
+    
+    @Override
+    public void registerMessageHandler(IMessageHandler handler, MessageHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+    	assertNonNulls(handler, handlerOptions, executorService);
+    	TRACE_LOGGER.info("Registering message handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
         this.setHandlerRegistered();
         this.messageHandler = handler;
         this.messageHandlerOptions = handlerOptions;
+        this.customCodeExecutor = executorService;
 
-        this.innerReceiver = ClientFactory.createMessageReceiverFromEntityPath(this.factory, this.entityPath, this.receiveMode);
+        this.innerReceiver = ClientFactory.createMessageReceiverFromEntityPath(this.factory, this.entityPath, this.entityType, this.receiveMode);
         TRACE_LOGGER.info("Created MessageReceiver to entity '{}'", this.entityPath);
         if(this.prefetchCount != UNSET_PREFETCH_COUNT)
         {
@@ -79,21 +98,43 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         }
     }
 
+    @Deprecated
     @Override
     public void registerSessionHandler(ISessionHandler handler) throws InterruptedException, ServiceBusException {
         this.registerSessionHandler(handler, new SessionHandlerOptions());
+    }    
+    
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+        this.registerSessionHandler(handler, new SessionHandlerOptions(), executorService);
     }
 
+    @Deprecated
     @Override
     public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions) throws InterruptedException, ServiceBusException {
-        TRACE_LOGGER.info("Registering session handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
+    	this.registerSessionHandler(handler, handlerOptions, ForkJoinPool.commonPool());
+    }
+    
+    @Override
+    public void registerSessionHandler(ISessionHandler handler, SessionHandlerOptions handlerOptions, ExecutorService executorService) throws InterruptedException, ServiceBusException {
+    	assertNonNulls(handler, handlerOptions, executorService);
+    	TRACE_LOGGER.info("Registering session handler on entity '{}' with '{}'", this.entityPath, handlerOptions);
         this.setHandlerRegistered();
         this.sessionHandler = handler;
         this.sessionHandlerOptions = handlerOptions;
+        this.customCodeExecutor = executorService;
 
         for (int i = 0; i < handlerOptions.getMaxConcurrentSessions(); i++) {
-            this.acceptSessionsAndPumpMessage();
+            this.acceptSessionAndPumpMessages();
         }
+    }
+    
+    private static void assertNonNulls(Object handler, Object options, ExecutorService executorService)
+    {
+    	if(handler == null || options == null || executorService == null)
+    	{
+    		throw new IllegalArgumentException("None of the arguments can be null.");
+    	}
     }
 
     private synchronized void setHandlerRegistered() {
@@ -109,7 +150,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
     private void receiveAndPumpMessage() {
         if (!this.getIsClosingOrClosed()) {
-            CompletableFuture<IMessage> receiveMessageFuture = this.innerReceiver.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
+            CompletableFuture<IMessage> receiveMessageFuture = this.innerReceiver.receiveAsync(this.messageHandlerOptions.getMessageWaitDuration());
             receiveMessageFuture.handleAsync((message, receiveEx) -> {
                 if (receiveEx != null) {
                     receiveEx = ExceptionUtil.extractAsyncCompletionCause(receiveEx);
@@ -136,11 +177,17 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         CompletableFuture<Void> onMessageFuture;
                         try {
                             TRACE_LOGGER.debug("Invoking onMessage with message containing sequence number '{}'", message.getSequenceNumber());
-                            onMessageFuture = this.messageHandler.onMessageAsync(message);
+                            onMessageFuture = COMPLETED_FUTURE.thenComposeAsync((v) -> this.messageHandler.onMessageAsync(message), this.customCodeExecutor);
                         } catch (Exception onMessageSyncEx) {
                             TRACE_LOGGER.error("Invocation of onMessage with message containing sequence number '{}' threw unexpected exception", message.getSequenceNumber(), onMessageSyncEx);
                             onMessageFuture = new CompletableFuture<Void>();
                             onMessageFuture.completeExceptionally(onMessageSyncEx);
+                        }
+                        
+                        // Some clients are returning null from the call
+                        if(onMessageFuture == null)
+                        {
+                            onMessageFuture = COMPLETED_FUTURE;
                         }
 
                         onMessageFuture.handleAsync((v, onMessageEx) -> {
@@ -187,26 +234,26 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                                     }
                                     this.receiveAndPumpMessage();
                                     return null;
-                                });
+                                }, MessagingFactory.INTERNAL_THREAD_POOL);
                             } else {
                                 this.receiveAndPumpMessage();
                             }
 
                             return null;
-                        });
+                        }, MessagingFactory.INTERNAL_THREAD_POOL);
                     }
 
                 }
 
                 return null;
-            });
+            }, MessagingFactory.INTERNAL_THREAD_POOL);
         }
     }
 
-    private void acceptSessionsAndPumpMessage() {
+    private void acceptSessionAndPumpMessages() {
         if (!this.getIsClosingOrClosed()) {
             TRACE_LOGGER.debug("Accepting a session from entity '{}'", this.entityPath);
-            CompletableFuture<IMessageSession> acceptSessionFuture = ClientFactory.acceptSessionFromEntityPathAsync(this.factory, this.entityPath, null, this.receiveMode);
+            CompletableFuture<IMessageSession> acceptSessionFuture = ClientFactory.acceptSessionFromEntityPathAsync(this.factory, this.entityPath, this.entityType, null, this.receiveMode);
             acceptSessionFuture.handleAsync((session, acceptSessionEx) -> {
                 if (acceptSessionEx != null) {
                     acceptSessionEx = ExceptionUtil.extractAsyncCompletionCause(acceptSessionEx);
@@ -222,7 +269,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         // In case of any other exception, sleep and retry
                         TRACE_LOGGER.debug("AcceptSession from entity '{}' will be retried after '{}'.", this.entityPath, SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION);
                         Timer.schedule(() -> {
-                            MessageAndSessionPump.this.acceptSessionsAndPumpMessage();
+                            MessageAndSessionPump.this.acceptSessionAndPumpMessages();
                         }, SLEEP_DURATION_ON_ACCEPT_SESSION_EXCEPTION, TimerType.OneTimeRun);
                     }
                 } else {
@@ -247,14 +294,14 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                 }
 
                 return null;
-            });
+            }, MessagingFactory.INTERNAL_THREAD_POOL);
         }
     }
 
     private void receiveFromSessionAndPumpMessage(SessionTracker sessionTracker) {
         if (!this.getIsClosingOrClosed()) {
             IMessageSession session = sessionTracker.getSession();
-            CompletableFuture<IMessage> receiverFuture = session.receiveAsync(MessageAndSessionPump.MESSAGE_RECEIVE_TIMEOUT);
+            CompletableFuture<IMessage> receiverFuture = session.receiveAsync(this.sessionHandlerOptions.getMessageWaitDuration());
             receiverFuture.handleAsync((message, receiveEx) -> {
                 if (receiveEx != null) {
                     receiveEx = ExceptionUtil.extractAsyncCompletionCause(receiveEx);
@@ -264,7 +311,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         if (shouldRetry) {
                             this.receiveFromSessionAndPumpMessage(sessionTracker);
                         }
-                    });
+                    }, MessagingFactory.INTERNAL_THREAD_POOL);
                 } else {
                     if (message == null) {
                         TRACE_LOGGER.debug("Receive from from session '{}' on entity '{}' returned no messages.", session.getSessionId(), this.entityPath);
@@ -272,7 +319,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                             if (shouldRetry) {
                                 this.receiveFromSessionAndPumpMessage(sessionTracker);
                             }
-                        });
+                        }, MessagingFactory.INTERNAL_THREAD_POOL);
                     } else {
                         TRACE_LOGGER.trace("Message with sequence number '{}' received from session '{}' on entity '{}'.", message.getSequenceNumber(), session.getSessionId(), this.entityPath);
                         sessionTracker.notifyMessageReceived();
@@ -286,13 +333,19 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         TRACE_LOGGER.debug("Invoking onMessage with message containing sequence number '{}'", message.getSequenceNumber());
                         CompletableFuture<Void> onMessageFuture;
                         try {
-                            onMessageFuture = this.sessionHandler.onMessageAsync(session, message);
+                            onMessageFuture = COMPLETED_FUTURE.thenComposeAsync((v) -> this.sessionHandler.onMessageAsync(session, message), this.customCodeExecutor);
                         } catch (Exception onMessageSyncEx) {
                             TRACE_LOGGER.error("Invocation of onMessage with message containing sequence number '{}' threw unexpected exception", message.getSequenceNumber(), onMessageSyncEx);
                             onMessageFuture = new CompletableFuture<Void>();
                             onMessageFuture.completeExceptionally(onMessageSyncEx);
                         }
 
+                        // Some clients are returning null from the call
+                        if(onMessageFuture == null)
+                        {
+                            onMessageFuture = COMPLETED_FUTURE;
+                        }
+                        
                         onMessageFuture.handleAsync((v, onMessageEx) -> {
                             renewCancelTimer.cancel(true);
                             if (onMessageEx != null) {
@@ -334,19 +387,19 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                                     }
                                     this.receiveFromSessionAndPumpMessage(sessionTracker);
                                     return null;
-                                });
+                                }, MessagingFactory.INTERNAL_THREAD_POOL);
                             } else {
                                 this.receiveFromSessionAndPumpMessage(sessionTracker);
                             }
 
                             return null;
-                        });
+                        }, MessagingFactory.INTERNAL_THREAD_POOL);
                     }
 
                 }
 
                 return null;
-            });
+            }, MessagingFactory.INTERNAL_THREAD_POOL);
         }
     }
 
@@ -413,11 +466,17 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         TimerType.OneTimeRun);
                 CompletableFuture<Void> onCloseFuture;
                 try {
-                    onCloseFuture = this.messageAndSessionPump.sessionHandler.OnCloseSessionAsync(session);
+                    onCloseFuture = COMPLETED_FUTURE.thenComposeAsync((v) -> this.messageAndSessionPump.sessionHandler.OnCloseSessionAsync(session), this.messageAndSessionPump.customCodeExecutor);
                 } catch (Exception onCloseSyncEx) {
                     TRACE_LOGGER.error("Invocation of onCloseSession on session '{}' threw unexpected exception", this.session.getSessionId(), onCloseSyncEx);
                     onCloseFuture = new CompletableFuture<Void>();
                     onCloseFuture.completeExceptionally(onCloseSyncEx);
+                }
+                
+                // Some clients are returning null from the call
+                if(onCloseFuture == null)
+                {
+                    onCloseFuture = COMPLETED_FUTURE;
                 }
 
                 onCloseFuture.handleAsync((v, onCloseEx) -> {
@@ -441,11 +500,11 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                         }
 
                         this.messageAndSessionPump.openSessions.remove(this.session.getSessionId());
-                        this.messageAndSessionPump.acceptSessionsAndPumpMessage();
+                        this.messageAndSessionPump.acceptSessionAndPumpMessages();
                         return null;
-                    });
+                    }, MessagingFactory.INTERNAL_THREAD_POOL);
                     return null;
-                });
+                }, MessagingFactory.INTERNAL_THREAD_POOL);
 
             }
 
@@ -539,7 +598,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                             }
 
                             return null;
-                        });
+                        }, MessagingFactory.INTERNAL_THREAD_POOL);
                     }, renewInterval, TimerType.OneTimeRun);
                 }
             }
@@ -594,7 +653,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                             }
 
                             return null;
-                        });
+                        }, MessagingFactory.INTERNAL_THREAD_POOL);
                     }, renewInterval, TimerType.OneTimeRun);
                 }
             }
@@ -603,38 +662,68 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
     @Override
     public void abandon(UUID lockToken) throws InterruptedException, ServiceBusException {
+        this.abandon(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void abandon(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.abandon(lockToken);
+        this.innerReceiver.abandon(lockToken, transaction);
     }
 
     @Override
     public void abandon(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
+        this.abandon(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void abandon(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.abandon(lockToken, propertiesToModify);
+        this.innerReceiver.abandon(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public CompletableFuture<Void> abandonAsync(UUID lockToken) {
+        return this.abandonAsync(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> abandonAsync(UUID lockToken, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.abandonAsync(lockToken);
+        return this.innerReceiver.abandonAsync(lockToken, transaction);
     }
 
     @Override
     public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
+        return this.abandonAsync(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> abandonAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.abandonAsync(lockToken, propertiesToModify);
+        return this.innerReceiver.abandonAsync(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public void complete(UUID lockToken) throws InterruptedException, ServiceBusException {
+        this.complete(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void complete(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.complete(lockToken);
+        this.innerReceiver.complete(lockToken, transaction);
     }
 
     @Override
     public CompletableFuture<Void> completeAsync(UUID lockToken) {
+        return this.completeAsync(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> completeAsync(UUID lockToken, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.completeAsync(lockToken);
+        return this.innerReceiver.completeAsync(lockToken, transaction);
     }
 
     //	@Override
@@ -663,48 +752,90 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
 
     @Override
     public void deadLetter(UUID lockToken) throws InterruptedException, ServiceBusException {
-        this.innerReceiver.deadLetter(lockToken);
+        this.deadLetter(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.checkInnerReceiveCreated();
+        this.innerReceiver.deadLetter(lockToken, transaction);
     }
 
     @Override
     public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
-        this.innerReceiver.deadLetter(lockToken, propertiesToModify);
+        this.deadLetter(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
+        this.checkInnerReceiveCreated();
+        this.innerReceiver.deadLetter(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription) throws InterruptedException, ServiceBusException {
+        this.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription);
+        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
     }
 
     @Override
     public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) throws InterruptedException, ServiceBusException {
+        this.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public void deadLetter(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) throws InterruptedException, ServiceBusException {
         this.checkInnerReceiveCreated();
-        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+        this.innerReceiver.deadLetter(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken) {
+        return this.deadLetterAsync(lockToken, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken);
+        return this.innerReceiver.deadLetterAsync(lockToken, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify) {
+        return this.deadLetterAsync(lockToken, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, Map<String, Object> propertiesToModify, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, propertiesToModify);
+        return this.innerReceiver.deadLetterAsync(lockToken, propertiesToModify, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription) {
+        return this.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription);
+        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, transaction);
     }
 
     @Override
     public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify) {
+        return  this.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, TransactionContext.NULL_TXN);
+    }
+
+    @Override
+    public CompletableFuture<Void> deadLetterAsync(UUID lockToken, String deadLetterReason, String deadLetterErrorDescription, Map<String, Object> propertiesToModify, TransactionContext transaction) {
         this.checkInnerReceiveCreated();
-        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify);
+        return this.innerReceiver.deadLetterAsync(lockToken, deadLetterReason, deadLetterErrorDescription, propertiesToModify, transaction);
     }
 
     private void checkInnerReceiveCreated() {
@@ -716,13 +847,13 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
     // Don't notify handler if the pump is already closed
     private void notifyExceptionToSessionHandler(Throwable ex, ExceptionPhase phase) {
         if (!(ex instanceof IllegalStateException && this.getIsClosingOrClosed())) {
-            this.sessionHandler.notifyException(ex, phase);
+            this.customCodeExecutor.execute(() -> {this.sessionHandler.notifyException(ex, phase);});
         }
     }
 
     private void notifyExceptionToMessageHandler(Throwable ex, ExceptionPhase phase) {
         if (!(ex instanceof IllegalStateException && this.getIsClosingOrClosed())) {
-            this.messageHandler.notifyException(ex, phase);
+        	this.customCodeExecutor.execute(() -> {this.messageHandler.notifyException(ex, phase);});            
         }
     }
 

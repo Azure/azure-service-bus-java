@@ -11,9 +11,9 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.microsoft.azure.servicebus.primitives.MessagingEntityType;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.MiscRequestResponseOperationHandler;
-import com.microsoft.azure.servicebus.primitives.Pair;
 
 final class SessionBrowser {
     private static final Logger TRACE_LOGGER = LoggerFactory.getLogger(SessionBrowser.class);
@@ -23,11 +23,13 @@ final class SessionBrowser {
 
     private final MessagingFactory messagingFactory;
     private final String entityPath;
+    private final MessagingEntityType entityType;
     private MiscRequestResponseOperationHandler miscRequestResponseHandler;
 
-    SessionBrowser(MessagingFactory messagingFactory, String entityPath, MiscRequestResponseOperationHandler miscRequestResponseHandler) {
+    SessionBrowser(MessagingFactory messagingFactory, String entityPath, MessagingEntityType entityType, MiscRequestResponseOperationHandler miscRequestResponseHandler) {
         this.messagingFactory = messagingFactory;
         this.entityPath = entityPath;
+        this.entityType = entityType;
         this.miscRequestResponseHandler = miscRequestResponseHandler;
     }
 
@@ -52,12 +54,12 @@ final class SessionBrowser {
                 int initFutureIndex = 0;
                 String newLastSessionId = sessionIds[sessionIds.length - 1];
                 for (String sessionId : sessionIds) {
-                    BrowsableMessageSession browsableSession = new BrowsableMessageSession(sessionId, this.messagingFactory, this.entityPath);
+                    BrowsableMessageSession browsableSession = new BrowsableMessageSession(sessionId, this.messagingFactory, this.entityPath, this.entityType);
                     sessionsList.add(browsableSession);
                     initFutures[initFutureIndex++] = browsableSession.initializeAsync();
                 }
                 CompletableFuture<Void> allInitFuture = CompletableFuture.allOf(initFutures);
-                return allInitFuture.thenComposeAsync((v) -> getMessageSessionsAsync(lastUpdatedTime, newLastReceivedSkip, newLastSessionId)).thenApply((c) -> {
+                return allInitFuture.thenComposeAsync((v) -> getMessageSessionsAsync(lastUpdatedTime, newLastReceivedSkip, newLastSessionId), MessagingFactory.INTERNAL_THREAD_POOL).thenApply((c) -> {
                     sessionsList.addAll(c);
                     return sessionsList;
                 });
@@ -65,6 +67,6 @@ final class SessionBrowser {
                 TRACE_LOGGER.debug("Got no browsable sessions from entity '{}'", this.entityPath);
                 return CompletableFuture.completedFuture(sessionsList);
             }
-        });
+        }, MessagingFactory.INTERNAL_THREAD_POOL);
     }
 }

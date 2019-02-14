@@ -6,6 +6,8 @@
 package com.microsoft.azure.servicebus.primitives;
 
 import java.lang.reflect.Array;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -31,9 +33,17 @@ import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.apache.qpid.proton.amqp.messaging.Data;
 import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
 import org.apache.qpid.proton.amqp.messaging.Section;
+import org.apache.qpid.proton.amqp.transaction.Declare;
+import org.apache.qpid.proton.amqp.transaction.Discharge;
 import org.apache.qpid.proton.engine.Delivery;
+import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.message.Message;
+
+import com.microsoft.azure.servicebus.ClientSettings;
+import com.microsoft.azure.servicebus.security.SecurityConstants;
+import com.microsoft.azure.servicebus.security.SharedAccessSignatureTokenProvider;
+import com.microsoft.azure.servicebus.security.TokenProvider;
 
 public class Util
 {
@@ -81,6 +91,11 @@ public class Util
 			return Short.BYTES;
 		}
 		
+		if (obj instanceof Boolean)
+		{
+			return 1;
+		}
+		
 		if (obj instanceof Character)
 		{
 			return 4;
@@ -121,6 +136,18 @@ public class Util
 		if (obj instanceof Binary)
 		{
 			return ((Binary)obj).getLength();
+		}
+
+		if (obj instanceof Declare)
+		{
+			// Empty declare command takes up 7 bytes.
+			return 7;
+		}
+
+		if (obj instanceof Discharge)
+		{
+			Discharge discharge = (Discharge) obj;
+			return 12 + discharge.getTxnId().getLength();
 		}
 		
 		if (obj instanceof Map)
@@ -345,20 +372,20 @@ public class Util
 		return annotationsSize + applicationPropertiesSize + payloadSize;
 	}
 	
-	static Pair<byte[], Integer> encodeMessageToOptimalSizeArray(Message message) throws PayloadSizeExceededException
+	static Pair<byte[], Integer> encodeMessageToOptimalSizeArray(Message message, int maxMessageSize) throws PayloadSizeExceededException
 	{
 		int payloadSize = Util.getDataSerializedSize(message);
-		int allocationSize = Math.min(payloadSize + ClientConstants.MAX_EVENTHUB_AMQP_HEADER_SIZE_BYTES, ClientConstants.MAX_MESSAGE_LENGTH_BYTES);
+		int allocationSize = Math.min(payloadSize + ClientConstants.MAX_MESSAGING_AMQP_HEADER_SIZE_BYTES, maxMessageSize);
 		byte[] encodedBytes = new byte[allocationSize];
 		int encodedSize = encodeMessageToCustomArray(message, encodedBytes, 0, allocationSize);
 		return new Pair<byte[], Integer>(encodedBytes, encodedSize);
 	}
 	
-	static Pair<byte[], Integer> encodeMessageToMaxSizeArray(Message message) throws PayloadSizeExceededException
+	static Pair<byte[], Integer> encodeMessageToMaxSizeArray(Message message, int maxMessageSize) throws PayloadSizeExceededException
 	{
 		// May be we should reduce memory allocations. Use a pool of byte arrays or something
-		byte[] encodedBytes = new byte[ClientConstants.MAX_MESSAGE_LENGTH_BYTES];
-		int encodedSize = encodeMessageToCustomArray(message, encodedBytes, 0, ClientConstants.MAX_MESSAGE_LENGTH_BYTES);
+		byte[] encodedBytes = new byte[maxMessageSize];
+		int encodedSize = encodeMessageToCustomArray(message, encodedBytes, 0, maxMessageSize);
 		return new Pair<byte[], Integer>(encodedBytes, encodedSize);
 	}
 	
@@ -370,12 +397,12 @@ public class Util
 		}
 		catch(BufferOverflowException exception)
 		{
-			throw new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s kb", ClientConstants.MAX_MESSAGE_LENGTH_BYTES / 1024), exception);		
+			throw new PayloadSizeExceededException(String.format("Size of the payload exceeded Maximum message size: %s KB", length / 1024), exception);		
 		}
 	}
 
 	// Pass little less than client timeout to the server so client doesn't time out before server times out
-	static Duration adjustServerTimeout(Duration clientTimeout)
+	public static Duration adjustServerTimeout(Duration clientTimeout)
 	{
 		return clientTimeout.minusMillis(100);
 	}
@@ -392,4 +419,67 @@ public class Util
         message.decode(buffer, 0, read);
         return message;	    
 	}
+
+    public static URI convertNamespaceToEndPointURI(String namespaceName)
+    {
+        try
+        {
+            return new URI(String.format(Locale.US, ClientConstants.END_POINT_FORMAT, namespaceName));
+        }
+        catch(URISyntaxException exception)
+        {
+            throw new IllegalConnectionStringFormatException(
+                    String.format(Locale.US, "Invalid namespace name: %s", namespaceName),
+                    exception);
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    public static ClientSettings getClientSettingsFromConnectionStringBuilder(ConnectionStringBuilder builder)
+    {
+        TokenProvider tokenProvider;
+        if(builder.getSharedAccessSignatureToken() == null)
+        {
+            tokenProvider = new SharedAccessSignatureTokenProvider(builder.getSasKeyName(), builder.getSasKey(), SecurityConstants.DEFAULT_SAS_TOKEN_VALIDITY_IN_SECONDS);
+        }
+        else
+        {
+            tokenProvider = new SharedAccessSignatureTokenProvider(builder.getSharedAccessSignatureToken(), Instant.now().plus(Duration.ofSeconds(SecurityConstants.DEFAULT_SAS_TOKEN_VALIDITY_IN_SECONDS)));
+        }
+        
+        return new ClientSettings(tokenProvider, builder.getRetryPolicy(), builder.getOperationTimeout(), builder.getTransportType());
+    }
+
+    static int getTokenRenewIntervalInSeconds(int tokenValidityInSeconds)
+    {
+        if(tokenValidityInSeconds >= 300)
+        {
+            return tokenValidityInSeconds - 30;
+        }
+        else if(tokenValidityInSeconds >= 60)
+        {
+            return tokenValidityInSeconds - 10;
+        }
+        else
+        {
+            return (tokenValidityInSeconds - 1) > 0 ? tokenValidityInSeconds - 1 : 0;
+        }
+    }
+    
+    static int getMaxMessageSizeFromLink(Link link)
+    {
+    	UnsignedLong maxMessageSize = link.getRemoteMaxMessageSize();
+    	if(maxMessageSize != null)
+    	{
+    		int maxMessageSizeAsInt = maxMessageSize.intValue();
+    		// A value of 0 means no limit. Treating no limit as 1024 KB thus putting a cap on max message size
+    		if(maxMessageSizeAsInt > 0)
+    		{    			
+    			return maxMessageSizeAsInt;
+    		}    			
+    	}
+    	
+    	// Default if link doesn't have the value
+    	return ClientConstants.MAX_MESSAGE_LENGTH_BYTES;
+    }
 }
