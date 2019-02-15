@@ -657,6 +657,27 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
         return this.renewMessageLockBatchAsync(new UUID[] {lockToken}).thenApply((c) -> c.toArray(new Instant[0])[0]);
     }
 
+    public CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(Collection<? extends IMessage> messages) {
+        this.ensurePeekLockReceiveMode();
+
+        if(messages == null || messages.size() == 0)
+        {
+            throw new UnsupportedOperationException("Message collection is null or empty. Locks cannot be renewed.");
+        }
+
+        UUID[] lockTokens = new UUID[messages.size()];
+        int messageIndex = 0;
+        for (IMessage message : messages) {
+            UUID lockToken = message.getLockToken();
+            if (lockToken.equals(ClientConstants.ZEROLOCKTOKEN)) {
+                throw new UnsupportedOperationException("Lock of a message received in ReceiveAndDelete mode cannot be renewed.");
+            }
+            lockTokens[messageIndex++] = lockToken;
+        }
+
+        return this.renewMessageLockBatchAsync(lockTokens);
+    }
+
     private CompletableFuture<Collection<Instant>> renewMessageLockBatchAsync(UUID[] lockTokens) {
         this.ensurePeekLockReceiveMode();
 
@@ -683,6 +704,10 @@ class MessageReceiver extends InitializableEntity implements IMessageReceiver, I
             },
             MessagingFactory.INTERNAL_THREAD_POOL
         );
+    }
+
+    public Collection<Instant> renewMessageLockBatch(Collection<? extends IMessage> messages) throws InterruptedException, ServiceBusException {
+        return Utils.completeFuture(this.renewMessageLockBatchAsync(messages));
     }
 
     @Override
