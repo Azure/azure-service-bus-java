@@ -40,7 +40,7 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return Gets the path of the topic.
+     * @return the path of the topic.
      */
     public String getTopicPath() {
         return topicPath;
@@ -57,7 +57,7 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return Gets the subscription name.
+     * @return the subscription name.
      */
     public String getSubscriptionName() {
         return subscriptionName;
@@ -73,16 +73,16 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return Gets the path of the subscription, including the topic.
+     * @return the path of the subscription, including the topic.
      */
     public String getPath() {
         return EntityNameHelper.formatSubscriptionPath(this.topicPath, this.subscriptionName);
     }
 
     /**
-     * @return  Gets the duration of a peek lock receive. i.e., the amount of time that the message is locked by a given receiver
+     * The amount of time that the message is locked by a given receiver
      * so that no other receiver receives the same message.
-     * Default value is 60 seconds.
+     * @return The duration of a peek lock. Default value is 60 seconds.
      */
     public Duration getLockDuration()
     {
@@ -90,8 +90,9 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @param lockDuration - Sets the duration for which a message will be locked while receiving through a PeekLock receiver.
-     * Max value is 5 minutes.
+     * Sets The amount of time that the message is locked by a given receiver
+     * so that no other receiver receives the same message.
+     * @param lockDuration - The duration of a peek lock. Max value is 5 minutes.
      */
     public void setLockDuration(Duration lockDuration)
     {
@@ -116,13 +117,12 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return The default time to live value for the messages.
-     * This is the duration after which the message expires, starting from when
+     * Time-To-Live is the duration after which the message expires, starting from when
      * the message is sent to Service Bus.
      * This is the default value used when {@link IMessage#getTimeToLive()} is not set on a message itself.
      * Messages older than their TimeToLive value will expire and no longer be retained in the message store.
      * Subscribers will be unable to receive expired messages.
-     * Default value is {@link ManagementClientConstants#MAX_DURATION}
+     * @return The default time to live value for the messages. Default value is {@link ManagementClientConstants#MAX_DURATION}
      */
     public Duration getDefaultMessageTimeToLive() {
         return defaultMessageTimeToLive;
@@ -175,8 +175,8 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return Indicates whether this subscription has dead letter support when a message expires.
-     * If true, the expired messages are moved to dead-letter subqueue.
+     * Indicates whether this subscription has dead letter support when a message expires.
+     * @return If true, the expired messages are moved to dead-letter subqueue.
      * Default value is false.
      */
     public boolean isEnableDeadLetteringOnMessageExpiration() {
@@ -192,7 +192,7 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return Indicates whether messages need to be forwarded to dead-letter subqueue when subscription rule evaluation fails.
+     * @return boolean indicating whether messages need to be forwarded to dead-letter subqueue when subscription rule evaluation fails.
      * Default value is true.
      */
     public boolean isEnableDeadLetteringOnFilterEvaluationException() {
@@ -208,20 +208,20 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return The maximum delivery count of a message before it is dead-lettered.
+     * The maximum delivery count of a message before it is dead-lettered.
      * The delivery count is increased when a message is received in {@link com.microsoft.azure.servicebus.ReceiveMode#PEEKLOCK} mode
      * and didn't complete the message before the message lock expired.
-     * Default value is 10.
+     * @return Default value is 10.
      */
     public int getMaxDeliveryCount() {
         return maxDeliveryCount;
     }
 
     /**
-     * @param maxDeliveryCount - The maximum delivery count of a message before it is dead-lettered.
+     * The maximum delivery count of a message before it is dead-lettered.
      * The delivery count is increased when a message is received in {@link com.microsoft.azure.servicebus.ReceiveMode#PEEKLOCK} mode
      * and didn't complete the message before the message lock expired.
-     * Minimum value is 1.
+     * @param maxDeliveryCount - Minimum value is 1.
      */
     public void setMaxDeliveryCount(int maxDeliveryCount) {
         if (maxDeliveryCount < ManagementClientConstants.MIN_ALLOWED_MAX_DELIVERYCOUNT)
@@ -250,16 +250,16 @@ public class SubscriptionDescription {
     }
 
     /**
-     * @return The current status of the subscription (Enabled / Disabled).
+     * Gets the status of the entity. When an entity is disabled, that entity cannot send or receive messages.
+     * @return The current status of the queue (Enabled / Disabled).
      * The default value is Enabled.
-     * When an entity is disabled, that entity cannot send or receive messages.
      */
     public EntityStatus getEntityStatus() {
         return this.status;
     }
 
     /**
-     * @param status - Sets the status of the subscription (Enabled / Disabled).
+     * @param status - the status of the queue (Enabled / Disabled).
      * When an entity is disabled, that entity cannot send or receive messages.
      */
     public void setEntityStatus(EntityStatus status) {

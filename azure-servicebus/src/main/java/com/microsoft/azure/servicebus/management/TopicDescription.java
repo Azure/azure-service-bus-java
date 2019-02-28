@@ -34,7 +34,7 @@ public class TopicDescription {
     }
 
     /**
-     * @return Gets the path of the topic.
+     * @return the path of the topic.
      */
     public String getPath()
     {
@@ -42,7 +42,7 @@ public class TopicDescription {
     }
 
     /**
-     * @param path - Sets the path of topic.
+     * @param path - the path of topic.
      * Max length is 260 chars. Cannot start or end with a slash.
      * Cannot have restricted characters: '@','?','#','*'
      */
@@ -53,7 +53,7 @@ public class TopicDescription {
     }
 
     /**
-     * @return Gets the maximum size of the topic in megabytes, which is the size of memory allocated for the topic.
+     * @return the maximum size of the topic in megabytes, which is the size of memory allocated for the topic.
      * Default value is 1024.
      */
     public long getMaxSizeInMB() {
@@ -69,9 +69,9 @@ public class TopicDescription {
     }
 
     /**
-     * @return - This value indicates if the topic requires guard against duplicate messages. If true, duplicate messages
-     * having same {@link IMessage#getMessageId()} and sent to topic within duration of {@link #getDuplicationDetectionHistoryTimeWindow}
-     * will be discarded.
+     * If enabled, duplicate messages having same {@link IMessage#getMessageId()} and sent to queue
+     * within duration of {@link #getDuplicationDetectionHistoryTimeWindow} will be discarded.
+     * @return value indicating if the queue requires guard against duplicate messages.
      */
     public boolean isRequiresDuplicateDetection() {
         return requiresDuplicateDetection;
@@ -86,13 +86,12 @@ public class TopicDescription {
     }
 
     /**
-     * @return The default time to live value for the messages.
-     * This is the duration after which the message expires, starting from when
+     * Time-To-live is the duration after which the message expires, starting from when
      * the message is sent to Service Bus.
      * This is the default value used when {@link IMessage#getTimeToLive()} is not set on a message itself.
      * Messages older than their TimeToLive value will expire and no longer be retained in the message store.
      * Subscribers will be unable to receive expired messages.
-     * Default value is {@link ManagementClientConstants#MAX_DURATION}
+     * @return The default time to live value for the messages. Default value is {@link ManagementClientConstants#MAX_DURATION}
      */
     public Duration getDefaultMessageTimeToLive() {
         return defaultMessageTimeToLive;
@@ -203,16 +202,16 @@ public class TopicDescription {
     }
 
     /**
+     * Gets the status of the entity. When an entity is disabled, that entity cannot send or receive messages.
      * @return The current status of the topic (Enabled / Disabled).
      * The default value is Enabled.
-     * When an entity is disabled, that entity cannot send or receive messages.
      */
     public EntityStatus getEntityStatus() {
         return this.status;
     }
 
     /**
-     * @param status - Sets the status of the topic (Enabled / Disabled).
+     * @param status - the status of the topic (Enabled / Disabled).
      * When an entity is disabled, that entity cannot send or receive messages.
      */
     public void setEntityStatus(EntityStatus status) {
@@ -220,7 +219,7 @@ public class TopicDescription {
     }
 
     /**
-     * @return Indicates whether the topic is to be partitioned across multiple message brokers.
+     * @return boolean indicating whether the topic is to be partitioned across multiple message brokers.
      * Defaults to false
      */
     public boolean isEnablePartitioning() {
@@ -228,7 +227,7 @@ public class TopicDescription {
     }
 
     /**
-     * @param enablePartitioning - Indicates whether the topic is to be partitioned across multiple message brokers.
+     * @param enablePartitioning - true if topic is to be partitioned across multiple message brokers.
      */
     public void setEnablePartitioning(boolean enablePartitioning) {
         this.enablePartitioning = enablePartitioning;

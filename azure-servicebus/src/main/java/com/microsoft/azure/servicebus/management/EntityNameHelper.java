@@ -51,7 +51,7 @@ public class EntityNameHelper {
     /**
      * Formats the transfer dead letter path.
      * @param entityPath - Path of the entity whose transfer dead letter needs to be formatted.
-     * @return The path of the dead letter sub-queue for the entity
+     * @return The path of the transfer dead letter sub-queue for the entity
      */
     public static String formatTransferDeadLetterPath(String entityPath) {
         return String.join(pathDelimiter, entityPath, transferDeadLetterQueueName);

@@ -13,7 +13,7 @@ public abstract class EntityRuntimeInfo {
     String path;
 
     /**
-     * @return Gets the path of the entity.
+     * @return The path of the entity.
      */
     public String getPath() {
         return path;

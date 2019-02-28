@@ -918,7 +918,7 @@ public class ManagementClientAsync {
     /**
      * Deletes the queue described by the path relative to the service namespace base address.
      * @param path - The name of the entity relative to the service namespace base address.
-     * @return A completable future.
+     * @return A completable future that completes when the queue is deleted.
      * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
      */
     public CompletableFuture<Void> deleteQueueAsync(String path) {
@@ -929,7 +929,7 @@ public class ManagementClientAsync {
     /**
      * Deletes the topic described by the path relative to the service namespace base address.
      * @param path - The name of the entity relative to the service namespace base address.
-     * @return A completable future.
+     * @return A completable future that completes when the topic is deleted.
      * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
      */
     public CompletableFuture<Void> deleteTopicAsync(String path) {
@@ -941,7 +941,7 @@ public class ManagementClientAsync {
      * Deletes the subscription described by the topicPath and the subscriptionName.
      * @param topicPath - The name of the topic.
      * @param subscriptionName - The name of the subscription.
-     * @return A completable future.
+     * @return A completable future that completes when the subscription is deleted.
      * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
      */
     public CompletableFuture<Void> deleteSubscriptionAsync(String topicPath, String subscriptionName) {
@@ -956,7 +956,7 @@ public class ManagementClientAsync {
      * @param topicPath - The name of the topic.
      * @param subscriptionName - The name of the subscription.
      * @param ruleName - The name of the rule.
-     * @return A completable future.
+     * @return A completable future that completes when the rule is deleted.
      * @throws IllegalArgumentException - path is not null / empty / too long / invalid.
      */
     public CompletableFuture<Void> deleteRuleAsync(String topicPath, String subscriptionName, String ruleName) {
