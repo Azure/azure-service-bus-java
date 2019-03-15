@@ -1167,6 +1167,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	                	Throwable cause = ExceptionUtil.extractAsyncCompletionCause(sendTokenEx);
         				TRACE_LOGGER.error("Sending SAS Token to '{}' failed.", this.receivePath, cause);
 	                    this.receiveLinkReopenFuture.completeExceptionally(sendTokenEx);
+	                    this.clearAllPendingWorkItems(sendTokenEx);
 	                }
 	                else
 	                {
@@ -1214,7 +1215,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 		this.pendingUpdateStateRequests.remove(deliveryTagAsString);
 	}
 	
-	private void clearAllPendingWorkItems(Exception exception)
+	private void clearAllPendingWorkItems(Throwable exception)
 	{
 	    TRACE_LOGGER.info("Completeing all pending receive and updateState operation on the receiver to '{}'", this.receivePath);
 		final boolean isTransientException = exception == null ||
