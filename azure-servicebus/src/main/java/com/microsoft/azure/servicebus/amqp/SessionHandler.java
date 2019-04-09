@@ -39,6 +39,11 @@ public class SessionHandler extends BaseHandler
 	public void onSessionLocalClose(Event e)
 	{		
 		TRACE_LOGGER.debug("onSessionLocalClose - entityName: {}, condition: {}", this.name, e.getSession().getCondition() == null ? "none" : e.getSession().getCondition().toString());
+		Session session = e.getSession();
+		if (session != null)
+		{
+			checkAndFreeSession(session);
+		}
 	}
 
 	@Override
@@ -47,9 +52,14 @@ public class SessionHandler extends BaseHandler
 		TRACE_LOGGER.debug("onSessionRemoteClose - entityName: {}, condition: {}", this.name, e.getSession().getCondition() == null ? "none" : e.getSession().getCondition().toString());
 
 		Session session = e.getSession();
-		if (session != null && session.getLocalState() != EndpointState.CLOSED)
+		if (session != null)
 		{
-			session.close();
+			if(session.getLocalState() != EndpointState.CLOSED)
+			{
+				session.close();
+			}
+			
+			checkAndFreeSession(session);
 		}
 	}
 
@@ -57,5 +67,18 @@ public class SessionHandler extends BaseHandler
 	public void onSessionFinal(Event e)
 	{ 
 	    TRACE_LOGGER.debug("onSessionFinal - entityName: {}", this.name);
+	    Session session = e.getSession();
+	    if(session != null)
+	    {
+	    	session.attachments().clear();
+	    }
+	}
+	
+	private static void checkAndFreeSession(Session session)
+	{
+		if(session.getLocalState() == EndpointState.CLOSED && session.getRemoteState() == EndpointState.CLOSED)
+		{
+			session.free();
+		}
 	}
 }
