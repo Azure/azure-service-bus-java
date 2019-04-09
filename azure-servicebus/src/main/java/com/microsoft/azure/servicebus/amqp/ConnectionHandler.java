@@ -7,10 +7,7 @@ package com.microsoft.azure.servicebus.amqp;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
-
 import javax.net.ssl.SSLContext;
-
-import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.TransportType;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
@@ -222,6 +219,11 @@ public class ConnectionHandler extends BaseHandler
 	@Override
     public void onConnectionFinal(Event event) {
 	    TRACE_LOGGER.debug("onConnectionFinal: hostname:{}", event.getConnection().getHostname());
+	    Connection connection = event.getConnection();
+	    if(connection != null)
+	    {
+	    	connection.attachments().clear();
+	    }
     }
 	
 	@Override
