@@ -21,11 +21,12 @@ public class BaseLinkHandler extends BaseHandler {
     @Override
     public void onLinkLocalClose(Event event) {
         Link link = event.getLink();
-        if (link != null) {            
+        if (link != null) {
             TRACE_LOGGER.debug("local link close. linkName:{}", link.getName());
+            
+            checkAndFreeLink(link);
+            closeSession(link);
         }
-
-        closeSession(link);
     }
 
     @Override
@@ -40,8 +41,9 @@ public class BaseLinkHandler extends BaseHandler {
 
             ErrorCondition condition = link.getRemoteCondition();
             this.processOnClose(link, condition);
+            checkAndFreeLink(link);
             closeSession(link);
-        }        
+        }
     }
 
     @Override
@@ -57,7 +59,16 @@ public class BaseLinkHandler extends BaseHandler {
             this.processOnClose(link, link.getRemoteCondition());
             closeSession(link);
         }
-        
+    }
+    
+    @Override
+    public void onLinkFinal(Event event)
+    {
+    	Link link = event.getLink();
+    	if(link != null)
+    	{
+    		link.attachments().clear();
+    	}
     }
 
     public void processOnClose(Link link, ErrorCondition condition) {
@@ -72,8 +83,15 @@ public class BaseLinkHandler extends BaseHandler {
         this.underlyingEntity.onError(exception);
     }
 
-    private void closeSession(Link link) {
+    private static void closeSession(Link link) {
         if (link.getSession() != null && link.getSession().getLocalState() != EndpointState.CLOSED)
             link.getSession().close();
+    }
+    
+    private static void checkAndFreeLink(Link link) {
+        if (link.getLocalState() == EndpointState.CLOSED && link.getRemoteState() == EndpointState.CLOSED)
+        {
+        	link.free();
+        }
     }
 }

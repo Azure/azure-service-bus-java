@@ -21,7 +21,7 @@ public class ReactorHandler extends BaseHandler
 	{		
 		TRACE_LOGGER.debug("reactor.onReactorInit");
 
-		final Reactor reactor = e.getReactor();
+		Reactor reactor = e.getReactor();
 		reactor.setTimeout(ClientConstants.REACTOR_IO_POLL_TIMEOUT);
 	}
 
@@ -29,5 +29,10 @@ public class ReactorHandler extends BaseHandler
 	public void onReactorFinal(Event e)
 	{		
 		TRACE_LOGGER.debug("reactor.onReactorFinal");
+		Reactor reactor = e.getReactor();
+		if(reactor != null)
+		{
+			reactor.attachments().clear();
+		}
 	}
 }
