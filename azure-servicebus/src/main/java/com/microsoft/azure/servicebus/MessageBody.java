@@ -113,4 +113,52 @@ public class MessageBody implements Serializable{
     public MessageBodyType getBodyType() {
         return bodyType;
     }
+	
+    
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+			+ ((binaryData == null) ? 0 : binaryData.hashCode());
+		result = prime * result
+			+ ((bodyType == null) ? 0 : bodyType.hashCode());
+		result = prime * result
+			+ ((sequenceData == null) ? 0 : sequenceData.hashCode());
+		result = prime * result
+			+ ((valueData == null) ? 0 : valueData.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		MessageBody other = (MessageBody) obj;
+		if (binaryData == null) {
+			if (other.binaryData != null)
+				return false;
+		}
+		else if (!binaryData.equals(other.binaryData))
+			return false;
+		if (bodyType != other.bodyType)
+			return false;
+		if (sequenceData == null) {
+			if (other.sequenceData != null)
+				return false;
+		}
+		else if (!sequenceData.equals(other.sequenceData))
+			return false;
+		if (valueData == null) {
+			if (other.valueData != null)
+				return false;
+		}
+		else if (!valueData.equals(other.valueData))
+			return false;
+		return true;
+	}	
 }
