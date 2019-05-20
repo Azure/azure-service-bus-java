@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 import com.microsoft.azure.servicebus.primitives.SASUtil;
+import com.microsoft.azure.servicebus.primitives.StringUtil;
 
 /**
  * This is a token provider that generates Shared Access Signature(SAS) tokens or reuses an already generated SAS token.
@@ -34,7 +35,7 @@ public class SharedAccessSignatureTokenProvider extends TokenProvider
      */
     public SharedAccessSignatureTokenProvider(String sasKeyName, String sasKey, int tokenValidityInSeconds)
     {
-        if (sasKeyName == null || sasKeyName.isEmpty()) {
+        if (StringUtil.isNullOrEmpty(sasKeyName)) {
             throw new IllegalArgumentException("sasKeyName cannot be empty");
         }
 
@@ -42,7 +43,7 @@ public class SharedAccessSignatureTokenProvider extends TokenProvider
             throw new IllegalArgumentException("sasKeyName cannot be greater than " + SecurityConstants.MAX_KEY_NAME_LENGTH + " characters.");
         }
 
-        if (sasKey == null || sasKey.isEmpty()) {
+        if (StringUtil.isNullOrEmpty(sasKey)) {
             throw new IllegalArgumentException("sasKeyName cannot be empty");
         }
 
