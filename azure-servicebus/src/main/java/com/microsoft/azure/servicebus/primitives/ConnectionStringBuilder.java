@@ -52,12 +52,25 @@ public class ConnectionStringBuilder
 	private final static String ENTITY_PATH_CONFIG_NAME = "EntityPath";
 	private final static String OPERATION_TIMEOUT_CONFIG_NAME = "OperationTimeout";
 	private final static String RETRY_POLICY_CONFIG_NAME = "RetryPolicy";
+	private static final String AUTHENTICATION_CONFIG_NAME = "Authentication";
 	private final static String KEY_VALUE_SEPARATOR = "=";
 	private final static String KEY_VALUE_PAIR_DELIMITER = ";";
 
-	private static final String ALL_KEY_ENUMERATE_REGEX = "(" + HOSTNAME_CONFIG_NAME + "|" +  ENDPOINT_CONFIG_NAME + "|" + SHARED_ACCESS_KEY_NAME_CONFIG_NAME
-			+ "|" + SHARED_ACCESS_KEY_CONFIG_NAME + "|"  + SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + "|" + ENTITY_PATH_CONFIG_NAME + "|" + OPERATION_TIMEOUT_CONFIG_NAME
-			+ "|" + RETRY_POLICY_CONFIG_NAME + "|" + ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME + "|" + TRANSPORT_TYPE_CONFIG_NAME + "|" +")";
+	private static final String ALL_KEY_ENUMERATE_REGEX = "(" + 
+		String.join("|", 
+			HOSTNAME_CONFIG_NAME,
+			ENDPOINT_CONFIG_NAME,
+			SHARED_ACCESS_KEY_NAME_CONFIG_NAME,
+			SHARED_ACCESS_KEY_CONFIG_NAME,
+			SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME,
+			ENTITY_PATH_CONFIG_NAME,
+			OPERATION_TIMEOUT_CONFIG_NAME,
+			RETRY_POLICY_CONFIG_NAME,
+			ALTERNATE_SHARED_ACCESS_SIGNATURE_TOKEN_CONFIG_NAME,
+			TRANSPORT_TYPE_CONFIG_NAME,
+			AUTHENTICATION_CONFIG_NAME,
+			")"
+		);
 
 	private static final String KEYS_WITH_DELIMITERS_REGEX = KEY_VALUE_PAIR_DELIMITER + ALL_KEY_ENUMERATE_REGEX	+ KEY_VALUE_SEPARATOR;
 
@@ -71,6 +84,7 @@ public class ConnectionStringBuilder
 	private Duration operationTimeout;
 	private RetryPolicy retryPolicy;
 	private TransportType transportType;
+	private String authentication;
 	
 	/**
 	 * Default operation timeout if timeout is not specified in the connection string. 30 seconds.
@@ -330,6 +344,20 @@ public class ConnectionStringBuilder
 		return this;
 	}
 
+    /**
+	 * @return Returns the authentication method.
+	 */
+	public String getAuthentication() {
+		return this.authentication;
+	}
+
+	/**
+	 * @param authentication The authentication type. Enables Azure Active Directory Managed Identity authentication when set to 'Managed Identity'.
+	 */
+	public void setAadManagedIdentity(String authentication) {
+		this.authentication = authentication;
+	}
+	
 	/**
 	 * Returns an inter-operable connection string that can be used to connect to ServiceBus Namespace
 	 * @return connection string
@@ -337,6 +365,7 @@ public class ConnectionStringBuilder
 	@Override
 	public String toString()
 	{
+		this.validate();
 		if (StringUtil.isNullOrWhiteSpace(this.connectionString))
 		{
 			StringBuilder connectionStringBuilder = new StringBuilder();
@@ -387,6 +416,12 @@ public class ConnectionStringBuilder
 				connectionStringBuilder.append(String.format(Locale.US, "%s%s%s%s", KEY_VALUE_PAIR_DELIMITER, TRANSPORT_TYPE_CONFIG_NAME,
 						KEY_VALUE_SEPARATOR, this.transportType.toString()));
 			}
+
+            if (this.authentication != null)
+            {
+            	connectionStringBuilder.append(String.format(Locale.US,"%s%s%s%s", KEY_VALUE_PAIR_DELIMITER, 
+            			AUTHENTICATION_CONFIG_NAME, KEY_VALUE_SEPARATOR, this.authentication));
+            }
 
 			this.connectionString = connectionStringBuilder.toString();
 		}
@@ -529,12 +564,34 @@ public class ConnectionStringBuilder
 							exception);
 				}
 			}
+			else if (key.equalsIgnoreCase(AUTHENTICATION_CONFIG_NAME))
+			{
+				this.authentication = values[valueIndex];
+			}
 			else
 			{
 				throw new IllegalConnectionStringFormatException(
 						String.format(Locale.US, "Illegal connection string parameter name: %s", key));
 			}
-		}		
+		}
+		this.validate();
+	}
+
+	private void validate() {
+		// Without "aadAuthentication" field set to a valid value, other AAD fields should not be respected
+        boolean hasAuthentication = !StringUtil.isNullOrEmpty(this.authentication);
+        boolean hasSasAuthentication = !StringUtil.isNullOrEmpty(this.sharedAccessKeyName);
+        boolean hasSharedAccessSignatureToken = !StringUtil.isNullOrEmpty(this.sharedAccessSingatureToken);
+
+        if (hasAuthentication && hasSasAuthentication)
+        {
+            throw new IllegalConnectionStringFormatException("Cannot have Authentication and SharedAccessKeyAuthentication simultaneously.");
+        }
+
+        if (hasAuthentication && hasSharedAccessSignatureToken)
+        {
+        	throw new IllegalConnectionStringFormatException("Cannot have Authentication and SharedAccessSingatureToken simultaneously.");
+        }
 	}
 	
 	// Generates a string that is logged in traces. Excludes secrets

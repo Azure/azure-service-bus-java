@@ -41,6 +41,7 @@ import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.message.Message;
 
 import com.microsoft.azure.servicebus.ClientSettings;
+import com.microsoft.azure.servicebus.security.ManagedIdentityTokenProvider;
 import com.microsoft.azure.servicebus.security.SecurityConstants;
 import com.microsoft.azure.servicebus.security.SharedAccessSignatureTokenProvider;
 import com.microsoft.azure.servicebus.security.TokenProvider;
@@ -434,11 +435,14 @@ public class Util
         }
     }
 
-    @SuppressWarnings("deprecation")
     public static ClientSettings getClientSettingsFromConnectionStringBuilder(ConnectionStringBuilder builder)
     {
         TokenProvider tokenProvider;
-        if(builder.getSharedAccessSignatureToken() == null)
+        if (builder.getAuthentication() != null && builder.getAuthentication().equalsIgnoreCase("Managed Identity"))
+        {
+        	tokenProvider = new ManagedIdentityTokenProvider();
+        }
+        else if (builder.getSharedAccessSignatureToken() == null)
         {
             tokenProvider = new SharedAccessSignatureTokenProvider(builder.getSasKeyName(), builder.getSasKey(), SecurityConstants.DEFAULT_SAS_TOKEN_VALIDITY_IN_SECONDS);
         }
