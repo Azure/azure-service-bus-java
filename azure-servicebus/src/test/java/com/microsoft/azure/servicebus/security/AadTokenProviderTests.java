@@ -67,7 +67,7 @@ public class AadTokenProviderTests {
 		String queuePath = TestUtils.randomizeEntityName(ENTITY_NAME_PREFIX);
 		QueueDescription queueDescription = new QueueDescription(queuePath);
 		queueDescription.setEnablePartitioning(false);
-		managementClient.createQueueAsync(queueDescription).get();
+		managementClient.createQueueAsync(queueDescription).join();
 		
         ConnectionStringBuilder builder = new ConnectionStringBuilder(TestUtils.getNamespaceConnectionString());
         QueueClient queueClient = new QueueClient(builder.getEndpoint(), queuePath, settings, ReceiveMode.PEEKLOCK);
@@ -80,6 +80,7 @@ public class AadTokenProviderTests {
         finally
         {
         	queueClient.close();
+        	managementClient.deleteQueueAsync(queuePath).join();
         }
     }
 
@@ -107,6 +108,7 @@ public class AadTokenProviderTests {
         finally
         {
         	topicClient.close();
+        	managementClient.deleteTopicAsync(topicPath).join();
         }
     }
     
