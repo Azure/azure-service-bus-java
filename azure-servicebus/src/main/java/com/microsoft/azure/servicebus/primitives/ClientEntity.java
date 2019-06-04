@@ -4,6 +4,8 @@
  */
 package com.microsoft.azure.servicebus.primitives;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +23,7 @@ public abstract class ClientEntity
 
 	private boolean isClosing;
 	private boolean isClosed;
+	private List<CompletableFuture<Void>> closeFutures;
 
 	protected ClientEntity(final String clientId)
 	{
@@ -44,8 +47,7 @@ public abstract class ClientEntity
 	}
 	
 	protected boolean getIsClosingOrClosed()
-	{
-		
+	{		
 		synchronized (this.syncClose)
 		{
 			return this.isClosing || this.isClosed;
@@ -63,27 +65,49 @@ public abstract class ClientEntity
 
 	public final CompletableFuture<Void> closeAsync()
 	{
-		if(this.getIsClosingOrClosed())
-		{
-			return CompletableFuture.completedFuture(null);
-		}
-		
 		synchronized (this.syncClose)
 		{
-			this.isClosing = true;
+			if(this.isClosed) {
+				return CompletableFuture.completedFuture(null);
+			}else if (this.isClosing) {
+				if(this.closeFutures == null) {
+					this.closeFutures = new ArrayList<>();
+				}
+				
+				CompletableFuture<Void> closeFuture = new CompletableFuture<>();
+				this.closeFutures.add(closeFuture);
+				return closeFuture;
+			}else {
+				this.isClosing = true;
+			}
 		}
-
-		return this.onClose().thenRunAsync(new Runnable()
-		{
-			@Override
-			public void run()
+		
+		return this.onClose().whenCompleteAsync((v, t) -> {
+			if(t == null)
 			{
-				synchronized (ClientEntity.this.syncClose)
-				{
+				synchronized (ClientEntity.this.syncClose) {
 					ClientEntity.this.isClosing = false;
 					ClientEntity.this.isClosed = true;
+					if(this.closeFutures != null) {
+						for(CompletableFuture<Void> future : this.closeFutures) {
+							AsyncUtil.completeFuture(future, null);
+						}
+					}
 				}
-			}}, MessagingFactory.INTERNAL_THREAD_POOL);
+			}
+			else
+			{
+				// onClose failed with some exception. set isClosing to false, so client can call close again.
+				synchronized (ClientEntity.this.syncClose) {
+					ClientEntity.this.isClosing = false;
+					if(this.closeFutures != null) {
+						for(CompletableFuture<Void> future : this.closeFutures) {
+							AsyncUtil.completeFutureExceptionally(future, t);
+						}
+					}
+				}
+			}
+		}, MessagingFactory.INTERNAL_THREAD_POOL);
 	}
 
 	public final void close() throws ServiceBusException
