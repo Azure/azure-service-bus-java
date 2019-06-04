@@ -76,10 +76,52 @@ public class ClientEntityTests {
 		Assert.assertEquals("OnClose called more than expected number of times", 1, clientEntity.getTotalNumberOfCloseCalls());
 	}
 	
+	@Test
+	public void concurrentEntityCloseFailureTest() throws InterruptedException, ExecutionException {
+		int numConcurrentCalls = 10;
+		Duration sleepInCloseDuration = Duration.ofSeconds(5);
+		TestClientEntity clientEntity = new TestClientEntity(1, sleepInCloseDuration, true);
+		ArrayList<ForkJoinTask<CompletableFuture<Void>>> tasks = new ArrayList<>();
+		
+		for (int i=0; i<numConcurrentCalls + 1; i++)
+		{
+			tasks.add(ForkJoinPool.commonPool().submit(() -> clientEntity.closeAsync()));
+		}
+		
+		for (ForkJoinTask<CompletableFuture<Void>> task : tasks) {
+			Assert.assertFalse("Entity close failed too early.", task.get().isDone());
+		}
+		
+		Assert.assertTrue("Entity not closing even after calling close.", clientEntity.getIsClosingOrClosed());
+		Assert.assertFalse("Entity closed without sleeping.", clientEntity.getIsClosed());
+		
+		Thread.sleep(sleepInCloseDuration.toMillis() + 500); // 500 millis buffer
+		
+		Throwable failureException = null;
+		for (ForkJoinTask<CompletableFuture<Void>> task : tasks) {
+			CompletableFuture<Void> closeFuture = task.get();
+			Assert.assertTrue("Entity close didn't fail even after delay.", closeFuture.isDone());
+			try {
+				closeFuture.get();
+				Assert.fail("Entity close didn't fail.");
+			}catch (ExecutionException ex) {
+				Throwable cause = ex.getCause();
+				if (failureException == null) {
+					failureException = cause;
+				}
+				else
+				{
+					Assert.assertEquals("All concurrent close failures didn't fail with the same exception.", failureException, cause);
+				}
+			}
+		}
+	}
+	
 	class TestClientEntity extends ClientEntity {
 
 		private final Duration sleepDurationInClose;
 		private final int targetNumberOfCloseFailures;
+		private final boolean shouldSleepInFailure;
 		private AtomicInteger numberOfCloseFailures = new AtomicInteger(0);		
 		private AtomicInteger numberOfCloseCalls = new AtomicInteger(0);
 		
@@ -88,9 +130,14 @@ public class ClientEntityTests {
 		}
 		
 		TestClientEntity(int targetNumberOfCloseFailures, Duration sleepDurationInClose) {
+			this(targetNumberOfCloseFailures, sleepDurationInClose, false);
+		}
+		
+		TestClientEntity(int targetNumberOfCloseFailures, Duration sleepDurationInClose, boolean shouldSleepInFailure) {
 			super(UUID.randomUUID().toString());
 			this.sleepDurationInClose = sleepDurationInClose;
 			this.targetNumberOfCloseFailures = targetNumberOfCloseFailures;
+			this.shouldSleepInFailure = shouldSleepInFailure;
 		}
 		
 		@Override
@@ -100,7 +147,26 @@ public class ClientEntityTests {
 			{
 				numberOfCloseFailures.incrementAndGet();
 				CompletableFuture<Void> failFuture = new CompletableFuture<>();
-				failFuture.completeExceptionally(new Exception("Close failed."));
+				if (this.shouldSleepInFailure) {
+					if (this.sleepDurationInClose.isZero()) {
+						failFuture.completeExceptionally(new Exception("Close failed."));
+					} else {
+						Thread completionThread = new Thread(() -> {
+							try {
+								Thread.sleep(this.sleepDurationInClose.toMillis());
+							} catch (InterruptedException e) {
+								Thread.currentThread().interrupt();
+							}
+							
+							failFuture.completeExceptionally(new Exception("Close failed."));
+						});
+						
+						completionThread.start();
+					}
+				} else {
+					failFuture.completeExceptionally(new Exception("Close failed."));
+				}
+				
 				return failFuture;
 			}
 			else
