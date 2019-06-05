@@ -3,7 +3,7 @@ package com.microsoft.azure.servicebus.security;
 
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
+import com.microsoft.azure.servicebus.security.AzureActiveDirectoryTokenProvider.AuthenticationCallback;
 
 /**
  * This abstract class defines the contract of a token provider. All token providers should inherit from this class.
@@ -49,12 +49,12 @@ public abstract class TokenProvider
      * 				   to issue token and provides a security token for the target url
      * @return an instance of Azure Active Directory token provider
      */
-    public static TokenProvider createAzureActiveDirectoryTokenProvider(BiFunction<String, String, SecurityToken> callback, String authority)
+    public static TokenProvider createAzureActiveDirectoryTokenProvider(AuthenticationCallback callback, String authority, Object callbackState)
     {
     	if (callback == null) {
     		throw new IllegalArgumentException("The callback provided cannot be null.");
     	}
-    	return new AzureActiveDirectoryTokenProvider(callback, authority);
+    	return new AzureActiveDirectoryTokenProvider(callback, authority, callbackState);
     }
     
     /**

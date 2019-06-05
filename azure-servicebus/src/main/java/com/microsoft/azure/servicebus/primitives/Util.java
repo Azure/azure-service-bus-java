@@ -41,6 +41,7 @@ import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.message.Message;
 
 import com.microsoft.azure.servicebus.ClientSettings;
+import com.microsoft.azure.servicebus.primitives.ConnectionStringBuilder.AuthenticationType;
 import com.microsoft.azure.servicebus.security.ManagedIdentityTokenProvider;
 import com.microsoft.azure.servicebus.security.SecurityConstants;
 import com.microsoft.azure.servicebus.security.SharedAccessSignatureTokenProvider;
@@ -438,7 +439,7 @@ public class Util
     public static ClientSettings getClientSettingsFromConnectionStringBuilder(ConnectionStringBuilder builder)
     {
         TokenProvider tokenProvider;
-        if (builder.getAuthentication() != null && builder.getAuthentication().equalsIgnoreCase("Managed Identity"))
+        if (builder.getAuthentication() != null && builder.getAuthentication() == AuthenticationType.MANAGED_IDENTITY)
         {
         	tokenProvider = new ManagedIdentityTokenProvider();
         }

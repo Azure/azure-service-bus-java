@@ -1,8 +1,6 @@
 package com.microsoft.azure.servicebus.security;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
-
 import com.microsoft.azure.servicebus.primitives.StringUtil;
 
 /**
@@ -12,17 +10,32 @@ import com.microsoft.azure.servicebus.primitives.StringUtil;
  */
 public class AzureActiveDirectoryTokenProvider extends TokenProvider
 {
-    private final BiFunction<String, String, SecurityToken> callback;
+    private final AuthenticationCallback authCallback;
     private final String authority;
+    private final Object authCallbackState;
     
-    AzureActiveDirectoryTokenProvider(BiFunction<String, String, SecurityToken> callback, String authority)
+    AzureActiveDirectoryTokenProvider(AuthenticationCallback callback, String authority, Object callbackState)
     {
-    	this.callback = callback;
+    	this.authCallback = callback;
     	this.authority = (StringUtil.isNullOrEmpty(authority)) ? "https://login.microsoftonline.com/common" : authority;
+    	this.authCallbackState = callbackState;
     }
     
     @Override
     public CompletableFuture<SecurityToken> getSecurityTokenAsync(String audience) {
-        return CompletableFuture.supplyAsync(() -> this.callback.apply(audience, this.authority));
+    	return this.authCallback.acquireToken(audience, this.authority, this.authCallbackState);
+    }
+    
+    @FunctionalInterface
+    public interface AuthenticationCallback
+    {
+    	/**
+    	 * A user defined method for obtaining an access token.
+    	 * @param audience The target resource that the access token will be granted for.
+    	 * @param authority The resource that will validate the the access token.
+    	 * @param state Parameter that may be used as part of the custom acquireToken process.
+    	 * @return A valid security token.
+    	 */
+    	CompletableFuture<SecurityToken> acquireToken(final String audience, final String authority, final Object state);
     }
 }

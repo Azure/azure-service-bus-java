@@ -17,7 +17,7 @@ import com.google.gson.Gson;
 import com.microsoft.azure.servicebus.primitives.MessagingFactory;
 
 /**
- * This is a token provider that obtains token using Managed Service Identity(MSI). This token provider automatically detects MSI settings.
+ * This is a token provider that obtains token using Managed Identity(MSI). This token provider automatically detects MI settings.
  * @since 1.2.0
  *
  */
@@ -40,7 +40,7 @@ public class ManagedIdentityTokenProvider extends TokenProvider
         MessagingFactory.INTERNAL_THREAD_POOL.execute(() -> {
             try
             {
-                MSIToken msiToken = getMSIToken(addAudienceForSB);
+                MIToken msiToken = getMSIToken(addAudienceForSB);
                 SecurityToken generatedToken = new SecurityToken(SecurityTokenType.JWT, audience, msiToken.getAccessToken(), Instant.EPOCH.plus(Duration.ofSeconds(msiToken.getNotBefore())), Instant.now().plus(Duration.ofSeconds(msiToken.getExpiresIn())));
                 tokenGeneratingFuture.complete(generatedToken);
             }
@@ -54,7 +54,7 @@ public class ManagedIdentityTokenProvider extends TokenProvider
         return tokenGeneratingFuture;
     }
     
-    private static MSIToken getMSIToken(String audience) throws IOException
+    private static MIToken getMSIToken(String audience) throws IOException
     {
         boolean useStaticHttpUrl;
         String localMsiEndPointURL = System.getenv(MSI_ENDPOINT_ENV_VARIABLE);
@@ -100,11 +100,11 @@ public class ManagedIdentityTokenProvider extends TokenProvider
         }
         
         Gson gson = new Gson();
-        MSIToken msiToken = gson.fromJson(responseBuilder.toString(), MSIToken.class);
+        MIToken msiToken = gson.fromJson(responseBuilder.toString(), MIToken.class);
         return msiToken;
     }
     
-    private static class MSIToken
+    private static class MIToken
     {
         private String access_token;
         private String refresh_token;

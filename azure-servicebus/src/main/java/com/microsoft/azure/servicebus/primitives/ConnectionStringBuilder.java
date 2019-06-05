@@ -84,13 +84,42 @@ public class ConnectionStringBuilder
 	private Duration operationTimeout;
 	private RetryPolicy retryPolicy;
 	private TransportType transportType;
-	private String authentication;
+	private AuthenticationType authentication;
 	
 	/**
 	 * Default operation timeout if timeout is not specified in the connection string. 30 seconds.
 	 */
     public static final Duration DefaultOperationTimeout = Duration.ofSeconds(ClientConstants.DEFAULT_OPERATION_TIMEOUT_IN_SECONDS);
 
+    public enum AuthenticationType
+    {
+    	MANAGED_IDENTITY ("Managed Identity");
+    	
+    	private String authType;
+    	
+    	AuthenticationType(String value)
+    	{
+    		authType = value;
+    	}
+    	
+    	public String toString()
+    	{
+    		return authType;
+    	}
+    	
+    	static AuthenticationType ignoreCaseValueOf(String name)
+    	{
+    		for (AuthenticationType value : values())
+    		{
+    			if (value.toString().equalsIgnoreCase(name))
+    			{
+    				return value;
+    			}
+    		}
+    		return null;
+    	}
+    }
+    
 	private ConnectionStringBuilder(
             final URI endpointAddress,
             final String entityPath,
@@ -347,14 +376,14 @@ public class ConnectionStringBuilder
     /**
 	 * @return Returns the authentication method.
 	 */
-	public String getAuthentication() {
+	public AuthenticationType getAuthentication() {
 		return this.authentication;
 	}
 
 	/**
 	 * @param authentication The authentication type. Enables Azure Active Directory Managed Identity authentication when set to 'Managed Identity'.
 	 */
-	public void setAadManagedIdentity(String authentication) {
+	public void setAadManagedIdentity(AuthenticationType authentication) {
 		this.authentication = authentication;
 	}
 	
@@ -420,7 +449,7 @@ public class ConnectionStringBuilder
             if (this.authentication != null)
             {
             	connectionStringBuilder.append(String.format(Locale.US,"%s%s%s%s", KEY_VALUE_PAIR_DELIMITER, 
-            			AUTHENTICATION_CONFIG_NAME, KEY_VALUE_SEPARATOR, this.authentication));
+            			AUTHENTICATION_CONFIG_NAME, KEY_VALUE_SEPARATOR, this.authentication.toString()));
             }
 
 			this.connectionString = connectionStringBuilder.toString();
@@ -566,7 +595,7 @@ public class ConnectionStringBuilder
 			}
 			else if (key.equalsIgnoreCase(AUTHENTICATION_CONFIG_NAME))
 			{
-				this.authentication = values[valueIndex];
+				this.authentication = AuthenticationType.ignoreCaseValueOf(values[valueIndex]);
 			}
 			else
 			{
@@ -579,7 +608,7 @@ public class ConnectionStringBuilder
 
 	private void validate() {
 		// Without "aadAuthentication" field set to a valid value, other AAD fields should not be respected
-        boolean hasAuthentication = !StringUtil.isNullOrEmpty(this.authentication);
+        boolean hasAuthentication = this.authentication != null;
         boolean hasSasAuthentication = !StringUtil.isNullOrEmpty(this.sharedAccessKeyName);
         boolean hasSharedAccessSignatureToken = !StringUtil.isNullOrEmpty(this.sharedAccessSingatureToken);
 
