@@ -416,4 +416,175 @@ final public class Message implements Serializable, IMessage {
 		
 		return copy;
 	}
+	
+		@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+			+ ((contentType == null) ? 0 : contentType.hashCode());
+		result = prime * result
+			+ ((correlationId == null) ? 0 : correlationId.hashCode());
+		result = prime * result
+			+ ((deadLetterSource == null) ? 0 : deadLetterSource.hashCode());
+		result = prime * result
+			+ (int) (deliveryCount ^ (deliveryCount >>> 32));
+		result = prime * result + Arrays.hashCode(deliveryTag);
+		result = prime * result
+			+ ((enqueuedTimeUtc == null) ? 0 : enqueuedTimeUtc.hashCode());
+		result = prime * result + ((label == null) ? 0 : label.hashCode());
+		result = prime * result
+			+ ((lockToken == null) ? 0 : lockToken.hashCode());
+		result = prime * result
+			+ ((lockedUntilUtc == null) ? 0 : lockedUntilUtc.hashCode());
+		result = prime * result
+			+ ((messageBody == null) ? 0 : messageBody.hashCode());
+		result = prime * result
+			+ ((messageId == null) ? 0 : messageId.hashCode());
+		result = prime * result
+			+ ((partitionKey == null) ? 0 : partitionKey.hashCode());
+		result = prime * result
+			+ ((properties == null) ? 0 : properties.hashCode());
+		result = prime * result + ((replyTo == null) ? 0 : replyTo.hashCode());
+		result = prime * result
+			+ ((replyToSessionId == null) ? 0 : replyToSessionId.hashCode());
+		result = prime * result + ((scheduledEnqueueTimeUtc == null) ? 0
+			: scheduledEnqueueTimeUtc.hashCode());
+		result = prime * result
+			+ (int) (sequenceNumber ^ (sequenceNumber >>> 32));
+		result = prime * result
+			+ ((sessionId == null) ? 0 : sessionId.hashCode());
+		result = prime * result
+			+ ((timeToLive == null) ? 0 : timeToLive.hashCode());
+		result = prime * result + ((to == null) ? 0 : to.hashCode());
+		result = prime * result
+			+ ((viaPartitionKey == null) ? 0 : viaPartitionKey.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Message other = (Message) obj;
+		if (contentType == null) {
+			if (other.contentType != null)
+				return false;
+		}
+		else if (!contentType.equals(other.contentType))
+			return false;
+		if (correlationId == null) {
+			if (other.correlationId != null)
+				return false;
+		}
+		else if (!correlationId.equals(other.correlationId))
+			return false;
+		if (deadLetterSource == null) {
+			if (other.deadLetterSource != null)
+				return false;
+		}
+		else if (!deadLetterSource.equals(other.deadLetterSource))
+			return false;
+		if (deliveryCount != other.deliveryCount)
+			return false;
+		if (!Arrays.equals(deliveryTag, other.deliveryTag))
+			return false;
+		if (enqueuedTimeUtc == null) {
+			if (other.enqueuedTimeUtc != null)
+				return false;
+		}
+		else if (!enqueuedTimeUtc.equals(other.enqueuedTimeUtc))
+			return false;
+		if (label == null) {
+			if (other.label != null)
+				return false;
+		}
+		else if (!label.equals(other.label))
+			return false;
+		if (lockToken == null) {
+			if (other.lockToken != null)
+				return false;
+		}
+		else if (!lockToken.equals(other.lockToken))
+			return false;
+		if (lockedUntilUtc == null) {
+			if (other.lockedUntilUtc != null)
+				return false;
+		}
+		else if (!lockedUntilUtc.equals(other.lockedUntilUtc))
+			return false;
+		if (messageBody == null) {
+			if (other.messageBody != null)
+				return false;
+		}
+		else if (!messageBody.equals(other.messageBody))
+			return false;
+		if (messageId == null) {
+			if (other.messageId != null)
+				return false;
+		}
+		else if (!messageId.equals(other.messageId))
+			return false;
+		if (partitionKey == null) {
+			if (other.partitionKey != null)
+				return false;
+		}
+		else if (!partitionKey.equals(other.partitionKey))
+			return false;
+		if (properties == null) {
+			if (other.properties != null)
+				return false;
+		}
+		else if (!properties.equals(other.properties))
+			return false;
+		if (replyTo == null) {
+			if (other.replyTo != null)
+				return false;
+		}
+		else if (!replyTo.equals(other.replyTo))
+			return false;
+		if (replyToSessionId == null) {
+			if (other.replyToSessionId != null)
+				return false;
+		}
+		else if (!replyToSessionId.equals(other.replyToSessionId))
+			return false;
+		if (scheduledEnqueueTimeUtc == null) {
+			if (other.scheduledEnqueueTimeUtc != null)
+				return false;
+		}
+		else if (!scheduledEnqueueTimeUtc.equals(other.scheduledEnqueueTimeUtc))
+			return false;
+		if (sequenceNumber != other.sequenceNumber)
+			return false;
+		if (sessionId == null) {
+			if (other.sessionId != null)
+				return false;
+		}
+		else if (!sessionId.equals(other.sessionId))
+			return false;
+		if (timeToLive == null) {
+			if (other.timeToLive != null)
+				return false;
+		}
+		else if (!timeToLive.equals(other.timeToLive))
+			return false;
+		if (to == null) {
+			if (other.to != null)
+				return false;
+		}
+		else if (!to.equals(other.to))
+			return false;
+		if (viaPartitionKey == null) {
+			if (other.viaPartitionKey != null)
+				return false;
+		}
+		else if (!viaPartitionKey.equals(other.viaPartitionKey))
+			return false;
+		return true;
+	}
 }
