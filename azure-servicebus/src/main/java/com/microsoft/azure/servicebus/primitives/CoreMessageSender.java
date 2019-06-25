@@ -86,6 +86,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private CompletableFuture<Void> requestResponseLinkCreationFuture;
 	private CompletableFuture<Void> sendLinkReopenFuture;
 	private int maxMessageSize;
+	private boolean shouldRetryLinkOpenIfConnectionIsClosedAfterCBSTokenSent = true;
 
 	@Deprecated
 	public static CompletableFuture<CoreMessageSender> create(
@@ -375,6 +376,7 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	@Override
 	public void onOpenComplete(Exception completionException)
 	{
+		this.shouldRetryLinkOpenIfConnectionIsClosedAfterCBSTokenSent = true;
 		if (completionException == null)
 		{
 		    this.maxMessageSize = Util.getMaxMessageSizeFromLink(this.sendLink);
@@ -576,13 +578,35 @@ public class CoreMessageSender extends ClientEntity implements IAmqpSender, IErr
 	private void createSendLink()
 	{
 	    TRACE_LOGGER.info("Creating send link to '{}'", this.sendPath);
-		final Connection connection = this.underlyingFactory.getConnection();
+		Connection connection = this.underlyingFactory.getActiveConnectionOrNothing();
+		if (connection == null) {
+			// Connection closed after sending CBS token. Happens only in the rare case of azure service bus closing idle connection, just right after sending
+			// CBS token but before opening a link.
+			TRACE_LOGGER.warn("Idle connection closed by service just after sending CBS token. Very rare case. Will retry.");
+			ServiceBusException exception = new ServiceBusException(true, "Idle connection closed by service just after sending CBS token. Please retry.");
+			if (this.linkFirstOpen != null && !this.linkFirstOpen.isDone()) {
+				// Should never happen
+				AsyncUtil.completeFutureExceptionally(this.linkFirstOpen, exception);
+			}
+			
+			if (this.sendLinkReopenFuture != null && !this.sendLinkReopenFuture.isDone()) {
+				// Complete the future and re-attempt link creation
+				AsyncUtil.completeFutureExceptionally(this.sendLinkReopenFuture, exception);
+				if(this.shouldRetryLinkOpenIfConnectionIsClosedAfterCBSTokenSent) {
+					this.shouldRetryLinkOpenIfConnectionIsClosedAfterCBSTokenSent = false;
+					Timer.schedule(() -> {this.ensureLinkIsOpen();}, Duration.ZERO, TimerType.OneTimeRun);
+				}
+			}
+			
+			return;
+		}
+		
 		final Session session = connection.session();
 		session.setOutgoingWindow(Integer.MAX_VALUE);
 		session.open();
 		BaseHandler.setHandler(session, new SessionHandler(sendPath));
 
-		final String sendLinkNamePrefix = StringUtil.getShortRandomString();
+		final String sendLinkNamePrefix = "sender".concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(StringUtil.getShortRandomString());
 		final String sendLinkName = !StringUtil.isNullOrEmpty(connection.getRemoteContainer()) ?
 				sendLinkNamePrefix.concat(TrackingUtil.TRACKING_ID_TOKEN_SEPARATOR).concat(connection.getRemoteContainer()) :
 				sendLinkNamePrefix;
