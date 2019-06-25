@@ -102,11 +102,13 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private ScheduledFuture<?> sasTokenRenewTimerFuture;
 	private CompletableFuture<Void> requestResponseLinkCreationFuture;
 	private CompletableFuture<Void> receiveLinkReopenFuture;
+	private CompletableFuture<Void> ensureLinkReopenFutureToWaitOn;
 	private final Runnable timedOutUpdateStateRequestsDaemon;
 	private final Runnable returnMesagesLoopDaemon;
 	private final ScheduledFuture<?> updateStateRequestsTimeoutChecker;
 	private final ScheduledFuture<?> returnMessagesLoopRunner;
 	private final MessagingEntityType entityType;
+	private boolean shouldRetryLinkReopenOnTransientFailure = true;
 	
 	// TODO Change onReceiveComplete to handle empty deliveries. Change onError to retry updateState requests.
 	private CoreMessageReceiver(final MessagingFactory factory,
@@ -370,8 +372,25 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private void createReceiveLink()
 	{
 	    TRACE_LOGGER.info("Creating receive link to '{}'", this.receivePath);
-		Connection connection = this.underlyingFactory.getConnection();	
-
+		Connection connection = this.underlyingFactory.getActiveConnectionOrNothing();
+		if (connection == null) {
+			// Connection closed after sending CBS token. Happens only in the rare case of azure service bus closing idle connection, just right after sending
+			// CBS token but before opening a link.
+			TRACE_LOGGER.warn("Idle connection closed by service just after sending CBS token. Very rare case. Will retry.");
+			ServiceBusException exception = new ServiceBusException(true, "Idle connection closed by service just after sending CBS token. Please retry.");
+			if (this.linkOpen != null && !this.linkOpen.getWork().isDone()) {
+				// Should never happen
+				AsyncUtil.completeFutureExceptionally(this.linkOpen.getWork(), exception);
+			}
+			
+			if(this.receiveLinkReopenFuture != null && !this.receiveLinkReopenFuture.isDone()) {
+				// Complete the future and re-attempt link creation
+				AsyncUtil.completeFutureExceptionally(this.receiveLinkReopenFuture, exception);
+			}
+			
+			return;
+		}
+		
 		final Session session = connection.session();
 		session.setIncomingCapacity(Integer.MAX_VALUE);
 		session.open();
@@ -877,7 +896,7 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	            catch (IOException ioException)
 	            {
 	                this.pendingReceives.remove(receiveWorkItem);
-	                this.reduceCreditForCompletedReceiveRequest(receiveWorkItem.getMaxMessageCount());	                
+	                this.reduceCreditForCompletedReceiveRequest(receiveWorkItem.getMaxMessageCount());
 	                receiveWorkItem.getWork().completeExceptionally(generateDispatacherSchedulingFailedException("completeMessage", ioException));
 	                receiveWorkItem.cancelTimeoutTask(false);
 	            }
@@ -1191,7 +1210,33 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	            }, MessagingFactory.INTERNAL_THREAD_POOL);
 		    }
 		    
-		    return this.receiveLinkReopenFuture;
+		    if (this.ensureLinkReopenFutureToWaitOn == null || this.ensureLinkReopenFutureToWaitOn.isDone()) {
+		    	this.ensureLinkReopenFutureToWaitOn = new CompletableFuture<Void>();
+		    	this.shouldRetryLinkReopenOnTransientFailure = true;
+		    }
+		    
+		    this.receiveLinkReopenFuture.handleAsync((v, ex) -> {
+		    	if (ex == null) {
+		    		this.ensureLinkReopenFutureToWaitOn.complete(null);
+		    	} else {
+		    		if (ex instanceof ServiceBusException && ((ServiceBusException)ex).getIsTransient()) {
+		    			if (this.shouldRetryLinkReopenOnTransientFailure) {
+		    				// Retry link creation
+		    				this.shouldRetryLinkReopenOnTransientFailure = false;
+		    				this.ensureLinkIsOpen();
+		    			} else {
+		    				this.ensureLinkReopenFutureToWaitOn.completeExceptionally(ex);
+		    			}
+		    		} else {
+		    			this.ensureLinkReopenFutureToWaitOn.completeExceptionally(ex);
+		    		}
+		    		
+		    	}
+		    	return null;
+		    }, 
+		    MessagingFactory.INTERNAL_THREAD_POOL);
+		    
+		    return this.ensureLinkReopenFutureToWaitOn;
 		}
 		else
 		{

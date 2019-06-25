@@ -140,7 +140,17 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 		TRACE_LOGGER.info("Started reactor");
 	}
 	
-	Connection getConnection()
+	Connection getActiveConnectionOrNothing()
+	{
+		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED) {
+			return null;
+		}
+		else {
+			return this.connection;
+		}
+	}
+	
+	Connection getActiveConnectionCreateIfNecessary()
 	{
 		if (this.connection == null || this.connection.getLocalState() == EndpointState.CLOSED || this.connection.getRemoteState() == EndpointState.CLOSED)
 		{
@@ -667,7 +677,7 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
 	        this.cbsLinkCreationFuture.completeExceptionally(completionEx);
 	    }
 	    else
-	    {	        
+	    {
 	        String requestResponseLinkPath = RequestResponseLink.getCBSNodeLinkPath();
 	        TRACE_LOGGER.info("Creating CBS link to {}", requestResponseLinkPath);
 	        RequestResponseLink.createAsync(this, this.getClientId() + "-cbs", requestResponseLinkPath, null, null).handleAsync((cbsLink, ex) ->
