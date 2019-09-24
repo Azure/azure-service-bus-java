@@ -105,10 +105,10 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 	private CompletableFuture<Void> ensureLinkReopenFutureToWaitOn;
 	private final Runnable timedOutUpdateStateRequestsDaemon;
 	private final Runnable returnMesagesLoopDaemon;
-	private final ScheduledFuture<?> updateStateRequestsTimeoutChecker;
-	private final ScheduledFuture<?> returnMessagesLoopRunner;
 	private final MessagingEntityType entityType;
 	private boolean shouldRetryLinkReopenOnTransientFailure = true;
+	private ScheduledFuture<?> updateStateRequestsTimeoutChecker;
+	private ScheduledFuture<?> returnMessagesLoopRunner;
 	
 	// TODO Change onReceiveComplete to handle empty deliveries. Change onError to retry updateState requests.
 	private CoreMessageReceiver(final MessagingFactory factory,
@@ -151,6 +151,12 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			public void run() {
 			    try
 			    {
+			    	if (CoreMessageReceiver.this.getIsClosed())
+			    	{
+			    		CoreMessageReceiver.this.updateStateRequestsTimeoutChecker.cancel(true);
+			    		return;
+			    	}
+			    	
 			        TRACE_LOGGER.trace("Starting '{}' core message receiver's internal loop to complete timed out update state requests.", CoreMessageReceiver.this.receivePath);
 			        for(Map.Entry<String, UpdateStateWorkItem> entry : CoreMessageReceiver.this.pendingUpdateStateRequests.entrySet())
 	                {
@@ -182,6 +188,12 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             public void run() {
                 try
                 {
+                	if (CoreMessageReceiver.this.getIsClosed())
+			    	{
+			    		CoreMessageReceiver.this.returnMessagesLoopRunner.cancel(true);
+			    		return;
+			    	}
+                	
                     TRACE_LOGGER.trace("Starting '{}' core message receiver's internal loop to return messages to waiting clients.", CoreMessageReceiver.this.receivePath);
                     while(!CoreMessageReceiver.this.prefetchedMessages.isEmpty())
                     {
@@ -210,11 +222,6 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
                 }
             }
         };
-		
-		// As all update state requests have the same timeout, one timer is better than having one timer per request
-		this.updateStateRequestsTimeoutChecker = Timer.schedule(timedOutUpdateStateRequestsDaemon, CoreMessageReceiver.UPDATE_STATE_REQUESTS_DAEMON_WAKE_UP_INTERVAL, TimerType.RepeatRun);
-		// Scheduling it as a separate thread that wakes up at regular very short intervals.. Doesn't wait on incoming receive requests from callers or incoming deliveries from reactor 
-		this.returnMessagesLoopRunner = Timer.schedule(returnMesagesLoopDaemon, CoreMessageReceiver.RETURN_MESSAGES_DAEMON_WAKE_UP_INTERVAL, TimerType.RepeatRun);
 	}
 
 	// Connection has to be associated with Reactor before Creating a receiver on it.
@@ -636,6 +643,11 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
 			if (this.linkOpen != null && !this.linkOpen.getWork().isDone())
 			{
 				AsyncUtil.completeFuture(this.linkOpen.getWork(), this);
+				
+				// As all update state requests have the same timeout, one timer is better than having one timer per request
+				this.updateStateRequestsTimeoutChecker = Timer.schedule(timedOutUpdateStateRequestsDaemon, CoreMessageReceiver.UPDATE_STATE_REQUESTS_DAEMON_WAKE_UP_INTERVAL, TimerType.RepeatRun);
+				// Scheduling it as a separate thread that wakes up at regular very short intervals.. Doesn't wait on incoming receive requests from callers or incoming deliveries from reactor 
+				this.returnMessagesLoopRunner = Timer.schedule(returnMesagesLoopDaemon, CoreMessageReceiver.RETURN_MESSAGES_DAEMON_WAKE_UP_INTERVAL, TimerType.RepeatRun);
 			}
 			
 			if(this.receiveLinkReopenFuture != null && !this.receiveLinkReopenFuture.isDone())
