@@ -57,7 +57,18 @@ public abstract class ClientEntity
 	{
 		synchronized (this.syncClose)
 		{
+			this.isClosing = false;
 			this.isClosed = true;
+		}
+	}
+	
+	protected final void setClosing()
+	{
+		synchronized (this.syncClose)
+		{
+			if (!this.isClosed) {
+				this.isClosing = true;
+			}
 		}
 	}
 
