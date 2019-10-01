@@ -60,7 +60,7 @@ public final class ReceiveLinkHandler extends BaseLinkHandler
 			}
 			else
 			{				
-				TRACE_LOGGER.debug("onLinkRemoteOpen: linkName:{}, remoteTarget:{}, remoteTarget:{}, action:{}", receiver.getName(), null, null, "waitingForError");
+				TRACE_LOGGER.debug("onLinkRemoteOpen: linkName:{}, remoteSource:{}, remoteTarget:{}, action:{}", receiver.getName(), null, null, "waitingForError");
 			}
 		}
 	}
