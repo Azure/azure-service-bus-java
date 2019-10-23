@@ -723,12 +723,4 @@ public class MessagingFactory extends ClientEntity implements IAmqpConnection
             }
         }
     }
-	
-	@Override
-    protected void finalize() throws Throwable {
-    	if (!this.getIsClosingOrClosed()) {
-    		this.closeAsync();
-    	}
-    	super.finalize();
-    }
 }
