@@ -1051,8 +1051,12 @@ public class CoreMessageReceiver extends ClientEntity implements IAmqpReceiver, 
             
             this.cancelSASTokenRenewTimer();
             this.closeRequestResponseLink();
-            this.updateStateRequestsTimeoutChecker.cancel(false);
-            this.returnMessagesLoopRunner.cancel(false);
+            if (this.updateStateRequestsTimeoutChecker != null) {
+            	this.updateStateRequestsTimeoutChecker.cancel(false);
+            }
+            if (this.returnMessagesLoopRunner != null) {
+            	this.returnMessagesLoopRunner.cancel(false);
+            }
         }
 	}
 	
