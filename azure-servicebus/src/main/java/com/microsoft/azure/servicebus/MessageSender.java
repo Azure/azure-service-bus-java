@@ -73,7 +73,7 @@ final class MessageSender extends InitializableEntity implements IMessageSender 
                     if (TRACE_LOGGER.isInfoEnabled()) {
                         TRACE_LOGGER.info("Created MessagingFactory to namespace '{}'", this.namespaceEndpointURI.toString());
                     }
-                });
+                }, MessagingFactory.INTERNAL_THREAD_POOL);
             } else {
                 factoryFuture = CompletableFuture.completedFuture(null);
             }
