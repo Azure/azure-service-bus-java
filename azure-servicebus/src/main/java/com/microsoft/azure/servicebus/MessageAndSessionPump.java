@@ -164,10 +164,10 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
                     } else {
                         TRACE_LOGGER.trace("Message with sequence number '{}' received from entity '{}'.", message.getSequenceNumber(), this.entityPath);
                         // Start renew lock loop
-                        final MessgeRenewLockLoop renewLockLoop;
+                        final MessageRenewLockLoop renewLockLoop;
                         if (this.innerReceiver.getReceiveMode() == ReceiveMode.PEEKLOCK) {
                             Instant stopRenewMessageLockAt = Instant.now().plus(this.messageHandlerOptions.getMaxAutoRenewDuration());
-                            renewLockLoop = new MessgeRenewLockLoop(this.innerReceiver, this, message, stopRenewMessageLockAt);
+                            renewLockLoop = new MessageRenewLockLoop(this.innerReceiver, this, message, stopRenewMessageLockAt);
                             renewLockLoop.startLoop();
                             TRACE_LOGGER.trace("Started loop to renew lock on message with sequence number '{}' until '{}'", message.getSequenceNumber(), stopRenewMessageLockAt);
                         } else {
@@ -554,7 +554,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         }
     }
 
-    private static class MessgeRenewLockLoop extends RenewLockLoop {
+    private static class MessageRenewLockLoop extends RenewLockLoop {
         private IMessageReceiver innerReceiver;
         private MessageAndSessionPump messageAndSessionPump;
         private IMessage message;
@@ -562,7 +562,7 @@ class MessageAndSessionPump extends InitializableEntity implements IMessageAndSe
         private String messageIdentifier;
         ScheduledFuture<?> timerFuture;
 
-        MessgeRenewLockLoop(IMessageReceiver innerReceiver, MessageAndSessionPump messageAndSessionPump, IMessage message, Instant stopRenewalAt) {
+        MessageRenewLockLoop(IMessageReceiver innerReceiver, MessageAndSessionPump messageAndSessionPump, IMessage message, Instant stopRenewalAt) {
             super();
             this.innerReceiver = innerReceiver;
             this.messageAndSessionPump = messageAndSessionPump;
