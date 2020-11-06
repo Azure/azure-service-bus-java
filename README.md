@@ -25,7 +25,7 @@ See our [Contribution Guidelines](./.github/CONTRIBUTING.md).
 
 ## FAQ
 ### Where is the API document?
-Click [here](https://docs.microsoft.com/en-us/java/api/overview/azure/servicebus/clientlibrary).
+Click [here](https://docs.microsoft.com/en-us/java/api/overview/azure/servicebus?view=azure-java-stable).
 
 ### Where can I find examples that use this library?
 
